@@ -1,0 +1,80 @@
+{
+  "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
+  "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z",
+  "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or final review checkpoint.",
+  "status": "needs_review",
+  "summary": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+  "currentStep": "stage_1",
+  "currentStageLabel": "Section 1",
+  "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+  "retryCount": 0,
+  "handoffCount": 0,
+  "validationErrors": [
+    "mat-input-3",
+    "Email",
+    "Mobile +1",
+    "Current CTC"
+  ],
+  "subgoals": [
+    {
+      "id": "open_job_page",
+      "label": "Open job page",
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 5,
+      "lastUpdatedAt": "2026-05-21T10:24:50.833Z",
+      "completedAt": "2026-05-21T10:24:50.833Z"
+    },
+    {
+      "id": "authenticate_if_needed",
+      "label": "Handle login if needed",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-21T10:00:04.549Z"
+    },
+    {
+      "id": "finish_current_section",
+      "label": "Finish active section",
+      "status": "running",
+      "detail": "Resume upload completed. Re-reading the current section.",
+      "attempts": 17,
+      "lastUpdatedAt": "2026-05-21T10:25:02.010Z"
+    },
+    {
+      "id": "recover_from_validation_errors",
+      "label": "Recover from validation errors",
+      "status": "blocked",
+      "detail": "Validation or required-answer blockers were found: Mobile +1, Current CTC.",
+      "attempts": 3,
+      "lastUpdatedAt": "2026-05-21T10:25:04.750Z"
+    },
+    {
+      "id": "retry_alternative_path",
+      "label": "Retry alternative path",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-21T10:00:04.549Z"
+    },
+    {
+      "id": "reach_submit_gate",
+      "label": "Reach submit/review gate",
+      "status": "blocked",
+      "detail": "Reached the final step but could not safely finish the submit action.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-21T10:07:15.433Z",
+      "completedAt": "2026-05-21T10:07:14.907Z"
+    },
+    {
+      "id": "save_checkpoint",
+      "label": "Save checkpoint",
+      "status": "completed",
+      "detail": "Saved planner state at the final manual review checkpoint.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-21T10:07:15.433Z",
+      "completedAt": "2026-05-21T10:07:15.433Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-21T10:25:05.058Z"
+}

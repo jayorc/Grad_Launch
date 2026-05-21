@@ -1,0 +1,117 @@
+{
+  "intent": "browser_fill",
+  "outcome": "blocked",
+  "externalSubmitted": false,
+  "confirmation": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1941\n[pid=1941] <gracefully close start>",
+  "submittedAt": "2026-05-21T10:40:59.896Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "jaynrk200211@gmail.com",
+    "subject": "GradLaunch filled Stripe - Network Solution Specialist",
+    "sentAt": "2026-05-21T10:40:59.896Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "blocked",
+    "sourceUrl": "https://stripe.com/jobs/search?gh_jid=7589978",
+    "openedAt": "2026-05-21T10:40:58.280Z",
+    "completedAt": "2026-05-21T10:40:59.882Z",
+    "filledLabels": [],
+    "skippedLabels": [
+      "First name",
+      "Last name",
+      "Full name",
+      "Email",
+      "Confirm your email",
+      "City",
+      "Phone number",
+      "Degree",
+      "Graduation year",
+      "Preferred location",
+      "Target role",
+      "Work authorization",
+      "Legally authorized to work",
+      "Visa sponsorship required",
+      "Visa required",
+      "Current CTC",
+      "Current salary",
+      "Message to the Hiring Team",
+      "Primary skills",
+      "Resume context",
+      "Why are you interested in this role?",
+      "What makes you a match?"
+    ],
+    "screenshots": [],
+    "message": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1941\n[pid=1941] <gracefully close start>",
+    "planner": {
+      "sessionId": "planner-job_greenhouse_c3RyaXBlLTc1ODk5Nzg",
+      "resumeToken": "job_greenhouse_c3RyaXBlLTc1ODk5Nzg:2026-05-21T10:40:58.280Z",
+      "goal": "Complete the Network Solution Specialist application at Stripe autonomously until a protected or final review checkpoint.",
+      "status": "blocked",
+      "summary": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1941\n[pid=1941] <gracefully close start>",
+      "retryCount": 0,
+      "handoffCount": 0,
+      "validationErrors": [],
+      "subgoals": [
+        {
+          "id": "open_job_page",
+          "label": "Open job page",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:40:58.280Z"
+        },
+        {
+          "id": "authenticate_if_needed",
+          "label": "Handle login if needed",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:40:58.280Z"
+        },
+        {
+          "id": "finish_current_section",
+          "label": "Finish active section",
+          "status": "blocked",
+          "detail": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1941\n[pid=1941] <gracefully close start>",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-21T10:40:59.882Z"
+        },
+        {
+          "id": "recover_from_validation_errors",
+          "label": "Recover from validation errors",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:40:58.280Z"
+        },
+        {
+          "id": "retry_alternative_path",
+          "label": "Retry alternative path",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:40:58.280Z"
+        },
+        {
+          "id": "reach_submit_gate",
+          "label": "Reach submit/review gate",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:40:58.280Z"
+        },
+        {
+          "id": "save_checkpoint",
+          "label": "Save checkpoint",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:40:58.280Z"
+        }
+      ],
+      "lastUpdatedAt": "2026-05-21T10:40:59.882Z"
+    }
+  }
+}

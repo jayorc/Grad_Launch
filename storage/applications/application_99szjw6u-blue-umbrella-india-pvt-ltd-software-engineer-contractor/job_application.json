@@ -1,0 +1,247 @@
+{
+  "applicationId": "application_99szjw6u",
+  "studentId": "student_tcgn9yq4",
+  "jobId": "job_url_aHR0cHM6Ly9hbWxyaWdodHNv",
+  "status": "blocked",
+  "sourceLabel": "Pasted URL",
+  "matchScore": 54,
+  "generatedArtifacts": {
+    "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd.",
+    "coverLetterExcerpt": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd, where I can bring my JavaScript, React, Next.js experience as an aspiring a.",
+    "shortAnswers": [
+      {
+        "question": "Why are you interested in this role?",
+        "answer": "This role aligns with my goal of becoming a a and uses skills I have already practiced through projects and coursework."
+      },
+      {
+        "question": "What makes you a match?",
+        "answer": "My background in JavaScript, React, Next.js, Node.js closely matches the technical expectations in the job description."
+      }
+    ]
+  },
+  "uploadedDocuments": [
+    "jay_kumar_gupta_nit_kkr.pdf",
+    "tailored_resume_summary.txt",
+    "cover_letter_excerpt.txt",
+    "short_answers.json"
+  ],
+  "run": {
+    "id": "run_591mdmhe",
+    "status": "blocked",
+    "executionMode": "browser_apply",
+    "filledFields": [
+      {
+        "label": "First name",
+        "value": "Jay"
+      },
+      {
+        "label": "Last name",
+        "value": "Kumar Gupta"
+      },
+      {
+        "label": "Full name",
+        "value": "Jay Kumar Gupta"
+      },
+      {
+        "label": "Email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "Confirm your email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "City",
+        "value": "a"
+      },
+      {
+        "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Degree",
+        "value": "B.Tech in Computer ScienceCGPA: 8.67"
+      },
+      {
+        "label": "Graduation year",
+        "value": "2020"
+      },
+      {
+        "label": "Preferred location",
+        "value": "a"
+      },
+      {
+        "label": "Target role",
+        "value": "a"
+      },
+      {
+        "label": "Work authorization",
+        "value": "Yes"
+      },
+      {
+        "label": "Legally authorized to work",
+        "value": "Yes"
+      },
+      {
+        "label": "Visa sponsorship required",
+        "value": "No"
+      },
+      {
+        "label": "Visa required",
+        "value": "No"
+      },
+      {
+        "label": "Current CTC",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Current salary",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Message to the Hiring Team",
+        "value": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+      },
+      {
+        "label": "Primary skills",
+        "value": "JavaScript, React, Next.js, Node.js, Express"
+      },
+      {
+        "label": "Resume context",
+        "value": "jay_kumar_gupta_nit_kkr.pdf"
+      },
+      {
+        "label": "Why are you interested in this role?",
+        "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+      },
+      {
+        "label": "What makes you a match?",
+        "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+      }
+    ],
+    "submission": {
+      "intent": "browser_fill",
+      "outcome": "blocked",
+      "externalSubmitted": false,
+      "confirmation": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
+      "submittedAt": "2026-05-21T10:40:48.912Z",
+      "email": {
+        "status": "skipped",
+        "provider": "outbox",
+        "to": "jaynrk200211@gmail.com",
+        "subject": "GradLaunch filled Blue Umbrella India Pvt Ltd - Software Engineer Contractor",
+        "sentAt": "2026-05-21T10:40:48.912Z",
+        "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+      },
+      "browser": {
+        "status": "blocked",
+        "sourceUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+        "openedAt": "2026-05-21T10:40:47.089Z",
+        "completedAt": "2026-05-21T10:40:48.901Z",
+        "filledLabels": [],
+        "skippedLabels": [
+          "First name",
+          "Last name",
+          "Full name",
+          "Email",
+          "Confirm your email",
+          "City",
+          "Phone number",
+          "Degree",
+          "Graduation year",
+          "Preferred location",
+          "Target role",
+          "Work authorization",
+          "Legally authorized to work",
+          "Visa sponsorship required",
+          "Visa required",
+          "Current CTC",
+          "Current salary",
+          "Message to the Hiring Team",
+          "Primary skills",
+          "Resume context",
+          "Why are you interested in this role?",
+          "What makes you a match?"
+        ],
+        "screenshots": [],
+        "message": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
+        "planner": {
+          "sessionId": "planner-job_url_aHR0cHM6Ly9hbWxyaWdodHNv",
+          "resumeToken": "job_url_aHR0cHM6Ly9hbWxyaWdodHNv:2026-05-21T10:40:47.089Z",
+          "goal": "Complete the Software Engineer Contractor application at Blue Umbrella India Pvt Ltd autonomously until a protected or final review checkpoint.",
+          "status": "blocked",
+          "summary": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
+          "retryCount": 0,
+          "handoffCount": 0,
+          "validationErrors": [],
+          "subgoals": [
+            {
+              "id": "open_job_page",
+              "label": "Open job page",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+            },
+            {
+              "id": "authenticate_if_needed",
+              "label": "Handle login if needed",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+            },
+            {
+              "id": "finish_current_section",
+              "label": "Finish active section",
+              "status": "blocked",
+              "detail": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-21T10:40:48.901Z"
+            },
+            {
+              "id": "recover_from_validation_errors",
+              "label": "Recover from validation errors",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+            },
+            {
+              "id": "retry_alternative_path",
+              "label": "Retry alternative path",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+            },
+            {
+              "id": "reach_submit_gate",
+              "label": "Reach submit/review gate",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+            },
+            {
+              "id": "save_checkpoint",
+              "label": "Save checkpoint",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+            }
+          ],
+          "lastUpdatedAt": "2026-05-21T10:40:48.901Z"
+        }
+      }
+    },
+    "notes": [
+      "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
+      "Browser fill status: blocked.",
+      "Filled fields: 0. Skipped fields: 22."
+    ]
+  },
+  "createdAt": "2026-05-20T10:47:37.896Z",
+  "updatedAt": "2026-05-21T10:40:48.912Z"
+}

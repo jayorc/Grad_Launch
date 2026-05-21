@@ -1,0 +1,14 @@
+[
+  {
+    "label": "Full name",
+    "value": "Aarav Sharma"
+  },
+  {
+    "label": "Email",
+    "value": "aarav@example.com"
+  },
+  {
+    "label": "Location",
+    "value": "Bengaluru"
+  }
+]

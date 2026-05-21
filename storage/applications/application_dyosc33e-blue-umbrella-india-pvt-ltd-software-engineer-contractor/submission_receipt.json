@@ -1,0 +1,29 @@
+{
+  "intent": "browser_fill",
+  "outcome": "confirmed",
+  "externalSubmitted": false,
+  "confirmation": "GradLaunch clicked Apply, but the application form did not open. The job site may require login, may have blocked a popup, or may need manual interaction.",
+  "submittedAt": "2026-05-20T10:29:18.643Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "aarav@example.com",
+    "subject": "GradLaunch filled Blue Umbrella India Pvt Ltd - Software Engineer Contractor",
+    "sentAt": "2026-05-20T10:29:18.643Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "needs_manual_review",
+    "sourceUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+    "openedAt": "2026-05-20T10:28:54.606Z",
+    "completedAt": "2026-05-20T10:29:18.643Z",
+    "filledLabels": [],
+    "skippedLabels": [],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-stage-1-start.png",
+      "browser-filled.png"
+    ],
+    "message": "GradLaunch clicked Apply, but the application form did not open. The job site may require login, may have blocked a popup, or may need manual interaction."
+  }
+}

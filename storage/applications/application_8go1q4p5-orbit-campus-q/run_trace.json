@@ -1,0 +1,108 @@
+{
+  "id": "run_uxlleg70",
+  "status": "completed",
+  "executionMode": "guided_autofill",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-20T07:03:52.177Z",
+  "completedAt": "2026-05-20T07:03:52.177Z",
+  "filledFields": [
+    {
+      "label": "Full name",
+      "value": "Jay Kumar Gupta"
+    },
+    {
+      "label": "Email",
+      "value": "jaynrk200212@gmail.com"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer ScienceCGPA: 8.67"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2020"
+    },
+    {
+      "label": "Preferred location",
+      "value": "q"
+    },
+    {
+      "label": "Target role",
+      "value": "q"
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Next.js, Node.js, Express"
+    },
+    {
+      "label": "Resume context",
+      "value": "jay_kumar_gupta_nit_kkr.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a q and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "review",
+      "label": "Student review confirmed",
+      "detail": "The prepared fields, resume brief, cover-letter excerpt, and short answers were reviewed on the workspace screen.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Form values finalized",
+      "detail": "Final values were locked for q at Orbit Campus.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "submit",
+      "label": "Final submit recorded",
+      "detail": "Student reviewed the prepared fields and confirmed the final job portal submission.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Workspace receipt saved",
+      "detail": "Updated the workspace package at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_8go1q4p5-orbit-campus-q.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "email",
+      "label": "Student email notification",
+      "detail": "SMTP is not configured yet. Email receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/email-outbox/email_0pj0polv.json.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "notes": [
+    "Student reviewed the prepared fields and confirmed the final job portal submission.",
+    "Submission receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_8go1q4p5-orbit-campus-q.",
+    "Email status: queued via outbox."
+  ],
+  "submission": {
+    "intent": "review_submit",
+    "outcome": "confirmed",
+    "externalSubmitted": true,
+    "confirmation": "Student reviewed the prepared fields and confirmed the final job portal submission.",
+    "submittedAt": "2026-05-20T07:03:52.177Z",
+    "email": {
+      "status": "queued",
+      "provider": "outbox",
+      "to": "jaynrk200212@gmail.com",
+      "subject": "GradLaunch submitted Orbit Campus - q",
+      "sentAt": "2026-05-20T07:03:52.178Z",
+      "message": "SMTP is not configured yet. Email receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/email-outbox/email_0pj0polv.json."
+    }
+  },
+  "screenshots": []
+}

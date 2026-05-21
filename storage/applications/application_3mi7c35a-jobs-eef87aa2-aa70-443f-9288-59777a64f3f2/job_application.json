@@ -1,0 +1,233 @@
+{
+  "applicationId": "application_3mi7c35a",
+  "studentId": "student_tcgn9yq4",
+  "jobId": "job_u13nx3ht",
+  "status": "ready_for_review",
+  "sourceLabel": "Pasted URL",
+  "matchScore": 80,
+  "generatedArtifacts": {
+    "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs.",
+    "coverLetterExcerpt": "I am excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, where I can bring my JavaScript, React, Next.js experience as an aspiring a.",
+    "shortAnswers": [
+      {
+        "question": "Why are you interested in this role?",
+        "answer": "This role aligns with my goal of becoming a a and uses skills I have already practiced through projects and coursework."
+      },
+      {
+        "question": "What makes you a match?",
+        "answer": "My background in JavaScript, React, Next.js, Node.js closely matches the technical expectations in the job description."
+      }
+    ]
+  },
+  "uploadedDocuments": [
+    "jay_kumar_gupta_nit_kkr.pdf",
+    "tailored_resume_summary.txt",
+    "cover_letter_excerpt.txt",
+    "short_answers.json"
+  ],
+  "run": {
+    "id": "run_lsstgi2j",
+    "status": "needs_review",
+    "executionMode": "browser_apply",
+    "filledFields": [
+      {
+        "label": "First name",
+        "value": "Jay"
+      },
+      {
+        "label": "Last name",
+        "value": "Kumar Gupta"
+      },
+      {
+        "label": "Full name",
+        "value": "Jay Kumar Gupta"
+      },
+      {
+        "label": "Email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "Confirm your email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "City",
+        "value": "a"
+      },
+      {
+        "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Degree",
+        "value": "B.Tech in Computer ScienceCGPA: 8.67"
+      },
+      {
+        "label": "Graduation year",
+        "value": "2020"
+      },
+      {
+        "label": "Preferred location",
+        "value": "a"
+      },
+      {
+        "label": "Target role",
+        "value": "a"
+      },
+      {
+        "label": "Work authorization",
+        "value": "Yes"
+      },
+      {
+        "label": "Legally authorized to work",
+        "value": "Yes"
+      },
+      {
+        "label": "Visa sponsorship required",
+        "value": "No"
+      },
+      {
+        "label": "Visa required",
+        "value": "No"
+      },
+      {
+        "label": "Current CTC",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Current salary",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Message to the Hiring Team",
+        "value": "I am excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+      },
+      {
+        "label": "Primary skills",
+        "value": "JavaScript, React, Next.js, Node.js, Express"
+      },
+      {
+        "label": "Resume context",
+        "value": "jay_kumar_gupta_nit_kkr.pdf"
+      },
+      {
+        "label": "Why are you interested in this role?",
+        "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+      },
+      {
+        "label": "What makes you a match?",
+        "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+      }
+    ],
+    "submission": {
+      "intent": "browser_fill",
+      "outcome": "confirmed",
+      "externalSubmitted": false,
+      "confirmation": "The agent clicked a visible control, but the page did not advance. Reason: Easy apply",
+      "submittedAt": "2026-05-21T10:33:51.115Z",
+      "email": {
+        "status": "skipped",
+        "provider": "outbox",
+        "to": "jaynrk200211@gmail.com",
+        "subject": "GradLaunch filled Jobs - Eef87aa2 Aa70 443f 9288 59777a64f3f2",
+        "sentAt": "2026-05-21T10:33:51.115Z",
+        "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+      },
+      "browser": {
+        "status": "needs_manual_review",
+        "sourceUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+        "openedAt": "2026-05-21T10:33:34.340Z",
+        "completedAt": "2026-05-21T10:33:51.115Z",
+        "filledLabels": [
+          "Resume upload"
+        ],
+        "skippedLabels": [],
+        "screenshots": [
+          "browser-opened.png",
+          "browser-filled.png"
+        ],
+        "message": "The agent clicked a visible control, but the page did not advance. Reason: Easy apply",
+        "planner": {
+          "sessionId": "planner-job_u13nx3ht",
+          "resumeToken": "job_u13nx3ht:2026-05-21T10:30:48.952Z",
+          "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or final review checkpoint.",
+          "status": "needs_review",
+          "summary": "The agent clicked a visible control, but the page did not advance. Reason: Easy apply",
+          "currentStep": "stage_1",
+          "currentStageLabel": "Section 1",
+          "currentUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+          "retryCount": 0,
+          "handoffCount": 0,
+          "validationErrors": [],
+          "subgoals": [
+            {
+              "id": "open_job_page",
+              "label": "Open job page",
+              "status": "completed",
+              "detail": "Job page opened successfully in a visible Chrome session.",
+              "attempts": 2,
+              "lastUpdatedAt": "2026-05-21T10:33:37.792Z",
+              "completedAt": "2026-05-21T10:33:37.792Z"
+            },
+            {
+              "id": "authenticate_if_needed",
+              "label": "Handle login if needed",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+            },
+            {
+              "id": "finish_current_section",
+              "label": "Finish active section",
+              "status": "running",
+              "detail": "Resume upload completed. Re-reading the current section.",
+              "attempts": 6,
+              "lastUpdatedAt": "2026-05-21T10:33:48.858Z"
+            },
+            {
+              "id": "recover_from_validation_errors",
+              "label": "Recover from validation errors",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+            },
+            {
+              "id": "retry_alternative_path",
+              "label": "Retry alternative path",
+              "status": "blocked",
+              "detail": "A visible control was clicked but the flow did not advance: Easy apply",
+              "attempts": 2,
+              "lastUpdatedAt": "2026-05-21T10:33:50.979Z"
+            },
+            {
+              "id": "reach_submit_gate",
+              "label": "Reach submit/review gate",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+            },
+            {
+              "id": "save_checkpoint",
+              "label": "Save checkpoint",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+            }
+          ],
+          "lastUpdatedAt": "2026-05-21T10:33:51.115Z"
+        }
+      }
+    },
+    "notes": [
+      "The agent clicked a visible control, but the page did not advance. Reason: Easy apply",
+      "Browser fill status: needs_manual_review.",
+      "Filled fields: 1. Skipped fields: 0."
+    ]
+  },
+  "createdAt": "2026-05-20T12:40:47.078Z",
+  "updatedAt": "2026-05-21T10:33:51.115Z"
+}

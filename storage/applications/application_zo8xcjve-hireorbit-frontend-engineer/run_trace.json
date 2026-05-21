@@ -1,0 +1,137 @@
+{
+  "id": "run_5dz4r9lm",
+  "status": "completed",
+  "executionMode": "browser_apply",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-20T07:16:00.869Z",
+  "completedAt": "2026-05-20T07:16:00.869Z",
+  "filledFields": [
+    {
+      "label": "Full name",
+      "value": "Aarav Sharma"
+    },
+    {
+      "label": "Email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer Science"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2026"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Target role",
+      "value": "Software Engineer"
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, TypeScript, React, Node.js, MongoDB"
+    },
+    {
+      "label": "Resume context",
+      "value": "Profile data only"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a Software Engineer and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, TypeScript, React, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "review",
+      "label": "Student review confirmed",
+      "detail": "The prepared fields, resume brief, cover-letter excerpt, and short answers were reviewed on the workspace screen.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Form values finalized",
+      "detail": "Final values were locked for Frontend Engineer at HireOrbit.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "submit",
+      "label": "Final submit recorded",
+      "detail": "Chrome opened the job page, filled recognized fields, clicked the final submit control, and saved screenshots.",
+      "state": "done",
+      "source": "aihawk"
+    },
+    {
+      "id": "workspace",
+      "label": "Workspace receipt saved",
+      "detail": "Updated the workspace package at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_zo8xcjve-hireorbit-frontend-engineer.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "email",
+      "label": "Student email notification",
+      "detail": "SMTP is not configured yet. Email receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/email-outbox/email_17clbr0l.json.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "notes": [
+    "Chrome opened the job page, filled recognized fields, clicked the final submit control, and saved screenshots.",
+    "Submission receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_zo8xcjve-hireorbit-frontend-engineer.",
+    "Email status: queued via outbox."
+  ],
+  "submission": {
+    "intent": "auto_submit",
+    "outcome": "confirmed",
+    "externalSubmitted": true,
+    "confirmation": "Chrome opened the job page, filled recognized fields, clicked the final submit control, and saved screenshots.",
+    "submittedAt": "2026-05-20T07:16:00.869Z",
+    "email": {
+      "status": "queued",
+      "provider": "outbox",
+      "to": "aarav@example.com",
+      "subject": "GradLaunch submitted HireOrbit - Frontend Engineer",
+      "sentAt": "2026-05-20T07:16:35.779Z",
+      "message": "SMTP is not configured yet. Email receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/email-outbox/email_17clbr0l.json."
+    },
+    "browser": {
+      "status": "submitted",
+      "sourceUrl": "data:text/html,%3Chtml%3E%3Cbody%3E%3Cform%20onsubmit%3D%22document.body.innerHTML%3D%22Thank%20you%22%3B%20return%20false%3B%22%3E%3Clabel%3EFull%20name%20%3Cinput%20name%3D%22full_name%22%3E%3C%2Flabel%3E%3Clabel%3EEmail%20%3Cinput%20type%3D%22email%22%20name%3D%22email%22%3E%3C%2Flabel%3E%3Clabel%3EWhy%20are%20you%20interested%20in%20this%20role%3F%20%3Ctextarea%20name%3D%22why%22%3E%3C%2Ftextarea%3E%3C%2Flabel%3E%3Cbutton%20type%3D%22submit%22%3ESubmit%20application%3C%2Fbutton%3E%3C%2Fform%3E%3C%2Fbody%3E%3C%2Fhtml%3E",
+      "openedAt": "2026-05-20T07:16:00.870Z",
+      "completedAt": "2026-05-20T07:16:35.712Z",
+      "filledLabels": [
+        "Full name",
+        "Email",
+        "Why are you interested in this role?"
+      ],
+      "skippedLabels": [
+        "Degree",
+        "Graduation year",
+        "Preferred location",
+        "Target role",
+        "What makes you a match?"
+      ],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-filled.png",
+        "browser-submitted.png"
+      ],
+      "message": "Chrome opened the job page, filled recognized fields, clicked the final submit control, and saved screenshots."
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-filled.png",
+    "browser-submitted.png"
+  ]
+}

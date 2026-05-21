@@ -1,0 +1,100 @@
+{
+  "id": "run_u1cioeoy",
+  "status": "needs_review",
+  "executionMode": "guided_autofill",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-19T18:41:51.332Z",
+  "filledFields": [
+    {
+      "label": "Full name",
+      "value": "Aarav Sharma"
+    },
+    {
+      "label": "Email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer Science"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2026"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Target role",
+      "value": "Software Engineer"
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, TypeScript, React, Node.js, MongoDB"
+    },
+    {
+      "label": "Resume context",
+      "value": "Profile data only"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "adapter",
+      "label": "AIHawk adapter checked",
+      "detail": "Local AIHawk modules were detected, but the provider/apply engine is missing in this checkout.",
+      "state": "done",
+      "source": "aihawk"
+    },
+    {
+      "id": "profile",
+      "label": "Profile and resume loaded",
+      "detail": "Loaded Aarav Sharma's profile data. No uploaded resume was linked for this run.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "job",
+      "label": "Job normalized",
+      "detail": "Prepared Frontend Engineer at HireOrbit from the Lever source.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "artifacts",
+      "label": "Review package generated",
+      "detail": "Generated a tailored resume summary, a cover-letter excerpt, and reusable short-answer drafts.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fields",
+      "label": "Known fields prepared",
+      "detail": "Prepared 8 mapped values for the application form and review checklist.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "package",
+      "label": "Structured application package",
+      "detail": "Saved job_application.json, job_description.json, student_profile_snapshot.json, run_trace.json, short_answers.json, tailored_resume_summary.txt, cover_letter_excerpt.txt, README.txt to /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_125j8eag-hireorbit-frontend-engineer.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "review",
+      "label": "Review gate reached",
+      "detail": "GradLaunch prepared the autofill data but stopped before browser submission because the local AIHawk checkout does not include the apply engine.",
+      "state": "attention",
+      "source": "aihawk"
+    }
+  ],
+  "notes": [
+    "No uploaded resume was available. The run relied on profile data only.",
+    "Browser auto-apply is unavailable in this AIHawk checkout, so autofill stays review-first.",
+    "Structured application package saved to /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_125j8eag-hireorbit-frontend-engineer."
+  ],
+  "screenshots": [
+    "review-gate.png"
+  ]
+}

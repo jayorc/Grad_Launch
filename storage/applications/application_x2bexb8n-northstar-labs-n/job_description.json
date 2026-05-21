@@ -1,0 +1,26 @@
+{
+  "id": "job_generated_northstar-labs-n-n",
+  "title": "n",
+  "company": "Northstar Labs",
+  "location": "n",
+  "workMode": "remote",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "BCA",
+    "MCA"
+  ],
+  "skills": [
+    "JavaScript",
+    "React",
+    "TypeScript",
+    "Node.js",
+    "REST APIs"
+  ],
+  "description": "Discovered during an active search run for Jay Kumar Gupta. This role was prioritized because it overlaps with the student's role, skill, and location preferences.",
+  "sourceType": "aggregated_search",
+  "sourceUrl": "https://search.gradlaunch.local/jobs/northstar-labs-n-n",
+  "createdAt": "2026-05-19T19:27:04.142Z"
+}

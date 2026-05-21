@@ -1,0 +1,32 @@
+{
+  "id": "student_1",
+  "fullName": "Aarav Sharma",
+  "email": "aarav@example.com",
+  "degree": "B.Tech in Computer Science",
+  "graduationYear": 2026,
+  "targetRoles": [
+    "Software Engineer",
+    "Frontend Engineer",
+    "Full Stack Developer"
+  ],
+  "preferredLocations": [
+    "Bengaluru",
+    "Remote",
+    "Hyderabad"
+  ],
+  "workModes": [
+    "remote",
+    "hybrid"
+  ],
+  "skills": [
+    "JavaScript",
+    "TypeScript",
+    "React",
+    "Node.js",
+    "MongoDB",
+    "Express",
+    "CSS"
+  ],
+  "automationMode": "autofill_with_review",
+  "defaultStrictness": "balanced"
+}

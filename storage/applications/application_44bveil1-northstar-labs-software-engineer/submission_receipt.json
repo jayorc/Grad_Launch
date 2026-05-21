@@ -1,0 +1,36 @@
+{
+  "intent": "auto_submit",
+  "outcome": "blocked",
+  "externalSubmitted": false,
+  "confirmation": "page.goto: net::ERR_NAME_NOT_RESOLVED at https://search.gradlaunch.local/jobs/northstar-labs-software-engineer-bengaluru\nCall log:\n\u001b[2m  - navigating to \"https://search.gradlaunch.local/jobs/northstar-labs-software-engineer-bengaluru\", waiting until \"domcontentloaded\"\u001b[22m\n",
+  "submittedAt": "2026-05-20T07:37:18.672Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "aarav@example.com",
+    "subject": "GradLaunch could not submit Northstar Labs - Software Engineer",
+    "sentAt": "2026-05-20T07:37:18.672Z",
+    "message": "page.goto: net::ERR_NAME_NOT_RESOLVED at https://search.gradlaunch.local/jobs/northstar-labs-software-engineer-bengaluru\nCall log:\n\u001b[2m  - navigating to \"https://search.gradlaunch.local/jobs/northstar-labs-software-engineer-bengaluru\", waiting until \"domcontentloaded\"\u001b[22m\n"
+  },
+  "browser": {
+    "status": "blocked",
+    "sourceUrl": "https://search.gradlaunch.local/jobs/northstar-labs-software-engineer-bengaluru",
+    "openedAt": "2026-05-20T07:37:18.672Z",
+    "completedAt": "2026-05-20T07:37:29.916Z",
+    "filledLabels": [],
+    "skippedLabels": [
+      "Full name",
+      "Email",
+      "Degree",
+      "Graduation year",
+      "Preferred location",
+      "Target role",
+      "Primary skills",
+      "Resume context",
+      "Why are you interested in this role?",
+      "What makes you a match?"
+    ],
+    "screenshots": [],
+    "message": "page.goto: net::ERR_NAME_NOT_RESOLVED at https://search.gradlaunch.local/jobs/northstar-labs-software-engineer-bengaluru\nCall log:\n\u001b[2m  - navigating to \"https://search.gradlaunch.local/jobs/northstar-labs-software-engineer-bengaluru\", waiting until \"domcontentloaded\"\u001b[22m\n"
+  }
+}

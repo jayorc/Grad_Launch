@@ -1,0 +1,38 @@
+{
+  "intent": "browser_fill",
+  "outcome": "confirmed",
+  "externalSubmitted": false,
+  "confirmation": "The browser filled the recognized fields and stopped before final submit.",
+  "submittedAt": "2026-05-20T08:02:47.488Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "aarav@example.com",
+    "subject": "GradLaunch filled URL Company - Frontend Engineer",
+    "sentAt": "2026-05-20T08:02:47.488Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "filled",
+    "sourceUrl": "data:text/html,%3Chtml%3E%3Cbody%3E%3Cform%3E%3Clabel%3EFull%20name%20%3Cinput%20name%3D%22full_name%22%3E%3C%2Flabel%3E%3Clabel%3EEmail%20%3Cinput%20type%3D%22email%22%20name%3D%22email%22%3E%3C%2Flabel%3E%3Clabel%3EWhy%20are%20you%20interested%20in%20this%20role%3F%20%3Ctextarea%20name%3D%22why%22%3E%3C%2Ftextarea%3E%3C%2Flabel%3E%3Cbutton%20type%3D%22submit%22%3ESubmit%20application%3C%2Fbutton%3E%3C%2Fform%3E%3C%2Fbody%3E%3C%2Fhtml%3E",
+    "openedAt": "2026-05-20T08:02:30.160Z",
+    "completedAt": "2026-05-20T08:02:47.405Z",
+    "filledLabels": [
+      "Full name",
+      "Email",
+      "Why are you interested in this role?"
+    ],
+    "skippedLabels": [
+      "Degree",
+      "Graduation year",
+      "Preferred location",
+      "Target role",
+      "What makes you a match?"
+    ],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-filled.png"
+    ],
+    "message": "The browser filled the recognized fields and stopped before final submit."
+  }
+}

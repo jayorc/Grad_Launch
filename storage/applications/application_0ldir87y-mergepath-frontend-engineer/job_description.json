@@ -1,0 +1,26 @@
+{
+  "id": "job_generated_mergepath-frontend-engineer-remote",
+  "title": "Frontend Engineer",
+  "company": "MergePath",
+  "location": "Remote",
+  "workMode": "remote",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "BCA",
+    "MCA"
+  ],
+  "skills": [
+    "JavaScript",
+    "TypeScript",
+    "React",
+    "CSS",
+    "Next.js"
+  ],
+  "description": "Discovered during an active search run for Aarav Sharma. This role was prioritized because it overlaps with the student's role, skill, and location preferences.",
+  "sourceType": "aggregated_search",
+  "sourceUrl": "https://search.gradlaunch.local/jobs/mergepath-frontend-engineer-remote",
+  "createdAt": "2026-05-19T19:06:59.092Z"
+}

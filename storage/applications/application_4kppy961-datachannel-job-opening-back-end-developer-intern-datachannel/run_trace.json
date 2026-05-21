@@ -1,0 +1,321 @@
+{
+  "id": "run_qhijgidx",
+  "status": "needs_review",
+  "executionMode": "browser_apply",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-21T10:36:58.968Z",
+  "completedAt": "2026-05-21T10:37:46.592Z",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Jay"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar Gupta"
+    },
+    {
+      "label": "Full name",
+      "value": "Jay Kumar Gupta"
+    },
+    {
+      "label": "Email",
+      "value": "jaynrk200211@gmail.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "jaynrk200211@gmail.com"
+    },
+    {
+      "label": "City",
+      "value": "a"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer ScienceCGPA: 8.67"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2020"
+    },
+    {
+      "label": "Preferred location",
+      "value": "a"
+    },
+    {
+      "label": "Target role",
+      "value": "a"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the Job Opening - Back End Developer (Intern) | DataChannel role at Datachannel, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Next.js, Node.js, Express"
+    },
+    {
+      "label": "Resume context",
+      "value": "jay_kumar_gupta_nit_kkr.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://www.datachannel.co/career/back-end-developer-intern.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "The run stops before final submission.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "planner",
+      "label": "Planner checkpoint updated",
+      "detail": "Final submit requires manual review or external submit is disabled. Resume token: job_url_aHR0cHM6Ly93d3cuZGF0YWNo:2026-05-21T10:36:58.974Z.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_4kppy961-datachannel-job-opening-back-end-developer-intern-datachannel.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "planner": {
+    "sessionId": "planner-job_url_aHR0cHM6Ly93d3cuZGF0YWNo",
+    "resumeToken": "job_url_aHR0cHM6Ly93d3cuZGF0YWNo:2026-05-21T10:36:58.974Z",
+    "goal": "Complete the Job Opening - Back End Developer (Intern) | DataChannel application at Datachannel autonomously until a protected or final review checkpoint.",
+    "status": "needs_review",
+    "summary": "Final submit requires manual review or external submit is disabled.",
+    "retryCount": 0,
+    "handoffCount": 0,
+    "validationErrors": [],
+    "subgoals": [
+      {
+        "id": "open_job_page",
+        "label": "Open job page",
+        "status": "completed",
+        "detail": "Job page opened successfully in a visible Chrome session.",
+        "attempts": 1,
+        "lastUpdatedAt": "2026-05-21T10:37:01.609Z",
+        "completedAt": "2026-05-21T10:37:01.609Z"
+      },
+      {
+        "id": "authenticate_if_needed",
+        "label": "Handle login if needed",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:36:58.974Z"
+      },
+      {
+        "id": "finish_current_section",
+        "label": "Finish active section",
+        "status": "running",
+        "detail": "Reading Section 5 and planning the next safe action.",
+        "attempts": 7,
+        "lastUpdatedAt": "2026-05-21T10:37:45.789Z"
+      },
+      {
+        "id": "recover_from_validation_errors",
+        "label": "Recover from validation errors",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:36:58.974Z"
+      },
+      {
+        "id": "retry_alternative_path",
+        "label": "Retry alternative path",
+        "status": "running",
+        "detail": "No visible fields yet, so the planner is opening the application path.",
+        "attempts": 1,
+        "lastUpdatedAt": "2026-05-21T10:37:46.584Z"
+      },
+      {
+        "id": "reach_submit_gate",
+        "label": "Reach submit/review gate",
+        "status": "blocked",
+        "detail": "Reached the final step but could not safely finish the submit action.",
+        "attempts": 1,
+        "lastUpdatedAt": "2026-05-21T10:37:46.592Z"
+      },
+      {
+        "id": "save_checkpoint",
+        "label": "Save checkpoint",
+        "status": "completed",
+        "detail": "Saved planner state at the final manual review checkpoint.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:37:46.592Z",
+        "completedAt": "2026-05-21T10:37:46.592Z"
+      }
+    ],
+    "lastUpdatedAt": "2026-05-21T10:37:46.592Z",
+    "currentUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+    "currentStep": "stage_5",
+    "currentStageLabel": "Section 5"
+  },
+  "notes": [
+    "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+    "Browser fill status: needs_manual_review.",
+    "Filled fields: 1. Skipped fields: 0."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "confirmed",
+    "externalSubmitted": false,
+    "confirmation": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+    "submittedAt": "2026-05-21T10:37:46.592Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "jaynrk200211@gmail.com",
+      "subject": "GradLaunch filled Datachannel - Job Opening - Back End Developer (Intern) | DataChannel",
+      "sentAt": "2026-05-21T10:37:46.592Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "needs_manual_review",
+      "sourceUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+      "openedAt": "2026-05-21T10:36:58.974Z",
+      "completedAt": "2026-05-21T10:37:46.592Z",
+      "filledLabels": [
+        "Resume upload"
+      ],
+      "skippedLabels": [],
+      "screenshots": [
+        "browser-opened.png"
+      ],
+      "message": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+      "planner": {
+        "sessionId": "planner-job_url_aHR0cHM6Ly93d3cuZGF0YWNo",
+        "resumeToken": "job_url_aHR0cHM6Ly93d3cuZGF0YWNo:2026-05-21T10:36:58.974Z",
+        "goal": "Complete the Job Opening - Back End Developer (Intern) | DataChannel application at Datachannel autonomously until a protected or final review checkpoint.",
+        "status": "needs_review",
+        "summary": "Final submit requires manual review or external submit is disabled.",
+        "retryCount": 0,
+        "handoffCount": 0,
+        "validationErrors": [],
+        "subgoals": [
+          {
+            "id": "open_job_page",
+            "label": "Open job page",
+            "status": "completed",
+            "detail": "Job page opened successfully in a visible Chrome session.",
+            "attempts": 1,
+            "lastUpdatedAt": "2026-05-21T10:37:01.609Z",
+            "completedAt": "2026-05-21T10:37:01.609Z"
+          },
+          {
+            "id": "authenticate_if_needed",
+            "label": "Handle login if needed",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:36:58.974Z"
+          },
+          {
+            "id": "finish_current_section",
+            "label": "Finish active section",
+            "status": "running",
+            "detail": "Reading Section 5 and planning the next safe action.",
+            "attempts": 7,
+            "lastUpdatedAt": "2026-05-21T10:37:45.789Z"
+          },
+          {
+            "id": "recover_from_validation_errors",
+            "label": "Recover from validation errors",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:36:58.974Z"
+          },
+          {
+            "id": "retry_alternative_path",
+            "label": "Retry alternative path",
+            "status": "running",
+            "detail": "No visible fields yet, so the planner is opening the application path.",
+            "attempts": 1,
+            "lastUpdatedAt": "2026-05-21T10:37:46.584Z"
+          },
+          {
+            "id": "reach_submit_gate",
+            "label": "Reach submit/review gate",
+            "status": "blocked",
+            "detail": "Reached the final step but could not safely finish the submit action.",
+            "attempts": 1,
+            "lastUpdatedAt": "2026-05-21T10:37:46.592Z"
+          },
+          {
+            "id": "save_checkpoint",
+            "label": "Save checkpoint",
+            "status": "completed",
+            "detail": "Saved planner state at the final manual review checkpoint.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:37:46.592Z",
+            "completedAt": "2026-05-21T10:37:46.592Z"
+          }
+        ],
+        "lastUpdatedAt": "2026-05-21T10:37:46.592Z",
+        "currentUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+        "currentStep": "stage_5",
+        "currentStageLabel": "Section 5"
+      }
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png"
+  ]
+}

@@ -1,0 +1,349 @@
+{
+  "id": "run_c522uqqr",
+  "status": "needs_review",
+  "executionMode": "browser_apply",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-21T10:24:45.989Z",
+  "completedAt": "2026-05-21T10:25:05.058Z",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Jay"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar Gupta"
+    },
+    {
+      "label": "Full name",
+      "value": "Jay Kumar Gupta"
+    },
+    {
+      "label": "Email",
+      "value": "jaynrk200211@gmail.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "jaynrk200211@gmail.com"
+    },
+    {
+      "label": "City",
+      "value": "a"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer ScienceCGPA: 8.67"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2020"
+    },
+    {
+      "label": "Preferred location",
+      "value": "a"
+    },
+    {
+      "label": "Target role",
+      "value": "a"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the Oorwin role at Willwaretech, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Next.js, Node.js, Express"
+    },
+    {
+      "label": "Resume context",
+      "value": "jay_kumar_gupta_nit_kkr.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "The run stops before final submission.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "planner",
+      "label": "Planner checkpoint updated",
+      "detail": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON. Resume token: job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_45vxmwkh-willwaretech-oorwin.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "planner": {
+    "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
+    "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z",
+    "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or final review checkpoint.",
+    "status": "needs_review",
+    "summary": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+    "currentStep": "stage_1",
+    "currentStageLabel": "Section 1",
+    "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+    "retryCount": 0,
+    "handoffCount": 0,
+    "validationErrors": [
+      "mat-input-3",
+      "Email",
+      "Mobile +1",
+      "Current CTC"
+    ],
+    "subgoals": [
+      {
+        "id": "open_job_page",
+        "label": "Open job page",
+        "status": "completed",
+        "detail": "Job page opened successfully in a visible Chrome session.",
+        "attempts": 5,
+        "lastUpdatedAt": "2026-05-21T10:24:50.833Z",
+        "completedAt": "2026-05-21T10:24:50.833Z"
+      },
+      {
+        "id": "authenticate_if_needed",
+        "label": "Handle login if needed",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:00:04.549Z"
+      },
+      {
+        "id": "finish_current_section",
+        "label": "Finish active section",
+        "status": "running",
+        "detail": "Resume upload completed. Re-reading the current section.",
+        "attempts": 17,
+        "lastUpdatedAt": "2026-05-21T10:25:02.010Z"
+      },
+      {
+        "id": "recover_from_validation_errors",
+        "label": "Recover from validation errors",
+        "status": "blocked",
+        "detail": "Validation or required-answer blockers were found: Mobile +1, Current CTC.",
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-21T10:25:04.750Z"
+      },
+      {
+        "id": "retry_alternative_path",
+        "label": "Retry alternative path",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:00:04.549Z"
+      },
+      {
+        "id": "reach_submit_gate",
+        "label": "Reach submit/review gate",
+        "status": "blocked",
+        "detail": "Reached the final step but could not safely finish the submit action.",
+        "attempts": 2,
+        "lastUpdatedAt": "2026-05-21T10:07:15.433Z",
+        "completedAt": "2026-05-21T10:07:14.907Z"
+      },
+      {
+        "id": "save_checkpoint",
+        "label": "Save checkpoint",
+        "status": "completed",
+        "detail": "Saved planner state at the final manual review checkpoint.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:07:15.433Z",
+        "completedAt": "2026-05-21T10:07:15.433Z"
+      }
+    ],
+    "lastUpdatedAt": "2026-05-21T10:25:05.058Z"
+  },
+  "notes": [
+    "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+    "Browser fill status: needs_manual_review.",
+    "Filled fields: 8. Skipped fields: 2."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "confirmed",
+    "externalSubmitted": false,
+    "confirmation": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+    "submittedAt": "2026-05-21T10:25:05.058Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "jaynrk200211@gmail.com",
+      "subject": "GradLaunch filled Willwaretech - Oorwin",
+      "sentAt": "2026-05-21T10:25:05.058Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "needs_manual_review",
+      "sourceUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+      "openedAt": "2026-05-21T10:24:46.308Z",
+      "completedAt": "2026-05-21T10:25:05.058Z",
+      "filledLabels": [
+        "Resume upload",
+        "Last Name",
+        "First Name",
+        "Email",
+        "Mobile +1",
+        "Years of Experience",
+        "City",
+        "Current CTC"
+      ],
+      "skippedLabels": [
+        "Mobile +1",
+        "Current CTC"
+      ],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-stage-1-needs-input.png",
+        "browser-filled.png"
+      ],
+      "message": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+      "planner": {
+        "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
+        "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z",
+        "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or final review checkpoint.",
+        "status": "needs_review",
+        "summary": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+        "currentStep": "stage_1",
+        "currentStageLabel": "Section 1",
+        "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+        "retryCount": 0,
+        "handoffCount": 0,
+        "validationErrors": [
+          "mat-input-3",
+          "Email",
+          "Mobile +1",
+          "Current CTC"
+        ],
+        "subgoals": [
+          {
+            "id": "open_job_page",
+            "label": "Open job page",
+            "status": "completed",
+            "detail": "Job page opened successfully in a visible Chrome session.",
+            "attempts": 5,
+            "lastUpdatedAt": "2026-05-21T10:24:50.833Z",
+            "completedAt": "2026-05-21T10:24:50.833Z"
+          },
+          {
+            "id": "authenticate_if_needed",
+            "label": "Handle login if needed",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:00:04.549Z"
+          },
+          {
+            "id": "finish_current_section",
+            "label": "Finish active section",
+            "status": "running",
+            "detail": "Resume upload completed. Re-reading the current section.",
+            "attempts": 17,
+            "lastUpdatedAt": "2026-05-21T10:25:02.010Z"
+          },
+          {
+            "id": "recover_from_validation_errors",
+            "label": "Recover from validation errors",
+            "status": "blocked",
+            "detail": "Validation or required-answer blockers were found: Mobile +1, Current CTC.",
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-21T10:25:04.750Z"
+          },
+          {
+            "id": "retry_alternative_path",
+            "label": "Retry alternative path",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:00:04.549Z"
+          },
+          {
+            "id": "reach_submit_gate",
+            "label": "Reach submit/review gate",
+            "status": "blocked",
+            "detail": "Reached the final step but could not safely finish the submit action.",
+            "attempts": 2,
+            "lastUpdatedAt": "2026-05-21T10:07:15.433Z",
+            "completedAt": "2026-05-21T10:07:14.907Z"
+          },
+          {
+            "id": "save_checkpoint",
+            "label": "Save checkpoint",
+            "status": "completed",
+            "detail": "Saved planner state at the final manual review checkpoint.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:07:15.433Z",
+            "completedAt": "2026-05-21T10:07:15.433Z"
+          }
+        ],
+        "lastUpdatedAt": "2026-05-21T10:25:05.058Z"
+      }
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-stage-1.png",
+    "browser-filled.png",
+    "manual-review-needed.png",
+    "browser-stage-1-needs-input.png"
+  ]
+}

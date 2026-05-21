@@ -1,0 +1,26 @@
+{
+  "id": "job_generated_orbit-campus-sw-bangalore",
+  "title": "sw",
+  "company": "Orbit Campus",
+  "location": "Bangalore",
+  "workMode": "remote",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "BCA",
+    "MCA"
+  ],
+  "skills": [
+    "JavaScript",
+    "React",
+    "TypeScript",
+    "Node.js",
+    "REST APIs"
+  ],
+  "description": "Discovered during an active search run for Jay Kumar Gupta. This role was prioritized because it overlaps with the student's role, skill, and location preferences.",
+  "sourceType": "aggregated_search",
+  "sourceUrl": "https://search.gradlaunch.local/jobs/orbit-campus-sw-bangalore",
+  "createdAt": "2026-05-19T18:48:27.817Z"
+}

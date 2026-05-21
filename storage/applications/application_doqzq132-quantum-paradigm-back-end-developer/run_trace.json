@@ -1,0 +1,366 @@
+{
+  "id": "run_wxwafiob",
+  "status": "needs_review",
+  "executionMode": "browser_apply",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-21T11:16:55.120Z",
+  "completedAt": "2026-05-21T11:17:32.734Z",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Jay"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar Gupta"
+    },
+    {
+      "label": "Full name",
+      "value": "Jay Kumar Gupta"
+    },
+    {
+      "label": "Email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "City",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Location (City)",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Country",
+      "value": "India"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Phone",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Mobile",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer ScienceCGPA: 8.67"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2020"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Target role",
+      "value": "Software Engineer"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Expected salary",
+      "value": "10 LPA"
+    },
+    {
+      "label": "Expected CTC",
+      "value": "10 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the Back-End Developer role at Quantum Paradigm, where I can bring my JavaScript, React, Next.js experience as an aspiring Software Engineer."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Next.js, Node.js, Express"
+    },
+    {
+      "label": "Resume context",
+      "value": "jay_kumar_gupta_nit_kkr.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a Software Engineer and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://www.quantumparadigm.in/jobs/back-end-developer/.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "The run stops before final submission.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "planner",
+      "label": "Planner checkpoint updated",
+      "detail": "Final submit requires manual review or external submit is disabled. Resume token: job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-21T10:48:13.843Z.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_doqzq132-quantum-paradigm-back-end-developer.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "planner": {
+    "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
+    "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-21T10:48:13.843Z",
+    "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or final review checkpoint.",
+    "status": "needs_review",
+    "summary": "Final submit requires manual review or external submit is disabled.",
+    "currentStep": "stage_1",
+    "currentStageLabel": "Section 1",
+    "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+    "retryCount": 0,
+    "handoffCount": 0,
+    "validationErrors": [],
+    "subgoals": [
+      {
+        "id": "open_job_page",
+        "label": "Open job page",
+        "status": "completed",
+        "detail": "Job page opened successfully in a visible Chrome session.",
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-21T11:17:01.511Z",
+        "completedAt": "2026-05-21T11:17:01.511Z"
+      },
+      {
+        "id": "authenticate_if_needed",
+        "label": "Handle login if needed",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:48:13.843Z"
+      },
+      {
+        "id": "finish_current_section",
+        "label": "Finish active section",
+        "status": "running",
+        "detail": "Filled 9 fields on Section 1.",
+        "attempts": 12,
+        "lastUpdatedAt": "2026-05-21T11:17:31.019Z"
+      },
+      {
+        "id": "recover_from_validation_errors",
+        "label": "Recover from validation errors",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:48:13.843Z"
+      },
+      {
+        "id": "retry_alternative_path",
+        "label": "Retry alternative path",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:48:13.843Z"
+      },
+      {
+        "id": "reach_submit_gate",
+        "label": "Reach submit/review gate",
+        "status": "blocked",
+        "detail": "Reached the final step but could not safely finish the submit action.",
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-21T11:17:32.734Z",
+        "completedAt": "2026-05-21T11:17:31.936Z"
+      },
+      {
+        "id": "save_checkpoint",
+        "label": "Save checkpoint",
+        "status": "completed",
+        "detail": "Saved planner state at the final manual review checkpoint.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T11:17:32.734Z",
+        "completedAt": "2026-05-21T11:17:32.734Z"
+      }
+    ],
+    "lastUpdatedAt": "2026-05-21T11:17:32.734Z"
+  },
+  "notes": [
+    "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+    "Browser fill status: needs_manual_review.",
+    "Filled fields: 10. Skipped fields: 0."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "confirmed",
+    "externalSubmitted": false,
+    "confirmation": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+    "submittedAt": "2026-05-21T11:17:32.734Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "aarav@example.com",
+      "subject": "GradLaunch filled Quantum Paradigm - Back-End Developer",
+      "sentAt": "2026-05-21T11:17:32.734Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "needs_manual_review",
+      "sourceUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+      "openedAt": "2026-05-21T11:16:55.247Z",
+      "completedAt": "2026-05-21T11:17:32.734Z",
+      "filledLabels": [
+        "Resume upload",
+        "Full Name",
+        "Email",
+        "Confirm your email",
+        "Phone number",
+        "Phone",
+        "Mobile",
+        "Message to the Hiring Team",
+        "Cover Letter",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "skippedLabels": [],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-stage-1.png",
+        "browser-filled.png",
+        "manual-review-needed.png"
+      ],
+      "message": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+      "planner": {
+        "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
+        "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-21T10:48:13.843Z",
+        "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or final review checkpoint.",
+        "status": "needs_review",
+        "summary": "Final submit requires manual review or external submit is disabled.",
+        "currentStep": "stage_1",
+        "currentStageLabel": "Section 1",
+        "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+        "retryCount": 0,
+        "handoffCount": 0,
+        "validationErrors": [],
+        "subgoals": [
+          {
+            "id": "open_job_page",
+            "label": "Open job page",
+            "status": "completed",
+            "detail": "Job page opened successfully in a visible Chrome session.",
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-21T11:17:01.511Z",
+            "completedAt": "2026-05-21T11:17:01.511Z"
+          },
+          {
+            "id": "authenticate_if_needed",
+            "label": "Handle login if needed",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:48:13.843Z"
+          },
+          {
+            "id": "finish_current_section",
+            "label": "Finish active section",
+            "status": "running",
+            "detail": "Filled 9 fields on Section 1.",
+            "attempts": 12,
+            "lastUpdatedAt": "2026-05-21T11:17:31.019Z"
+          },
+          {
+            "id": "recover_from_validation_errors",
+            "label": "Recover from validation errors",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:48:13.843Z"
+          },
+          {
+            "id": "retry_alternative_path",
+            "label": "Retry alternative path",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:48:13.843Z"
+          },
+          {
+            "id": "reach_submit_gate",
+            "label": "Reach submit/review gate",
+            "status": "blocked",
+            "detail": "Reached the final step but could not safely finish the submit action.",
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-21T11:17:32.734Z",
+            "completedAt": "2026-05-21T11:17:31.936Z"
+          },
+          {
+            "id": "save_checkpoint",
+            "label": "Save checkpoint",
+            "status": "completed",
+            "detail": "Saved planner state at the final manual review checkpoint.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T11:17:32.734Z",
+            "completedAt": "2026-05-21T11:17:32.734Z"
+          }
+        ],
+        "lastUpdatedAt": "2026-05-21T11:17:32.734Z"
+      }
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-filled.png",
+    "browser-stage-1.png",
+    "manual-review-needed.png"
+  ]
+}

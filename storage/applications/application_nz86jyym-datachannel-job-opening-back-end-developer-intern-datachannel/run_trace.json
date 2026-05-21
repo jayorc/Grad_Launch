@@ -1,0 +1,199 @@
+{
+  "id": "run_xl3nyksc",
+  "status": "blocked",
+  "executionMode": "browser_apply",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-20T10:13:03.953Z",
+  "completedAt": "2026-05-20T10:13:27.491Z",
+  "blockedReason": "frame.evaluate: Target page, context or browser has been closed",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Jay"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar Gupta"
+    },
+    {
+      "label": "Full name",
+      "value": "Aarav Sharma"
+    },
+    {
+      "label": "Email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "City",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer Science"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2026"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Target role",
+      "value": "Software Engineer"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Expected salary",
+      "value": "10 LPA"
+    },
+    {
+      "label": "Expected CTC",
+      "value": "10 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the Job Opening - Back End Developer (Intern) | DataChannel role at Datachannel, where I can bring my JavaScript, TypeScript, React experience as an aspiring Software Engineer."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, TypeScript, React, Node.js, MongoDB"
+    },
+    {
+      "label": "Resume context",
+      "value": "Profile data only"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a Software Engineer and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, TypeScript, React, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://www.datachannel.co/career/back-end-developer-intern.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "frame.evaluate: Target page, context or browser has been closed",
+      "state": "attention",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "frame.evaluate: Target page, context or browser has been closed",
+      "state": "attention",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_nz86jyym-datachannel-job-opening-back-end-developer-intern-datachannel.",
+      "state": "attention",
+      "source": "gradlaunch"
+    }
+  ],
+  "notes": [
+    "frame.evaluate: Target page, context or browser has been closed",
+    "Browser fill status: blocked.",
+    "Filled fields: 0. Skipped fields: 24."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "blocked",
+    "externalSubmitted": false,
+    "confirmation": "frame.evaluate: Target page, context or browser has been closed",
+    "submittedAt": "2026-05-20T10:13:27.491Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "aarav@example.com",
+      "subject": "GradLaunch filled Datachannel - Job Opening - Back End Developer (Intern) | DataChannel",
+      "sentAt": "2026-05-20T10:13:27.491Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "blocked",
+      "sourceUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+      "openedAt": "2026-05-20T10:13:04.093Z",
+      "completedAt": "2026-05-20T10:13:27.386Z",
+      "filledLabels": [],
+      "skippedLabels": [
+        "First name",
+        "Last name",
+        "Full name",
+        "Email",
+        "Confirm your email",
+        "City",
+        "Phone number",
+        "Degree",
+        "Graduation year",
+        "Preferred location",
+        "Target role",
+        "Work authorization",
+        "Legally authorized to work",
+        "Visa sponsorship required",
+        "Visa required",
+        "Current CTC",
+        "Current salary",
+        "Expected salary",
+        "Expected CTC",
+        "Message to the Hiring Team",
+        "Primary skills",
+        "Resume context",
+        "Why are you interested in this role?",
+        "What makes you a match?"
+      ],
+      "screenshots": [
+        "browser-opened.png"
+      ],
+      "message": "frame.evaluate: Target page, context or browser has been closed"
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-filled.png"
+  ]
+}

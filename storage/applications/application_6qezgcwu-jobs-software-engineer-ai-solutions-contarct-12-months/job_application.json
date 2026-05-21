@@ -1,0 +1,256 @@
+{
+  "applicationId": "application_6qezgcwu",
+  "studentId": "student_tcgn9yq4",
+  "jobId": "job_url_aHR0cHM6Ly9qb2JzLmVhLmNv",
+  "status": "blocked",
+  "sourceLabel": "Pasted URL",
+  "matchScore": 38,
+  "generatedArtifacts": {
+    "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Software Engineer, AI Solutions(Contarct-12 Months) role at Jobs.",
+    "coverLetterExcerpt": "I am excited to apply for the Software Engineer, AI Solutions(Contarct-12 Months) role at Jobs, where I can bring my JavaScript, React, Next.js experience as an aspiring a.",
+    "shortAnswers": [
+      {
+        "question": "Why are you interested in this role?",
+        "answer": "This role aligns with my goal of becoming a a and uses skills I have already practiced through projects and coursework."
+      },
+      {
+        "question": "What makes you a match?",
+        "answer": "My background in JavaScript, React, Next.js, Node.js closely matches the technical expectations in the job description."
+      }
+    ]
+  },
+  "uploadedDocuments": [
+    "jay_kumar_gupta_nit_kkr.pdf",
+    "tailored_resume_summary.txt",
+    "cover_letter_excerpt.txt",
+    "short_answers.json"
+  ],
+  "run": {
+    "id": "run_k0fferol",
+    "status": "blocked",
+    "executionMode": "browser_apply",
+    "filledFields": [
+      {
+        "label": "First name",
+        "value": "Jay"
+      },
+      {
+        "label": "Last name",
+        "value": "Kumar Gupta"
+      },
+      {
+        "label": "Full name",
+        "value": "Jay Kumar Gupta"
+      },
+      {
+        "label": "Email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "Confirm your email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "City",
+        "value": "a"
+      },
+      {
+        "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Degree",
+        "value": "B.Tech in Computer ScienceCGPA: 8.67"
+      },
+      {
+        "label": "Graduation year",
+        "value": "2020"
+      },
+      {
+        "label": "Preferred location",
+        "value": "a"
+      },
+      {
+        "label": "Target role",
+        "value": "a"
+      },
+      {
+        "label": "Work authorization",
+        "value": "Yes"
+      },
+      {
+        "label": "Legally authorized to work",
+        "value": "Yes"
+      },
+      {
+        "label": "Visa sponsorship required",
+        "value": "No"
+      },
+      {
+        "label": "Visa required",
+        "value": "No"
+      },
+      {
+        "label": "Current CTC",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Current salary",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Message to the Hiring Team",
+        "value": "I am excited to apply for the Software Engineer, AI Solutions(Contarct-12 Months) role at Jobs, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+      },
+      {
+        "label": "Primary skills",
+        "value": "JavaScript, React, Next.js, Node.js, Express"
+      },
+      {
+        "label": "Resume context",
+        "value": "jay_kumar_gupta_nit_kkr.pdf"
+      },
+      {
+        "label": "Why are you interested in this role?",
+        "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+      },
+      {
+        "label": "What makes you a match?",
+        "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+      }
+    ],
+    "submission": {
+      "intent": "browser_fill",
+      "outcome": "blocked",
+      "externalSubmitted": false,
+      "confirmation": "page.waitForTimeout: Target page, context or browser has been closed",
+      "submittedAt": "2026-05-21T10:29:19.670Z",
+      "email": {
+        "status": "skipped",
+        "provider": "outbox",
+        "to": "jaynrk200211@gmail.com",
+        "subject": "GradLaunch filled Jobs - Software Engineer, AI Solutions(Contarct-12 Months)",
+        "sentAt": "2026-05-21T10:29:19.670Z",
+        "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+      },
+      "browser": {
+        "status": "blocked",
+        "sourceUrl": "https://jobs.ea.com/en_US/careers/JobDetail/Software-Engineer-AI-Solutions-Contract-12-Months/213675?source=LinkedIn",
+        "openedAt": "2026-05-21T10:28:23.596Z",
+        "completedAt": "2026-05-21T10:29:19.579Z",
+        "filledLabels": [],
+        "skippedLabels": [
+          "First name",
+          "Last name",
+          "Full name",
+          "Email",
+          "Confirm your email",
+          "City",
+          "Phone number",
+          "Degree",
+          "Graduation year",
+          "Preferred location",
+          "Target role",
+          "Work authorization",
+          "Legally authorized to work",
+          "Visa sponsorship required",
+          "Visa required",
+          "Current CTC",
+          "Current salary",
+          "Message to the Hiring Team",
+          "Primary skills",
+          "Resume context",
+          "Why are you interested in this role?",
+          "What makes you a match?"
+        ],
+        "screenshots": [
+          "browser-opened.png",
+          "browser-handoff-needed.png",
+          "browser-handoff-needed.png"
+        ],
+        "message": "page.waitForTimeout: Target page, context or browser has been closed",
+        "planner": {
+          "sessionId": "planner-job_url_aHR0cHM6Ly9qb2JzLmVhLmNv",
+          "resumeToken": "job_url_aHR0cHM6Ly9qb2JzLmVhLmNv:2026-05-21T10:27:14.231Z",
+          "goal": "Complete the Software Engineer, AI Solutions(Contarct-12 Months) application at Jobs autonomously until a protected or final review checkpoint.",
+          "status": "blocked",
+          "summary": "page.waitForTimeout: Target page, context or browser has been closed",
+          "currentStep": "stage_4",
+          "currentStageLabel": "Section 4",
+          "currentUrl": "https://jobs.ea.com/en_US/careers/ApplicationMethods?jobId=213675&source=LinkedIn",
+          "retryCount": 0,
+          "handoffCount": 2,
+          "validationErrors": [],
+          "subgoals": [
+            {
+              "id": "open_job_page",
+              "label": "Open job page",
+              "status": "completed",
+              "detail": "Job page opened successfully in a visible Chrome session.",
+              "attempts": 2,
+              "lastUpdatedAt": "2026-05-21T10:28:30.058Z",
+              "completedAt": "2026-05-21T10:28:30.058Z"
+            },
+            {
+              "id": "authenticate_if_needed",
+              "label": "Handle login if needed",
+              "status": "running",
+              "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+              "attempts": 4,
+              "lastUpdatedAt": "2026-05-21T10:29:07.997Z"
+            },
+            {
+              "id": "finish_current_section",
+              "label": "Finish active section",
+              "status": "blocked",
+              "detail": "page.waitForTimeout: Target page, context or browser has been closed",
+              "attempts": 8,
+              "lastUpdatedAt": "2026-05-21T10:29:19.579Z"
+            },
+            {
+              "id": "recover_from_validation_errors",
+              "label": "Recover from validation errors",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:27:14.231Z"
+            },
+            {
+              "id": "retry_alternative_path",
+              "label": "Retry alternative path",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:27:14.231Z"
+            },
+            {
+              "id": "reach_submit_gate",
+              "label": "Reach submit/review gate",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:27:14.231Z"
+            },
+            {
+              "id": "save_checkpoint",
+              "label": "Save checkpoint",
+              "status": "completed",
+              "detail": "Saved checkpoint before handing the browser to the student.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T10:29:06.279Z",
+              "completedAt": "2026-05-21T10:29:06.279Z"
+            }
+          ],
+          "lastUpdatedAt": "2026-05-21T10:29:19.579Z"
+        }
+      }
+    },
+    "notes": [
+      "page.waitForTimeout: Target page, context or browser has been closed",
+      "Browser fill status: blocked.",
+      "Filled fields: 0. Skipped fields: 22."
+    ]
+  },
+  "createdAt": "2026-05-20T12:39:50.170Z",
+  "updatedAt": "2026-05-21T10:29:19.670Z"
+}

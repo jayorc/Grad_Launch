@@ -1,0 +1,90 @@
+[
+  {
+    "label": "First name",
+    "value": "Jay"
+  },
+  {
+    "label": "Last name",
+    "value": "Kumar Gupta"
+  },
+  {
+    "label": "Full name",
+    "value": "Jay Kumar Gupta"
+  },
+  {
+    "label": "Email",
+    "value": "jaynrk200211@gmail.com"
+  },
+  {
+    "label": "Confirm your email",
+    "value": "jaynrk200211@gmail.com"
+  },
+  {
+    "label": "City",
+    "value": "a"
+  },
+  {
+    "label": "Phone number",
+    "value": "+91-7320967983"
+  },
+  {
+    "label": "Degree",
+    "value": "B.Tech in Computer ScienceCGPA: 8.67"
+  },
+  {
+    "label": "Graduation year",
+    "value": "2020"
+  },
+  {
+    "label": "Preferred location",
+    "value": "a"
+  },
+  {
+    "label": "Target role",
+    "value": "a"
+  },
+  {
+    "label": "Work authorization",
+    "value": "Yes"
+  },
+  {
+    "label": "Legally authorized to work",
+    "value": "Yes"
+  },
+  {
+    "label": "Visa sponsorship required",
+    "value": "No"
+  },
+  {
+    "label": "Visa required",
+    "value": "No"
+  },
+  {
+    "label": "Current CTC",
+    "value": "0 LPA"
+  },
+  {
+    "label": "Current salary",
+    "value": "0 LPA"
+  },
+  {
+    "label": "Message to the Hiring Team",
+    "value": "I am excited to apply for the Marketing Manager, SMB and Mid-Market - EMEA role at Stripe, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+  },
+  {
+    "label": "Primary skills",
+    "value": "JavaScript, React, Next.js, Node.js, Express"
+  },
+  {
+    "label": "Resume context",
+    "value": "jay_kumar_gupta_nit_kkr.pdf"
+  },
+  {
+    "label": "Why are you interested in this role?",
+    "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+  },
+  {
+    "label": "What makes you a match?",
+    "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+  }
+]

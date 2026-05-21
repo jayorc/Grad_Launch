@@ -1,0 +1,24 @@
+{
+  "id": "job_1",
+  "title": "Software Engineer Intern",
+  "company": "LaunchGrid",
+  "location": "Bengaluru",
+  "workMode": "hybrid",
+  "minExperience": 0,
+  "maxExperience": 1,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "B.Sc"
+  ],
+  "skills": [
+    "JavaScript",
+    "React",
+    "Node.js",
+    "CSS"
+  ],
+  "description": "Build internal products for early-career hiring workflows.",
+  "sourceType": "greenhouse",
+  "sourceUrl": "https://boards.greenhouse.io/launchgrid/jobs/123",
+  "createdAt": "Tue May 19 2026 18:36:25 GMT+0530 (India Standard Time)"
+}

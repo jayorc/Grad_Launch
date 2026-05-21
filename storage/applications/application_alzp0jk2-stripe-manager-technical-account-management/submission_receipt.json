@@ -1,0 +1,44 @@
+{
+  "intent": "browser_fill",
+  "outcome": "blocked",
+  "externalSubmitted": false,
+  "confirmation": "frame.evaluate: Target page, context or browser has been closed",
+  "submittedAt": "2026-05-20T09:04:31.932Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "aarav@example.com",
+    "subject": "GradLaunch filled Stripe - Manager, Technical Account Management",
+    "sentAt": "2026-05-20T09:04:31.932Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "blocked",
+    "sourceUrl": "https://stripe.com/jobs/search?gh_jid=7664667",
+    "openedAt": "2026-05-20T09:03:27.464Z",
+    "completedAt": "2026-05-20T09:04:31.849Z",
+    "filledLabels": [],
+    "skippedLabels": [
+      "First name",
+      "Last name",
+      "Full name",
+      "Email",
+      "Confirm your email",
+      "City",
+      "Phone number",
+      "Degree",
+      "Graduation year",
+      "Preferred location",
+      "Target role",
+      "Message to the Hiring Team",
+      "Primary skills",
+      "Resume context",
+      "Why are you interested in this role?",
+      "What makes you a match?"
+    ],
+    "screenshots": [
+      "browser-opened.png"
+    ],
+    "message": "frame.evaluate: Target page, context or browser has been closed"
+  }
+}

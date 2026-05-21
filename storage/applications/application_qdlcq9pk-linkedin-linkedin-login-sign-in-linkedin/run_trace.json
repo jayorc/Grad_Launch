@@ -1,0 +1,346 @@
+{
+  "id": "run_u57ysz9s",
+  "status": "blocked",
+  "executionMode": "browser_apply",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-21T10:34:59.045Z",
+  "completedAt": "2026-05-21T10:35:25.287Z",
+  "blockedReason": "frame.evaluate: Target page, context or browser has been closed",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Jay"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar Gupta"
+    },
+    {
+      "label": "Full name",
+      "value": "Jay Kumar Gupta"
+    },
+    {
+      "label": "Email",
+      "value": "jaynrk200211@gmail.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "jaynrk200211@gmail.com"
+    },
+    {
+      "label": "City",
+      "value": "a"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer ScienceCGPA: 8.67"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2020"
+    },
+    {
+      "label": "Preferred location",
+      "value": "a"
+    },
+    {
+      "label": "Target role",
+      "value": "a"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the LinkedIn Login, Sign In | LinkedIn role at Linkedin, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Next.js, Node.js, Express"
+    },
+    {
+      "label": "Resume context",
+      "value": "jay_kumar_gupta_nit_kkr.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://www.linkedin.com/jobs/search-results/?currentJobId=4404713630&eBP=NOT_ELIGIBLE_FOR_CHARGING&refId=bmuVzLv3wARa91TgPATRSg%3D%3D&trackingId=736Wudo4Kq6JfyQQFZtQ%2Fg%3D%3D&keywords=part-time%20or%20contract%20or%20temporary%20Back%20End%20Developer%20or%20Web%20Developer%2C%20hybrid&origin=PREFERENCES_LANDING&geoId=102713980%2C105556991%2C106187582%2C114806696.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "frame.evaluate: Target page, context or browser has been closed",
+      "state": "attention",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "frame.evaluate: Target page, context or browser has been closed",
+      "state": "attention",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "planner",
+      "label": "Planner checkpoint updated",
+      "detail": "frame.evaluate: Target page, context or browser has been closed Resume token: job_url_aHR0cHM6Ly93d3cubGlua2Vk:2026-05-21T10:34:59.134Z.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_qdlcq9pk-linkedin-linkedin-login-sign-in-linkedin.",
+      "state": "attention",
+      "source": "gradlaunch"
+    }
+  ],
+  "planner": {
+    "sessionId": "planner-job_url_aHR0cHM6Ly93d3cubGlua2Vk",
+    "resumeToken": "job_url_aHR0cHM6Ly93d3cubGlua2Vk:2026-05-21T10:34:59.134Z",
+    "goal": "Complete the LinkedIn Login, Sign In | LinkedIn application at Linkedin autonomously until a protected or final review checkpoint.",
+    "status": "blocked",
+    "summary": "frame.evaluate: Target page, context or browser has been closed",
+    "retryCount": 0,
+    "handoffCount": 2,
+    "validationErrors": [],
+    "subgoals": [
+      {
+        "id": "open_job_page",
+        "label": "Open job page",
+        "status": "completed",
+        "detail": "Job page opened successfully in a visible Chrome session.",
+        "attempts": 1,
+        "lastUpdatedAt": "2026-05-21T10:35:03.467Z",
+        "completedAt": "2026-05-21T10:35:03.467Z"
+      },
+      {
+        "id": "authenticate_if_needed",
+        "label": "Handle login if needed",
+        "status": "running",
+        "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+        "attempts": 4,
+        "lastUpdatedAt": "2026-05-21T10:35:21.213Z"
+      },
+      {
+        "id": "finish_current_section",
+        "label": "Finish active section",
+        "status": "blocked",
+        "detail": "frame.evaluate: Target page, context or browser has been closed",
+        "attempts": 4,
+        "lastUpdatedAt": "2026-05-21T10:35:25.115Z"
+      },
+      {
+        "id": "recover_from_validation_errors",
+        "label": "Recover from validation errors",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:34:59.134Z"
+      },
+      {
+        "id": "retry_alternative_path",
+        "label": "Retry alternative path",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:34:59.134Z"
+      },
+      {
+        "id": "reach_submit_gate",
+        "label": "Reach submit/review gate",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:34:59.134Z"
+      },
+      {
+        "id": "save_checkpoint",
+        "label": "Save checkpoint",
+        "status": "completed",
+        "detail": "Saved checkpoint before handing the browser to the student.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-21T10:35:19.445Z",
+        "completedAt": "2026-05-21T10:35:19.445Z"
+      }
+    ],
+    "lastUpdatedAt": "2026-05-21T10:35:25.115Z",
+    "currentUrl": "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Faccounts.google.com%2Fgsi%2Fselect%3Fclient_id%3D990339570472-k6nqn1tpmitg8pui82bfaun3jrpmiuhs.apps.googleusercontent.com%26auto_select%3Dtrue%26ux_mode%3Dpopup%26ui_mode%3Dcard%26context%3Dsignin%26as%3DZpAzwVQzJhxacR%2FxRnGlpg%26channel_id%3Da59da760931f2e7920bb1d3d8f75f820cd83c76cbd98b8e90a3af932bfcdc8c9%26origin%3Dhttps%3A%2F%2Fwww.linkedin.com&dsh=S1915008983%3A1779359719109302&faa=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin&ifkv=AWa2PauizWe0e1gfN3IjhfRI0QTKp8ZLl-gQqZifCG3i1OyRkC0sN4wAqG33Xwkpefp1nU1MNxLc",
+    "currentStep": "stage_3",
+    "currentStageLabel": "Section 3"
+  },
+  "notes": [
+    "frame.evaluate: Target page, context or browser has been closed",
+    "Browser fill status: blocked.",
+    "Filled fields: 0. Skipped fields: 22."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "blocked",
+    "externalSubmitted": false,
+    "confirmation": "frame.evaluate: Target page, context or browser has been closed",
+    "submittedAt": "2026-05-21T10:35:25.287Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "jaynrk200211@gmail.com",
+      "subject": "GradLaunch filled Linkedin - LinkedIn Login, Sign In | LinkedIn",
+      "sentAt": "2026-05-21T10:35:25.287Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "blocked",
+      "sourceUrl": "https://www.linkedin.com/jobs/search-results/?currentJobId=4404713630&eBP=NOT_ELIGIBLE_FOR_CHARGING&refId=bmuVzLv3wARa91TgPATRSg%3D%3D&trackingId=736Wudo4Kq6JfyQQFZtQ%2Fg%3D%3D&keywords=part-time%20or%20contract%20or%20temporary%20Back%20End%20Developer%20or%20Web%20Developer%2C%20hybrid&origin=PREFERENCES_LANDING&geoId=102713980%2C105556991%2C106187582%2C114806696",
+      "openedAt": "2026-05-21T10:34:59.134Z",
+      "completedAt": "2026-05-21T10:35:25.115Z",
+      "filledLabels": [],
+      "skippedLabels": [
+        "First name",
+        "Last name",
+        "Full name",
+        "Email",
+        "Confirm your email",
+        "City",
+        "Phone number",
+        "Degree",
+        "Graduation year",
+        "Preferred location",
+        "Target role",
+        "Work authorization",
+        "Legally authorized to work",
+        "Visa sponsorship required",
+        "Visa required",
+        "Current CTC",
+        "Current salary",
+        "Message to the Hiring Team",
+        "Primary skills",
+        "Resume context",
+        "Why are you interested in this role?",
+        "What makes you a match?"
+      ],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-handoff-needed.png",
+        "browser-handoff-needed.png"
+      ],
+      "message": "frame.evaluate: Target page, context or browser has been closed",
+      "planner": {
+        "sessionId": "planner-job_url_aHR0cHM6Ly93d3cubGlua2Vk",
+        "resumeToken": "job_url_aHR0cHM6Ly93d3cubGlua2Vk:2026-05-21T10:34:59.134Z",
+        "goal": "Complete the LinkedIn Login, Sign In | LinkedIn application at Linkedin autonomously until a protected or final review checkpoint.",
+        "status": "blocked",
+        "summary": "frame.evaluate: Target page, context or browser has been closed",
+        "retryCount": 0,
+        "handoffCount": 2,
+        "validationErrors": [],
+        "subgoals": [
+          {
+            "id": "open_job_page",
+            "label": "Open job page",
+            "status": "completed",
+            "detail": "Job page opened successfully in a visible Chrome session.",
+            "attempts": 1,
+            "lastUpdatedAt": "2026-05-21T10:35:03.467Z",
+            "completedAt": "2026-05-21T10:35:03.467Z"
+          },
+          {
+            "id": "authenticate_if_needed",
+            "label": "Handle login if needed",
+            "status": "running",
+            "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+            "attempts": 4,
+            "lastUpdatedAt": "2026-05-21T10:35:21.213Z"
+          },
+          {
+            "id": "finish_current_section",
+            "label": "Finish active section",
+            "status": "blocked",
+            "detail": "frame.evaluate: Target page, context or browser has been closed",
+            "attempts": 4,
+            "lastUpdatedAt": "2026-05-21T10:35:25.115Z"
+          },
+          {
+            "id": "recover_from_validation_errors",
+            "label": "Recover from validation errors",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:34:59.134Z"
+          },
+          {
+            "id": "retry_alternative_path",
+            "label": "Retry alternative path",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:34:59.134Z"
+          },
+          {
+            "id": "reach_submit_gate",
+            "label": "Reach submit/review gate",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:34:59.134Z"
+          },
+          {
+            "id": "save_checkpoint",
+            "label": "Save checkpoint",
+            "status": "completed",
+            "detail": "Saved checkpoint before handing the browser to the student.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-21T10:35:19.445Z",
+            "completedAt": "2026-05-21T10:35:19.445Z"
+          }
+        ],
+        "lastUpdatedAt": "2026-05-21T10:35:25.115Z",
+        "currentUrl": "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Faccounts.google.com%2Fgsi%2Fselect%3Fclient_id%3D990339570472-k6nqn1tpmitg8pui82bfaun3jrpmiuhs.apps.googleusercontent.com%26auto_select%3Dtrue%26ux_mode%3Dpopup%26ui_mode%3Dcard%26context%3Dsignin%26as%3DZpAzwVQzJhxacR%2FxRnGlpg%26channel_id%3Da59da760931f2e7920bb1d3d8f75f820cd83c76cbd98b8e90a3af932bfcdc8c9%26origin%3Dhttps%3A%2F%2Fwww.linkedin.com&dsh=S1915008983%3A1779359719109302&faa=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin&ifkv=AWa2PauizWe0e1gfN3IjhfRI0QTKp8ZLl-gQqZifCG3i1OyRkC0sN4wAqG33Xwkpefp1nU1MNxLc",
+        "currentStep": "stage_3",
+        "currentStageLabel": "Section 3"
+      }
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-handoff-needed.png"
+  ]
+}

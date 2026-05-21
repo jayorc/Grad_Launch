@@ -1,0 +1,15 @@
+{
+  "intent": "review_submit",
+  "outcome": "confirmed",
+  "externalSubmitted": true,
+  "confirmation": "Student reviewed the prepared fields and confirmed the final job portal submission.",
+  "submittedAt": "2026-05-20T07:03:52.177Z",
+  "email": {
+    "status": "queued",
+    "provider": "outbox",
+    "to": "jaynrk200212@gmail.com",
+    "subject": "GradLaunch submitted Orbit Campus - q",
+    "sentAt": "2026-05-20T07:03:52.178Z",
+    "message": "SMTP is not configured yet. Email receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/email-outbox/email_0pj0polv.json."
+  }
+}

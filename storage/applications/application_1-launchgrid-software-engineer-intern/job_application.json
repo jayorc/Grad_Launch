@@ -1,0 +1,62 @@
+{
+  "applicationId": "application_1",
+  "studentId": "student_1",
+  "jobId": "job_1",
+  "status": "submitted",
+  "sourceLabel": "Greenhouse",
+  "matchScore": 89,
+  "generatedArtifacts": {
+    "tailoredResumeSummary": "Highlighted React and Node.js coursework for internship-fit alignment.",
+    "coverLetterExcerpt": "I am excited to bring my frontend and API experience to LaunchGrid's hiring platform.",
+    "shortAnswers": [
+      {
+        "question": "Why are you a fit for this role?",
+        "answer": "My coursework and projects center on React, Node.js, and building user-facing workflows."
+      }
+    ]
+  },
+  "uploadedDocuments": [
+    "aarav_resume_v3.pdf"
+  ],
+  "run": {
+    "id": "run_z4xrh5pg",
+    "status": "completed",
+    "executionMode": "guided_autofill",
+    "filledFields": [
+      {
+        "label": "Full name",
+        "value": "Aarav Sharma"
+      },
+      {
+        "label": "Email",
+        "value": "aarav@example.com"
+      },
+      {
+        "label": "Location",
+        "value": "Bengaluru"
+      }
+    ],
+    "submission": {
+      "intent": "review_submit",
+      "outcome": "confirmed",
+      "externalSubmitted": true,
+      "confirmation": "Student reviewed the prepared fields and confirmed the final job portal submission.",
+      "submittedAt": "2026-05-20T07:35:06.670Z",
+      "email": {
+        "status": "queued",
+        "provider": "outbox",
+        "to": "aarav@example.com",
+        "subject": "GradLaunch submitted LaunchGrid - Software Engineer Intern",
+        "sentAt": "2026-05-20T07:35:06.671Z",
+        "message": "SMTP is not configured yet. Email receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/email-outbox/email_pt8mljlq.json."
+      }
+    },
+    "notes": [
+      "Student reviewed the prepared fields and confirmed the final job portal submission.",
+      "Submission receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_1-launchgrid-software-engineer-intern.",
+      "Email status: queued via outbox."
+    ]
+  },
+  "createdAt": "Tue May 19 2026 18:36:25 GMT+0530 (India Standard Time)",
+  "updatedAt": "2026-05-20T07:35:06.670Z"
+}

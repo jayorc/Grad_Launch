@@ -1,0 +1,174 @@
+{
+  "id": "run_mvevu9so",
+  "status": "completed",
+  "executionMode": "browser_apply",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-20T10:33:09.838Z",
+  "completedAt": "2026-05-20T10:33:23.017Z",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Aarav"
+    },
+    {
+      "label": "Last name",
+      "value": "Sharma"
+    },
+    {
+      "label": "Full name",
+      "value": "Aarav Sharma"
+    },
+    {
+      "label": "Email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "City",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer Science"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2026"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Target role",
+      "value": "Software Engineer"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Expected salary",
+      "value": "10 LPA"
+    },
+    {
+      "label": "Expected CTC",
+      "value": "10 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the LinkedIn Login, Sign In | LinkedIn role at Linkedin, where I can bring my JavaScript, TypeScript, React experience as an aspiring Software Engineer."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, TypeScript, React, Node.js, MongoDB"
+    },
+    {
+      "label": "Resume context",
+      "value": "Profile data only"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a Software Engineer and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, TypeScript, React, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://www.linkedin.com/jobs/search-results/?currentJobId=4404713630&eBP=NOT_ELIGIBLE_FOR_CHARGING&refId=bmuVzLv3wARa91TgPATRSg%3D%3D&trackingId=736Wudo4Kq6JfyQQFZtQ%2Fg%3D%3D&keywords=part-time%20or%20contract%20or%20temporary%20Back%20End%20Developer%20or%20Web%20Developer%2C%20hybrid&origin=PREFERENCES_LANDING&geoId=102713980%2C105556991%2C106187582%2C114806696.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "This job portal needs an account password. Add ATS_CREDENTIALS_JSON for this host, or use the first-time applicant upload path manually.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "The run stops before final submission.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_z3j075ko-linkedin-linkedin-login-sign-in-linkedin.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "notes": [
+    "This job portal needs an account password. Add ATS_CREDENTIALS_JSON for this host, or use the first-time applicant upload path manually.",
+    "Browser fill status: needs_manual_review.",
+    "Filled fields: 0. Skipped fields: 0."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "confirmed",
+    "externalSubmitted": false,
+    "confirmation": "This job portal needs an account password. Add ATS_CREDENTIALS_JSON for this host, or use the first-time applicant upload path manually.",
+    "submittedAt": "2026-05-20T10:33:23.017Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "aarav@example.com",
+      "subject": "GradLaunch filled Linkedin - LinkedIn Login, Sign In | LinkedIn",
+      "sentAt": "2026-05-20T10:33:23.017Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "needs_manual_review",
+      "sourceUrl": "https://www.linkedin.com/jobs/search-results/?currentJobId=4404713630&eBP=NOT_ELIGIBLE_FOR_CHARGING&refId=bmuVzLv3wARa91TgPATRSg%3D%3D&trackingId=736Wudo4Kq6JfyQQFZtQ%2Fg%3D%3D&keywords=part-time%20or%20contract%20or%20temporary%20Back%20End%20Developer%20or%20Web%20Developer%2C%20hybrid&origin=PREFERENCES_LANDING&geoId=102713980%2C105556991%2C106187582%2C114806696",
+      "openedAt": "2026-05-20T10:33:10.072Z",
+      "completedAt": "2026-05-20T10:33:23.017Z",
+      "filledLabels": [],
+      "skippedLabels": [],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-filled.png"
+      ],
+      "message": "This job portal needs an account password. Add ATS_CREDENTIALS_JSON for this host, or use the first-time applicant upload path manually."
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-filled.png"
+  ]
+}

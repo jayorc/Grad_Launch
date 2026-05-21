@@ -1,0 +1,85 @@
+{
+  "id": "run_z4xrh5pg",
+  "status": "completed",
+  "executionMode": "guided_autofill",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-20T07:35:06.670Z",
+  "completedAt": "2026-05-20T07:35:06.670Z",
+  "filledFields": [
+    {
+      "label": "Full name",
+      "value": "Aarav Sharma"
+    },
+    {
+      "label": "Email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "Location",
+      "value": "Bengaluru"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "review",
+      "label": "Student review confirmed",
+      "detail": "The prepared fields, resume brief, cover-letter excerpt, and short answers were reviewed on the workspace screen.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Form values finalized",
+      "detail": "Final values were locked for Software Engineer Intern at LaunchGrid.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "submit",
+      "label": "Final submit recorded",
+      "detail": "Student reviewed the prepared fields and confirmed the final job portal submission.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Workspace receipt saved",
+      "detail": "Updated the workspace package at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_1-launchgrid-software-engineer-intern.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "email",
+      "label": "Student email notification",
+      "detail": "SMTP is not configured yet. Email receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/email-outbox/email_pt8mljlq.json.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "notes": [
+    "Student reviewed the prepared fields and confirmed the final job portal submission.",
+    "Submission receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_1-launchgrid-software-engineer-intern.",
+    "Email status: queued via outbox."
+  ],
+  "submission": {
+    "intent": "review_submit",
+    "outcome": "confirmed",
+    "externalSubmitted": true,
+    "confirmation": "Student reviewed the prepared fields and confirmed the final job portal submission.",
+    "submittedAt": "2026-05-20T07:35:06.670Z",
+    "email": {
+      "status": "queued",
+      "provider": "outbox",
+      "to": "aarav@example.com",
+      "subject": "GradLaunch submitted LaunchGrid - Software Engineer Intern",
+      "sentAt": "2026-05-20T07:35:06.671Z",
+      "message": "SMTP is not configured yet. Email receipt saved to /Users/jaykumargupta/Codes/gradlaunch/storage/email-outbox/email_pt8mljlq.json."
+    }
+  },
+  "screenshots": [
+    "launchgrid-review-step.png",
+    "browser-opened.png",
+    "browser-filled.png",
+    "manual-review-needed.png"
+  ]
+}

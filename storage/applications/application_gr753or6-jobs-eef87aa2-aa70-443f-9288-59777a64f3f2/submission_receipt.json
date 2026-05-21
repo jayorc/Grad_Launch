@@ -1,0 +1,135 @@
+{
+  "intent": "browser_fill",
+  "outcome": "blocked",
+  "externalSubmitted": false,
+  "confirmation": "frame.evaluate: Target page, context or browser has been closed",
+  "submittedAt": "2026-05-21T11:20:02.247Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "aarav@example.com",
+    "subject": "GradLaunch filled Jobs - Eef87aa2 Aa70 443f 9288 59777a64f3f2",
+    "sentAt": "2026-05-21T11:20:02.247Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "blocked",
+    "sourceUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+    "openedAt": "2026-05-21T11:18:03.467Z",
+    "completedAt": "2026-05-21T11:20:02.117Z",
+    "filledLabels": [],
+    "skippedLabels": [
+      "First name",
+      "Last name",
+      "Full name",
+      "Email",
+      "Confirm your email",
+      "City",
+      "Location",
+      "Location (City)",
+      "Country",
+      "Phone number",
+      "Phone",
+      "Mobile",
+      "Degree",
+      "Graduation year",
+      "Preferred location",
+      "Target role",
+      "Work authorization",
+      "Legally authorized to work",
+      "Visa sponsorship required",
+      "Visa required",
+      "Current CTC",
+      "Current salary",
+      "Expected salary",
+      "Expected CTC",
+      "Message to the Hiring Team",
+      "Primary skills",
+      "Resume context",
+      "Why are you interested in this role?",
+      "What makes you a match?"
+    ],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-stage-1.png",
+      "browser-handoff-needed.png",
+      "browser-stage-2.png",
+      "browser-handoff-needed.png"
+    ],
+    "message": "frame.evaluate: Target page, context or browser has been closed",
+    "planner": {
+      "sessionId": "planner-job_u13nx3ht",
+      "resumeToken": "job_u13nx3ht:2026-05-21T10:51:27.465Z",
+      "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or final review checkpoint.",
+      "status": "blocked",
+      "summary": "frame.evaluate: Target page, context or browser has been closed",
+      "currentStep": "stage_3",
+      "currentStageLabel": "Section 3",
+      "currentUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+      "retryCount": 2,
+      "handoffCount": 2,
+      "validationErrors": [],
+      "subgoals": [
+        {
+          "id": "open_job_page",
+          "label": "Open job page",
+          "status": "completed",
+          "detail": "Job page opened successfully in a visible Chrome session.",
+          "attempts": 7,
+          "lastUpdatedAt": "2026-05-21T11:18:07.749Z",
+          "completedAt": "2026-05-21T11:18:07.749Z"
+        },
+        {
+          "id": "authenticate_if_needed",
+          "label": "Handle login if needed",
+          "status": "running",
+          "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+          "attempts": 4,
+          "lastUpdatedAt": "2026-05-21T11:19:37.365Z"
+        },
+        {
+          "id": "finish_current_section",
+          "label": "Finish active section",
+          "status": "blocked",
+          "detail": "frame.evaluate: Target page, context or browser has been closed",
+          "attempts": 26,
+          "lastUpdatedAt": "2026-05-21T11:20:02.117Z"
+        },
+        {
+          "id": "recover_from_validation_errors",
+          "label": "Recover from validation errors",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:51:27.465Z"
+        },
+        {
+          "id": "retry_alternative_path",
+          "label": "Retry alternative path",
+          "status": "retrying",
+          "detail": "Planner saw the same screen again and is attempting a different recovery path.",
+          "attempts": 8,
+          "lastUpdatedAt": "2026-05-21T11:19:43.739Z"
+        },
+        {
+          "id": "reach_submit_gate",
+          "label": "Reach submit/review gate",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:51:27.465Z"
+        },
+        {
+          "id": "save_checkpoint",
+          "label": "Save checkpoint",
+          "status": "completed",
+          "detail": "Saved checkpoint before handing the browser to the student.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T11:19:35.649Z",
+          "completedAt": "2026-05-21T11:19:35.649Z"
+        }
+      ],
+      "lastUpdatedAt": "2026-05-21T11:20:02.117Z"
+    }
+  }
+}

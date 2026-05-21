@@ -1,0 +1,52 @@
+{
+  "intent": "browser_fill",
+  "outcome": "blocked",
+  "externalSubmitted": false,
+  "confirmation": "frame.evaluate: Target page, context or browser has been closed",
+  "submittedAt": "2026-05-20T10:13:27.491Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "aarav@example.com",
+    "subject": "GradLaunch filled Datachannel - Job Opening - Back End Developer (Intern) | DataChannel",
+    "sentAt": "2026-05-20T10:13:27.491Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "blocked",
+    "sourceUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+    "openedAt": "2026-05-20T10:13:04.093Z",
+    "completedAt": "2026-05-20T10:13:27.386Z",
+    "filledLabels": [],
+    "skippedLabels": [
+      "First name",
+      "Last name",
+      "Full name",
+      "Email",
+      "Confirm your email",
+      "City",
+      "Phone number",
+      "Degree",
+      "Graduation year",
+      "Preferred location",
+      "Target role",
+      "Work authorization",
+      "Legally authorized to work",
+      "Visa sponsorship required",
+      "Visa required",
+      "Current CTC",
+      "Current salary",
+      "Expected salary",
+      "Expected CTC",
+      "Message to the Hiring Team",
+      "Primary skills",
+      "Resume context",
+      "Why are you interested in this role?",
+      "What makes you a match?"
+    ],
+    "screenshots": [
+      "browser-opened.png"
+    ],
+    "message": "frame.evaluate: Target page, context or browser has been closed"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "job_url_aHR0cHM6Ly93d3cuZGF0YWNo",
+  "title": "Job Opening - Back End Developer (Intern) | DataChannel",
+  "company": "Datachannel",
+  "location": "Remote",
+  "workMode": "onsite",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "BCA"
+  ],
+  "skills": [
+    "JavaScript",
+    "APIs",
+    "Communication"
+  ],
+  "description": "Live opening parsed from www.datachannel.co.",
+  "sourceType": "manual_url",
+  "sourceUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+  "createdAt": "Wed May 20 2026 13:40:20 GMT+0530 (India Standard Time)"
+}

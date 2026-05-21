@@ -1,0 +1,42 @@
+[
+  {
+    "label": "Full name",
+    "value": "Aarav Sharma"
+  },
+  {
+    "label": "Email",
+    "value": "aarav@example.com"
+  },
+  {
+    "label": "Degree",
+    "value": "B.Tech in Computer Science"
+  },
+  {
+    "label": "Graduation year",
+    "value": "2026"
+  },
+  {
+    "label": "Preferred location",
+    "value": "Bengaluru"
+  },
+  {
+    "label": "Target role",
+    "value": "Software Engineer"
+  },
+  {
+    "label": "Primary skills",
+    "value": "JavaScript, TypeScript, React, Node.js, MongoDB"
+  },
+  {
+    "label": "Resume context",
+    "value": "Profile data only"
+  },
+  {
+    "label": "Why are you interested in this role?",
+    "value": "This role aligns with my goal of becoming a Software Engineer and uses skills I have practiced through projects and coursework."
+  },
+  {
+    "label": "What makes you a match?",
+    "value": "My background in JavaScript, TypeScript, React, Node.js closely matches the expectations in this job description."
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "id": "job_2",
+  "title": "Frontend Engineer",
+  "company": "HireOrbit",
+  "location": "Remote",
+  "workMode": "remote",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "BCA",
+    "MCA"
+  ],
+  "skills": [
+    "TypeScript",
+    "React",
+    "Next.js",
+    "Testing"
+  ],
+  "description": "Ship polished candidate-facing experiences for career products.",
+  "sourceType": "lever",
+  "sourceUrl": "https://jobs.lever.co/hireorbit/456",
+  "createdAt": "2026-05-18T11:30:00.000Z"
+}

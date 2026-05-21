@@ -1,0 +1,176 @@
+{
+  "id": "run_yh1b9afp",
+  "status": "completed",
+  "executionMode": "browser_apply",
+  "adapterId": "aihawk-local",
+  "startedAt": "2026-05-20T10:28:54.443Z",
+  "completedAt": "2026-05-20T10:29:18.643Z",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Jay"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar Gupta"
+    },
+    {
+      "label": "Full name",
+      "value": "Jay Kumar Gupta"
+    },
+    {
+      "label": "Email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "aarav@example.com"
+    },
+    {
+      "label": "City",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer ScienceCGPA: 8.67"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2020"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Target role",
+      "value": "Software Engineer"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Expected salary",
+      "value": "10 LPA"
+    },
+    {
+      "label": "Expected CTC",
+      "value": "10 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd, where I can bring my JavaScript, React, Next.js experience as an aspiring Software Engineer."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Next.js, Node.js, Express"
+    },
+    {
+      "label": "Resume context",
+      "value": "jay_kumar_gupta_nit_kkr.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a Software Engineer and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "GradLaunch clicked Apply, but the application form did not open. The job site may require login, may have blocked a popup, or may need manual interaction.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "The run stops before final submission.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_dyosc33e-blue-umbrella-india-pvt-ltd-software-engineer-contractor.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "notes": [
+    "GradLaunch clicked Apply, but the application form did not open. The job site may require login, may have blocked a popup, or may need manual interaction.",
+    "Browser fill status: needs_manual_review.",
+    "Filled fields: 0. Skipped fields: 0."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "confirmed",
+    "externalSubmitted": false,
+    "confirmation": "GradLaunch clicked Apply, but the application form did not open. The job site may require login, may have blocked a popup, or may need manual interaction.",
+    "submittedAt": "2026-05-20T10:29:18.643Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "aarav@example.com",
+      "subject": "GradLaunch filled Blue Umbrella India Pvt Ltd - Software Engineer Contractor",
+      "sentAt": "2026-05-20T10:29:18.643Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "needs_manual_review",
+      "sourceUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+      "openedAt": "2026-05-20T10:28:54.606Z",
+      "completedAt": "2026-05-20T10:29:18.643Z",
+      "filledLabels": [],
+      "skippedLabels": [],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-stage-1-start.png",
+        "browser-filled.png"
+      ],
+      "message": "GradLaunch clicked Apply, but the application form did not open. The job site may require login, may have blocked a popup, or may need manual interaction."
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-stage-1-start.png",
+    "browser-filled.png"
+  ]
+}

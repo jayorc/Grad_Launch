@@ -1,0 +1,103 @@
+{
+  "intent": "browser_fill",
+  "outcome": "confirmed",
+  "externalSubmitted": false,
+  "confirmation": "The agent clicked a visible control, but the page did not advance. Reason: Easy apply",
+  "submittedAt": "2026-05-21T10:33:51.115Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "jaynrk200211@gmail.com",
+    "subject": "GradLaunch filled Jobs - Eef87aa2 Aa70 443f 9288 59777a64f3f2",
+    "sentAt": "2026-05-21T10:33:51.115Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "needs_manual_review",
+    "sourceUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+    "openedAt": "2026-05-21T10:33:34.340Z",
+    "completedAt": "2026-05-21T10:33:51.115Z",
+    "filledLabels": [
+      "Resume upload"
+    ],
+    "skippedLabels": [],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-filled.png"
+    ],
+    "message": "The agent clicked a visible control, but the page did not advance. Reason: Easy apply",
+    "planner": {
+      "sessionId": "planner-job_u13nx3ht",
+      "resumeToken": "job_u13nx3ht:2026-05-21T10:30:48.952Z",
+      "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or final review checkpoint.",
+      "status": "needs_review",
+      "summary": "The agent clicked a visible control, but the page did not advance. Reason: Easy apply",
+      "currentStep": "stage_1",
+      "currentStageLabel": "Section 1",
+      "currentUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+      "retryCount": 0,
+      "handoffCount": 0,
+      "validationErrors": [],
+      "subgoals": [
+        {
+          "id": "open_job_page",
+          "label": "Open job page",
+          "status": "completed",
+          "detail": "Job page opened successfully in a visible Chrome session.",
+          "attempts": 2,
+          "lastUpdatedAt": "2026-05-21T10:33:37.792Z",
+          "completedAt": "2026-05-21T10:33:37.792Z"
+        },
+        {
+          "id": "authenticate_if_needed",
+          "label": "Handle login if needed",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+        },
+        {
+          "id": "finish_current_section",
+          "label": "Finish active section",
+          "status": "running",
+          "detail": "Resume upload completed. Re-reading the current section.",
+          "attempts": 6,
+          "lastUpdatedAt": "2026-05-21T10:33:48.858Z"
+        },
+        {
+          "id": "recover_from_validation_errors",
+          "label": "Recover from validation errors",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+        },
+        {
+          "id": "retry_alternative_path",
+          "label": "Retry alternative path",
+          "status": "blocked",
+          "detail": "A visible control was clicked but the flow did not advance: Easy apply",
+          "attempts": 2,
+          "lastUpdatedAt": "2026-05-21T10:33:50.979Z"
+        },
+        {
+          "id": "reach_submit_gate",
+          "label": "Reach submit/review gate",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+        },
+        {
+          "id": "save_checkpoint",
+          "label": "Save checkpoint",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+        }
+      ],
+      "lastUpdatedAt": "2026-05-21T10:33:51.115Z"
+    }
+  }
+}

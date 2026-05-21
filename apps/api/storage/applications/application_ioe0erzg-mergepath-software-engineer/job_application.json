@@ -1,0 +1,75 @@
+{
+  "applicationId": "application_ioe0erzg",
+  "studentId": "student_mp8i2i8s",
+  "jobId": "job_generated_mergepath-software-engineer-bangalore",
+  "status": "draft_ready",
+  "sourceLabel": "Search",
+  "matchScore": 84,
+  "generatedArtifacts": {
+    "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Software Engineer role at MergePath.",
+    "coverLetterExcerpt": "I am excited to apply for the Software Engineer role at MergePath, where I can bring my JavaScript, React, Next.js experience as an aspiring Software Engineer.",
+    "shortAnswers": [
+      {
+        "question": "Why are you interested in this role?",
+        "answer": "This role aligns with my goal of becoming a Software Engineer and uses skills I have already practiced through projects and coursework."
+      },
+      {
+        "question": "What makes you a match?",
+        "answer": "My background in JavaScript, React, Next.js, Node.js closely matches the technical expectations in the job description."
+      }
+    ]
+  },
+  "uploadedDocuments": [
+    "jay_kumar_gupta_nit_kkr.pdf",
+    "tailored_resume_summary.txt",
+    "cover_letter_excerpt.txt",
+    "short_answers.json"
+  ],
+  "run": {
+    "id": "run_qkhanqhg",
+    "status": "completed",
+    "executionMode": "draft_package",
+    "filledFields": [
+      {
+        "label": "Full name",
+        "value": "Jay Kumar Gupta"
+      },
+      {
+        "label": "Email",
+        "value": "jaynrk20021@gmail.com"
+      },
+      {
+        "label": "Degree",
+        "value": "B.Tech in Computer ScienceCGPA: 8.67"
+      },
+      {
+        "label": "Graduation year",
+        "value": "2020"
+      },
+      {
+        "label": "Preferred location",
+        "value": "Bangalore"
+      },
+      {
+        "label": "Target role",
+        "value": "Software Engineer"
+      },
+      {
+        "label": "Primary skills",
+        "value": "JavaScript, React, Next.js, Node.js, Express"
+      },
+      {
+        "label": "Resume context",
+        "value": "jay_kumar_gupta_nit_kkr.pdf"
+      }
+    ],
+    "notes": [
+      "Latest resume used: jay_kumar_gupta_nit_kkr.pdf.",
+      "Browser auto-apply is unavailable in this AIHawk checkout, so autofill stays review-first.",
+      "Structured application package saved to /Users/jaykumargupta/Codes/gradlaunch/apps/api/storage/applications/application_ioe0erzg-mergepath-software-engineer.",
+      "Draft mode does not attempt browser interaction."
+    ]
+  },
+  "createdAt": "2026-05-19T18:50:06.125Z",
+  "updatedAt": "2026-05-19T18:50:06.125Z"
+}
