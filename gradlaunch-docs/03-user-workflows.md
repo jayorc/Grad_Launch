@@ -51,7 +51,7 @@
 
 1. Student picks a matched job
 2. GradLaunch prepares a tailored application package
-3. Playwright fills form fields on supported pages and continues in the background by default
+3. Playwright opens a new controlled tab in the persistent managed GradLaunch browser session, fills form fields on supported pages, and continues in the background by default
 4. System pauses at:
    - captcha
    - OTP

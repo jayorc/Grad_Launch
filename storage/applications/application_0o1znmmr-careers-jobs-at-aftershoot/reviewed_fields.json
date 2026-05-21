@@ -24,7 +24,27 @@
     "value": "a"
   },
   {
+    "label": "Location",
+    "value": "a"
+  },
+  {
+    "label": "Location (City)",
+    "value": "a"
+  },
+  {
+    "label": "Country",
+    "value": "India"
+  },
+  {
     "label": "Phone number",
+    "value": "+91-7320967983"
+  },
+  {
+    "label": "Phone",
+    "value": "+91-7320967983"
+  },
+  {
+    "label": "Mobile",
     "value": "+91-7320967983"
   },
   {

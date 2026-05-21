@@ -2,13 +2,13 @@
   "sessionId": "planner-job_u13nx3ht",
   "resumeToken": "job_u13nx3ht:2026-05-21T10:30:48.952Z",
   "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or final review checkpoint.",
-  "status": "needs_review",
-  "summary": "The agent clicked a visible control, but the page did not advance. Reason: Easy apply",
-  "currentStep": "stage_1",
-  "currentStageLabel": "Section 1",
+  "status": "blocked",
+  "summary": "page.waitForTimeout: Target page, context or browser has been closed",
+  "currentStep": "stage_3",
+  "currentStageLabel": "Section 3",
   "currentUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-  "retryCount": 0,
-  "handoffCount": 0,
+  "retryCount": 2,
+  "handoffCount": 2,
   "validationErrors": [],
   "subgoals": [
     {
@@ -16,25 +16,25 @@
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 2,
-      "lastUpdatedAt": "2026-05-21T10:33:37.792Z",
-      "completedAt": "2026-05-21T10:33:37.792Z"
+      "attempts": 3,
+      "lastUpdatedAt": "2026-05-21T12:29:38.264Z",
+      "completedAt": "2026-05-21T12:29:38.264Z"
     },
     {
       "id": "authenticate_if_needed",
       "label": "Handle login if needed",
-      "status": "pending",
-      "detail": "Waiting to start.",
-      "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+      "status": "running",
+      "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+      "attempts": 4,
+      "lastUpdatedAt": "2026-05-21T12:31:06.991Z"
     },
     {
       "id": "finish_current_section",
       "label": "Finish active section",
-      "status": "running",
-      "detail": "Resume upload completed. Re-reading the current section.",
-      "attempts": 6,
-      "lastUpdatedAt": "2026-05-21T10:33:48.858Z"
+      "status": "blocked",
+      "detail": "page.waitForTimeout: Target page, context or browser has been closed",
+      "attempts": 15,
+      "lastUpdatedAt": "2026-05-21T12:31:38.309Z"
     },
     {
       "id": "recover_from_validation_errors",
@@ -47,10 +47,10 @@
     {
       "id": "retry_alternative_path",
       "label": "Retry alternative path",
-      "status": "blocked",
-      "detail": "A visible control was clicked but the flow did not advance: Easy apply",
-      "attempts": 2,
-      "lastUpdatedAt": "2026-05-21T10:33:50.979Z"
+      "status": "retrying",
+      "detail": "Planner saw the same screen again and is attempting a different recovery path.",
+      "attempts": 4,
+      "lastUpdatedAt": "2026-05-21T12:31:13.034Z"
     },
     {
       "id": "reach_submit_gate",
@@ -63,11 +63,12 @@
     {
       "id": "save_checkpoint",
       "label": "Save checkpoint",
-      "status": "pending",
-      "detail": "Waiting to start.",
+      "status": "completed",
+      "detail": "Saved checkpoint before handing the browser to the student.",
       "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+      "lastUpdatedAt": "2026-05-21T12:31:05.272Z",
+      "completedAt": "2026-05-21T12:31:05.272Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-21T10:33:51.115Z"
+  "lastUpdatedAt": "2026-05-21T12:31:38.309Z"
 }

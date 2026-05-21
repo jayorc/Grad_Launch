@@ -28,7 +28,7 @@ export function ProfilePageClient() {
               <li className="list-item soft-list-item">{student.fullName}</li>
               <li className="list-item soft-list-item">{student.email}</li>
               <li className="list-item soft-list-item">{student.bio || "No bio yet."}</li>
-              <li className="list-item soft-list-item">Automation mode: {student.automationMode}</li>
+              <li className="list-item soft-list-item">Automation mode: {student.automationMode.replaceAll("_", " ")}</li>
               <li className="list-item soft-list-item">Default strictness: {student.defaultStrictness}</li>
               <li className="list-item soft-list-item">Resume linked: {student.resumeId ? "Yes" : "No"}</li>
             </ul>

@@ -2,7 +2,7 @@
   "applicationId": "application_doqzq132",
   "studentId": "student_1",
   "jobId": "job_url_aHR0cHM6Ly93d3cucXVhbnR1",
-  "status": "ready_for_review",
+  "status": "blocked",
   "sourceLabel": "Pasted URL",
   "matchScore": 44,
   "generatedArtifacts": {
@@ -26,8 +26,8 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_wxwafiob",
-    "status": "needs_review",
+    "id": "run_mwkp3dkz",
+    "status": "blocked",
     "executionMode": "browser_apply",
     "filledFields": [
       {
@@ -149,49 +149,63 @@
     ],
     "submission": {
       "intent": "browser_fill",
-      "outcome": "confirmed",
+      "outcome": "blocked",
       "externalSubmitted": false,
-      "confirmation": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
-      "submittedAt": "2026-05-21T11:17:32.734Z",
+      "confirmation": "GradLaunch could not reuse your signed-in Chrome profile because Chrome is already using it. To open a new controlled tab in the same live browser session, start Chrome with remote debugging enabled and set BROWSER_CDP_URL, or fully quit Chrome and let GradLaunch relaunch your real profile.",
+      "submittedAt": "2026-05-21T13:38:46.478Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "aarav@example.com",
         "subject": "GradLaunch filled Quantum Paradigm - Back-End Developer",
-        "sentAt": "2026-05-21T11:17:32.734Z",
+        "sentAt": "2026-05-21T13:38:46.478Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
-        "status": "needs_manual_review",
+        "status": "blocked",
         "sourceUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
-        "openedAt": "2026-05-21T11:16:55.247Z",
-        "completedAt": "2026-05-21T11:17:32.734Z",
-        "filledLabels": [
-          "Resume upload",
-          "Full Name",
+        "openedAt": "2026-05-21T13:38:46.339Z",
+        "completedAt": "2026-05-21T13:38:46.478Z",
+        "filledLabels": [],
+        "skippedLabels": [
+          "First name",
+          "Last name",
+          "Full name",
           "Email",
           "Confirm your email",
+          "City",
+          "Location",
+          "Location (City)",
+          "Country",
           "Phone number",
           "Phone",
           "Mobile",
+          "Degree",
+          "Graduation year",
+          "Preferred location",
+          "Target role",
+          "Work authorization",
+          "Legally authorized to work",
+          "Visa sponsorship required",
+          "Visa required",
+          "Current CTC",
+          "Current salary",
+          "Expected salary",
+          "Expected CTC",
           "Message to the Hiring Team",
-          "Cover Letter",
-          "By using this form you agree with the storage and handling of your data by this website."
+          "Primary skills",
+          "Resume context",
+          "Why are you interested in this role?",
+          "What makes you a match?"
         ],
-        "skippedLabels": [],
-        "screenshots": [
-          "browser-opened.png",
-          "browser-stage-1.png",
-          "browser-filled.png",
-          "manual-review-needed.png"
-        ],
-        "message": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+        "screenshots": [],
+        "message": "GradLaunch could not reuse your signed-in Chrome profile because Chrome is already using it. To open a new controlled tab in the same live browser session, start Chrome with remote debugging enabled and set BROWSER_CDP_URL, or fully quit Chrome and let GradLaunch relaunch your real profile.",
         "planner": {
           "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
           "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-21T10:48:13.843Z",
           "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or final review checkpoint.",
-          "status": "needs_review",
-          "summary": "Final submit requires manual review or external submit is disabled.",
+          "status": "blocked",
+          "summary": "GradLaunch could not reuse your signed-in Chrome profile because Chrome is already using it. To open a new controlled tab in the same live browser session, start Chrome with remote debugging enabled and set BROWSER_CDP_URL, or fully quit Chrome and let GradLaunch relaunch your real profile.",
           "currentStep": "stage_1",
           "currentStageLabel": "Section 1",
           "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
@@ -204,9 +218,9 @@
               "label": "Open job page",
               "status": "completed",
               "detail": "Job page opened successfully in a visible Chrome session.",
-              "attempts": 3,
-              "lastUpdatedAt": "2026-05-21T11:17:01.511Z",
-              "completedAt": "2026-05-21T11:17:01.511Z"
+              "attempts": 4,
+              "lastUpdatedAt": "2026-05-21T13:29:38.251Z",
+              "completedAt": "2026-05-21T13:29:38.251Z"
             },
             {
               "id": "authenticate_if_needed",
@@ -219,10 +233,10 @@
             {
               "id": "finish_current_section",
               "label": "Finish active section",
-              "status": "running",
-              "detail": "Filled 9 fields on Section 1.",
-              "attempts": 12,
-              "lastUpdatedAt": "2026-05-21T11:17:31.019Z"
+              "status": "blocked",
+              "detail": "GradLaunch could not reuse your signed-in Chrome profile because Chrome is already using it. To open a new controlled tab in the same live browser session, start Chrome with remote debugging enabled and set BROWSER_CDP_URL, or fully quit Chrome and let GradLaunch relaunch your real profile.",
+              "attempts": 17,
+              "lastUpdatedAt": "2026-05-21T13:38:46.478Z"
             },
             {
               "id": "recover_from_validation_errors",
@@ -259,16 +273,16 @@
               "completedAt": "2026-05-21T11:17:32.734Z"
             }
           ],
-          "lastUpdatedAt": "2026-05-21T11:17:32.734Z"
+          "lastUpdatedAt": "2026-05-21T13:38:46.478Z"
         }
       }
     },
     "notes": [
-      "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
-      "Browser fill status: needs_manual_review.",
-      "Filled fields: 10. Skipped fields: 0."
+      "GradLaunch could not reuse your signed-in Chrome profile because Chrome is already using it. To open a new controlled tab in the same live browser session, start Chrome with remote debugging enabled and set BROWSER_CDP_URL, or fully quit Chrome and let GradLaunch relaunch your real profile.",
+      "Browser fill status: blocked.",
+      "Filled fields: 0. Skipped fields: 29."
     ]
   },
   "createdAt": "2026-05-20T11:40:18.923Z",
-  "updatedAt": "2026-05-21T11:17:32.734Z"
+  "updatedAt": "2026-05-21T13:38:46.478Z"
 }

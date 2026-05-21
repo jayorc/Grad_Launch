@@ -18,10 +18,10 @@ import { StudentRepository } from "../repositories/student-repository";
 import { createId } from "../lib/id";
 import { nowIso } from "../lib/time";
 import { AIHawkAdapterService, type StructuredApplicationPackageResult } from "./aihawk-adapter-service";
+import { AgentOrchestratorService } from "./agent-orchestrator-service";
 import { EmailService } from "./email-service";
 import { MatchingService } from "./matching-service";
-
-const activeAutopilotApplications = new Set<string>();
+import { StudentMemoryService } from "./student-memory-service";
 
 export class ApplicationService {
   constructor(
@@ -31,7 +31,9 @@ export class ApplicationService {
     private readonly resumes = new ResumeRepository(),
     private readonly matching = new MatchingService(),
     private readonly aihawk = new AIHawkAdapterService(),
-    private readonly emails = new EmailService()
+    private readonly emails = new EmailService(),
+    private readonly orchestrator = new AgentOrchestratorService(),
+    private readonly memory = new StudentMemoryService()
   ) {}
 
   async create(input: CreateApplicationInput) {
@@ -101,9 +103,10 @@ export class ApplicationService {
     await this.applications.createRun(run);
 
     if (input.mode === "autopilot") {
-      this.launchAutopilot({
-        applicationId: application.id,
-        studentId: student.id
+      await this.orchestrator.queueAutonomousApplication({
+        studentId: student.id,
+        application,
+        job
       });
     }
 
@@ -288,7 +291,7 @@ export class ApplicationService {
     const latestRun = runs[0];
     const browserCapability = capabilities.capabilities.find((capability) => capability.id === "browser_apply");
     const wantsAutoSubmit = input.intent === "auto_submit";
-    const canAutoSubmit = wantsAutoSubmit && browserCapability?.status !== "unavailable";
+    const canAutoSubmit = wantsAutoSubmit && (browserCapability?.status === "available" || browserCapability?.status === "partial");
     const now = nowIso();
     const reviewedFields = normalizeReviewedFields(input.reviewedFields, latestRun?.filledFields ?? buildFilledFields(student, job, resume, application.generatedArtifacts));
     const browserReceipt = canAutoSubmit
@@ -394,6 +397,10 @@ export class ApplicationService {
     await this.applications.update(updatedApplication);
     await this.applications.createRun(finalRun);
 
+    if (input.reviewedFields.length > 0) {
+      await this.memory.recordCorrections(application.studentId, reviewedFields);
+    }
+
     return {
       application: updatedApplication,
       run: finalRun,
@@ -414,95 +421,6 @@ export class ApplicationService {
       submit: input.submit
     });
   }
-
-  private launchAutopilot(input: { applicationId: string; studentId: string }) {
-    if (activeAutopilotApplications.has(input.applicationId)) {
-      return;
-    }
-
-    activeAutopilotApplications.add(input.applicationId);
-
-    setTimeout(() => {
-      void this.runAutopilotInBackground(input).finally(() => {
-        activeAutopilotApplications.delete(input.applicationId);
-      });
-    }, 0);
-  }
-
-  private async runAutopilotInBackground(input: { applicationId: string; studentId: string }) {
-    try {
-      await this.submit({
-        applicationId: input.applicationId,
-        studentId: input.studentId,
-        intent: "auto_submit",
-        reviewedFields: []
-      });
-    } catch (error) {
-      const [application, capabilities] = await Promise.all([
-        this.applications.getById(input.applicationId),
-        this.aihawk.getCapabilities()
-      ]);
-
-      if (!application) {
-        return;
-      }
-
-      const [student, job, resume, existingRuns] = await Promise.all([
-        this.students.getById(application.studentId),
-        this.jobs.getById(application.jobId),
-        this.resumes.getLatestByStudent(application.studentId),
-        this.applications.listRunsByApplication(application.id)
-      ]);
-
-      if (!student || !job) {
-        return;
-      }
-
-      const message = error instanceof Error ? error.message : "Autopilot failed before the browser agent could finish the submission flow.";
-      const failedAt = nowIso();
-      const updatedApplication: Application = {
-        ...application,
-        status: "blocked",
-        lastUpdatedAt: failedAt
-      };
-      const failedRun: ApplicationRun = {
-        id: createId("run"),
-        applicationId: application.id,
-        status: "blocked",
-        startedAt: failedAt,
-        completedAt: failedAt,
-        adapterId: capabilities.adapterId,
-        executionMode: "autonomous_apply",
-        workspacePath: existingRuns[0]?.workspacePath,
-        workspaceFiles: existingRuns[0]?.workspaceFiles ?? [],
-        screenshots: existingRuns[0]?.screenshots ?? [],
-        blockedReason: message,
-        filledFields: existingRuns[0]?.filledFields ?? buildFilledFields(student, job, resume, application.generatedArtifacts),
-        planner: existingRuns[0]?.planner,
-        timeline: buildAutopilotFailureTimeline(job, message, existingRuns[0]?.workspacePath),
-        notes: [
-          "Autopilot started in the background but hit a blocking error.",
-          message
-        ]
-      };
-
-      const packageResult = await this.aihawk.createStructuredApplicationPackage({
-        application: updatedApplication,
-        run: failedRun,
-        job,
-        student,
-        resume
-      }).catch(() => undefined);
-
-      await this.applications.update(updatedApplication);
-      await this.applications.createRun({
-        ...failedRun,
-        workspacePath: packageResult?.directory ?? failedRun.workspacePath,
-        workspaceFiles: packageResult?.files ?? failedRun.workspaceFiles
-      });
-    }
-  }
-
   private async finalizeRun(
     baseRun: ApplicationRun,
     application: Application,

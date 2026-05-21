@@ -1,10 +1,11 @@
 {
-  "id": "run_c522uqqr",
-  "status": "needs_review",
+  "id": "run_e76gtknl",
+  "status": "blocked",
   "executionMode": "browser_apply",
   "adapterId": "aihawk-local",
-  "startedAt": "2026-05-21T10:24:45.989Z",
-  "completedAt": "2026-05-21T10:25:05.058Z",
+  "startedAt": "2026-05-21T13:12:00.935Z",
+  "completedAt": "2026-05-21T13:12:52.624Z",
+  "blockedReason": "frame.evaluate: Target page, context or browser has been closed",
   "filledFields": [
     {
       "label": "First name",
@@ -31,7 +32,27 @@
       "value": "a"
     },
     {
+      "label": "Location",
+      "value": "a"
+    },
+    {
+      "label": "Location (City)",
+      "value": "a"
+    },
+    {
+      "label": "Country",
+      "value": "India"
+    },
+    {
       "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Phone",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Mobile",
       "value": "+91-7320967983"
     },
     {
@@ -106,21 +127,21 @@
     {
       "id": "fill",
       "label": "Filling visible form fields",
-      "detail": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
-      "state": "done",
+      "detail": "frame.evaluate: Target page, context or browser has been closed",
+      "state": "attention",
       "source": "gradlaunch"
     },
     {
       "id": "pause",
       "label": "Pausing before submit",
-      "detail": "The run stops before final submission.",
-      "state": "done",
+      "detail": "frame.evaluate: Target page, context or browser has been closed",
+      "state": "attention",
       "source": "gradlaunch"
     },
     {
       "id": "planner",
       "label": "Planner checkpoint updated",
-      "detail": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON. Resume token: job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z.",
+      "detail": "frame.evaluate: Target page, context or browser has been closed Resume token: job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z.",
       "state": "done",
       "source": "gradlaunch"
     },
@@ -128,7 +149,7 @@
       "id": "workspace",
       "label": "Saving screenshots and receipt",
       "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_45vxmwkh-willwaretech-oorwin.",
-      "state": "done",
+      "state": "attention",
       "source": "gradlaunch"
     }
   ],
@@ -136,8 +157,8 @@
     "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
     "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z",
     "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or final review checkpoint.",
-    "status": "needs_review",
-    "summary": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+    "status": "blocked",
+    "summary": "frame.evaluate: Target page, context or browser has been closed",
     "currentStep": "stage_1",
     "currentStageLabel": "Section 1",
     "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
@@ -155,9 +176,9 @@
         "label": "Open job page",
         "status": "completed",
         "detail": "Job page opened successfully in a visible Chrome session.",
-        "attempts": 5,
-        "lastUpdatedAt": "2026-05-21T10:24:50.833Z",
-        "completedAt": "2026-05-21T10:24:50.833Z"
+        "attempts": 6,
+        "lastUpdatedAt": "2026-05-21T13:12:04.497Z",
+        "completedAt": "2026-05-21T13:12:04.497Z"
       },
       {
         "id": "authenticate_if_needed",
@@ -170,10 +191,10 @@
       {
         "id": "finish_current_section",
         "label": "Finish active section",
-        "status": "running",
-        "detail": "Resume upload completed. Re-reading the current section.",
-        "attempts": 17,
-        "lastUpdatedAt": "2026-05-21T10:25:02.010Z"
+        "status": "blocked",
+        "detail": "frame.evaluate: Target page, context or browser has been closed",
+        "attempts": 21,
+        "lastUpdatedAt": "2026-05-21T13:12:52.580Z"
       },
       {
         "id": "recover_from_validation_errors",
@@ -210,58 +231,72 @@
         "completedAt": "2026-05-21T10:07:15.433Z"
       }
     ],
-    "lastUpdatedAt": "2026-05-21T10:25:05.058Z"
+    "lastUpdatedAt": "2026-05-21T13:12:52.580Z"
   },
   "notes": [
-    "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
-    "Browser fill status: needs_manual_review.",
-    "Filled fields: 8. Skipped fields: 2."
+    "frame.evaluate: Target page, context or browser has been closed",
+    "Browser fill status: blocked.",
+    "Filled fields: 0. Skipped fields: 27."
   ],
   "submission": {
     "intent": "browser_fill",
-    "outcome": "confirmed",
+    "outcome": "blocked",
     "externalSubmitted": false,
-    "confirmation": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
-    "submittedAt": "2026-05-21T10:25:05.058Z",
+    "confirmation": "frame.evaluate: Target page, context or browser has been closed",
+    "submittedAt": "2026-05-21T13:12:52.624Z",
     "email": {
       "status": "skipped",
       "provider": "outbox",
       "to": "jaynrk200211@gmail.com",
       "subject": "GradLaunch filled Willwaretech - Oorwin",
-      "sentAt": "2026-05-21T10:25:05.058Z",
+      "sentAt": "2026-05-21T13:12:52.624Z",
       "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
     },
     "browser": {
-      "status": "needs_manual_review",
+      "status": "blocked",
       "sourceUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-      "openedAt": "2026-05-21T10:24:46.308Z",
-      "completedAt": "2026-05-21T10:25:05.058Z",
-      "filledLabels": [
-        "Resume upload",
-        "Last Name",
-        "First Name",
-        "Email",
-        "Mobile +1",
-        "Years of Experience",
-        "City",
-        "Current CTC"
-      ],
+      "openedAt": "2026-05-21T13:12:01.224Z",
+      "completedAt": "2026-05-21T13:12:52.580Z",
+      "filledLabels": [],
       "skippedLabels": [
-        "Mobile +1",
-        "Current CTC"
+        "First name",
+        "Last name",
+        "Full name",
+        "Email",
+        "Confirm your email",
+        "City",
+        "Location",
+        "Location (City)",
+        "Country",
+        "Phone number",
+        "Phone",
+        "Mobile",
+        "Degree",
+        "Graduation year",
+        "Preferred location",
+        "Target role",
+        "Work authorization",
+        "Legally authorized to work",
+        "Visa sponsorship required",
+        "Visa required",
+        "Current CTC",
+        "Current salary",
+        "Message to the Hiring Team",
+        "Primary skills",
+        "Resume context",
+        "Why are you interested in this role?",
+        "What makes you a match?"
       ],
       "screenshots": [
-        "browser-opened.png",
-        "browser-stage-1-needs-input.png",
-        "browser-filled.png"
+        "browser-opened.png"
       ],
-      "message": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+      "message": "frame.evaluate: Target page, context or browser has been closed",
       "planner": {
         "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
         "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z",
         "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or final review checkpoint.",
-        "status": "needs_review",
-        "summary": "GradLaunch found required fields it cannot answer safely yet: Mobile +1, Current CTC. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+        "status": "blocked",
+        "summary": "frame.evaluate: Target page, context or browser has been closed",
         "currentStep": "stage_1",
         "currentStageLabel": "Section 1",
         "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
@@ -279,9 +314,9 @@
             "label": "Open job page",
             "status": "completed",
             "detail": "Job page opened successfully in a visible Chrome session.",
-            "attempts": 5,
-            "lastUpdatedAt": "2026-05-21T10:24:50.833Z",
-            "completedAt": "2026-05-21T10:24:50.833Z"
+            "attempts": 6,
+            "lastUpdatedAt": "2026-05-21T13:12:04.497Z",
+            "completedAt": "2026-05-21T13:12:04.497Z"
           },
           {
             "id": "authenticate_if_needed",
@@ -294,10 +329,10 @@
           {
             "id": "finish_current_section",
             "label": "Finish active section",
-            "status": "running",
-            "detail": "Resume upload completed. Re-reading the current section.",
-            "attempts": 17,
-            "lastUpdatedAt": "2026-05-21T10:25:02.010Z"
+            "status": "blocked",
+            "detail": "frame.evaluate: Target page, context or browser has been closed",
+            "attempts": 21,
+            "lastUpdatedAt": "2026-05-21T13:12:52.580Z"
           },
           {
             "id": "recover_from_validation_errors",
@@ -334,7 +369,7 @@
             "completedAt": "2026-05-21T10:07:15.433Z"
           }
         ],
-        "lastUpdatedAt": "2026-05-21T10:25:05.058Z"
+        "lastUpdatedAt": "2026-05-21T13:12:52.580Z"
       }
     }
   },

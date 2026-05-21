@@ -8,9 +8,11 @@ import { useAgentConsole } from "../providers/agent-console-provider";
 type BrowserFillActionProps = {
   token: string;
   jobId: string;
+  browserReady?: boolean;
+  browserMessage?: string;
 };
 
-export function BrowserFillAction({ token, jobId }: BrowserFillActionProps) {
+export function BrowserFillAction({ token, jobId, browserReady = true, browserMessage }: BrowserFillActionProps) {
   const [loading, setLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
@@ -32,8 +34,8 @@ export function BrowserFillAction({ token, jobId }: BrowserFillActionProps) {
 
   async function handleFill(submit: boolean) {
     const initialMessage = submit
-      ? "Chrome will open visibly. GradLaunch will keep navigating stages and attempt the final submit when the backend allows real submission."
-      : "Chrome will open visibly. GradLaunch will keep navigating stages, hand control to you only for login or OTP if needed, and otherwise keep going automatically.";
+      ? "GradLaunch will open a new controlled tab in the managed GradLaunch browser session, then continue toward final submit."
+      : "GradLaunch will open a new controlled tab in the managed GradLaunch browser session, hand control to you only for login or OTP if needed, and then keep going automatically.";
 
     setLoading(true);
     setMessage(initialMessage);
@@ -88,15 +90,16 @@ export function BrowserFillAction({ token, jobId }: BrowserFillActionProps) {
   return (
     <div className="action-stack">
       <div className="button-row button-row-compact">
-        <button className="button button-primary" disabled={loading} onClick={() => handleFill(false)} type="button">
+        <button className="button button-primary" disabled={loading || !browserReady} onClick={() => handleFill(false)} type="button">
           {loading ? "Agent running..." : "Assisted Browser Fill"}
         </button>
-        <button className="button button-secondary" disabled={loading} onClick={() => handleFill(true)} type="button">
+        <button className="button button-secondary" disabled={loading || !browserReady} onClick={() => handleFill(true)} type="button">
           Run to Submit
         </button>
       </div>
+      {!browserReady && browserMessage ? <p className="action-inline-status">{browserMessage}</p> : null}
       {pendingSteps ? <p className="action-inline-status">Browser agent is active. Watch the draggable companion and the live Chrome window.</p> : null}
-      {message && !pendingSteps ? <p className="action-inline-status">{message}</p> : null}
+      {message && !pendingSteps && browserReady ? <p className="action-inline-status">{message}</p> : null}
     </div>
   );
 }
@@ -107,7 +110,7 @@ function createBrowserFillSteps(elapsedSeconds: number): AgentTimelineStep[] {
     {
       id: "open",
       label: "Open exact URL",
-      detail: "Launching visible Chrome on the job page you provided.",
+      detail: "Opening the job in a new controlled tab inside the managed GradLaunch browser session.",
       state: "queued",
       source: "gradlaunch"
     },

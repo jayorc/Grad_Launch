@@ -4,6 +4,9 @@
   "goal": "Complete the Jobs At Aftershoot application at Careers autonomously until a protected or final review checkpoint.",
   "status": "needs_review",
   "summary": "Final submit requires manual review or external submit is disabled.",
+  "currentStep": "stage_1",
+  "currentStageLabel": "Section 1",
+  "currentUrl": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
   "retryCount": 0,
   "handoffCount": 0,
   "validationErrors": [],
@@ -13,9 +16,9 @@
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 1,
-      "lastUpdatedAt": "2026-05-21T10:29:29.475Z",
-      "completedAt": "2026-05-21T10:29:29.475Z"
+      "attempts": 3,
+      "lastUpdatedAt": "2026-05-21T13:27:19.522Z",
+      "completedAt": "2026-05-21T13:27:19.522Z"
     },
     {
       "id": "authenticate_if_needed",
@@ -29,9 +32,9 @@
       "id": "finish_current_section",
       "label": "Finish active section",
       "status": "running",
-      "detail": "Filled 6 fields on Section 1.",
-      "attempts": 4,
-      "lastUpdatedAt": "2026-05-21T10:29:43.568Z"
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 10,
+      "lastUpdatedAt": "2026-05-21T13:27:22.975Z"
     },
     {
       "id": "recover_from_validation_errors",
@@ -44,18 +47,18 @@
     {
       "id": "retry_alternative_path",
       "label": "Retry alternative path",
-      "status": "pending",
-      "detail": "Waiting to start.",
-      "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:29:25.602Z"
+      "status": "running",
+      "detail": "No visible fields yet, so the planner is opening the application path.",
+      "attempts": 1,
+      "lastUpdatedAt": "2026-05-21T13:27:23.375Z"
     },
     {
       "id": "reach_submit_gate",
       "label": "Reach submit/review gate",
       "status": "blocked",
       "detail": "Reached the final step but could not safely finish the submit action.",
-      "attempts": 1,
-      "lastUpdatedAt": "2026-05-21T10:29:44.451Z"
+      "attempts": 3,
+      "lastUpdatedAt": "2026-05-21T13:27:23.382Z"
     },
     {
       "id": "save_checkpoint",
@@ -63,12 +66,9 @@
       "status": "completed",
       "detail": "Saved planner state at the final manual review checkpoint.",
       "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:29:44.451Z",
-      "completedAt": "2026-05-21T10:29:44.451Z"
+      "lastUpdatedAt": "2026-05-21T13:27:23.382Z",
+      "completedAt": "2026-05-21T13:27:23.382Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-21T10:29:44.451Z",
-  "currentUrl": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
-  "currentStep": "stage_1",
-  "currentStageLabel": "Section 1"
+  "lastUpdatedAt": "2026-05-21T13:27:23.382Z"
 }

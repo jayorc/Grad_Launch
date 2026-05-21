@@ -10,6 +10,7 @@ If we want to avoid drift and "hallucinated" features during development, we sho
 - `04-mvp-plan.md`: what we build first, in order
 - `05-risks-and-robustness.md`: technical, legal, and operational realities
 - `06-decision-log.md`: explicit stack and product decisions
+- `07-autonomous-agent-architecture.md`: migration plan from MVP autopilot to durable agent orchestration
 
 Working rule:
 

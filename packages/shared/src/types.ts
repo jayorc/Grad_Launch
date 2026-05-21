@@ -22,6 +22,44 @@ export type EmailDeliveryStatus = "sent" | "queued" | "skipped" | "failed";
 export type BrowserApplyStatus = "filled" | "submitted" | "needs_manual_review" | "handoff_required" | "blocked";
 export type PlannerStatus = "idle" | "running" | "handoff_required" | "needs_review" | "completed" | "blocked";
 export type PlannerTaskStatus = "pending" | "running" | "completed" | "blocked" | "needs_user" | "retrying" | "skipped";
+export type AgentGoalType = "autonomous_application" | "job_discovery";
+export type AgentGoalStatus = "queued" | "running" | "waiting" | "completed" | "blocked" | "failed" | "cancelled";
+export type AgentWorkerType =
+  | "discovery"
+  | "intake"
+  | "ranking"
+  | "drafting"
+  | "application_planner"
+  | "browser_executor"
+  | "recovery"
+  | "notifications";
+export type AgentTaskKind =
+  | "refresh_job_discovery"
+  | "intake_job_url"
+  | "rank_application"
+  | "prepare_application_draft"
+  | "plan_application"
+  | "execute_browser_apply"
+  | "recover_autonomy"
+  | "send_notification";
+export type AgentTaskStatus = "queued" | "running" | "waiting" | "completed" | "blocked" | "failed" | "cancelled";
+export type AgentHandoffKind = "login" | "otp" | "captcha" | "verification" | "review" | "missing_data" | "policy";
+export type AgentHandoffStatus = "open" | "resolved" | "expired";
+export type PolicyAction = "allow" | "review" | "pause" | "block";
+export type PolicyScope = "plan_application" | "execute_browser_apply" | "submit_application";
+export type TaskRunStatus = "running" | "completed" | "failed" | "cancelled";
+export type AgentEventType =
+  | "goal.created"
+  | "goal.updated"
+  | "task.queued"
+  | "task.started"
+  | "task.completed"
+  | "task.failed"
+  | "task.waiting"
+  | "handoff.created"
+  | "handoff.resolved"
+  | "policy.decided"
+  | "memory.updated";
 
 export interface StudentProfile {
   id: string;
@@ -204,6 +242,111 @@ export interface ApplicationRun {
   submission?: ApplicationSubmission;
 }
 
+export interface AgentGoal {
+  id: string;
+  studentId: string;
+  applicationId?: string;
+  type: AgentGoalType;
+  status: AgentGoalStatus;
+  title: string;
+  summary: string;
+  currentTaskId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface AgentTask {
+  id: string;
+  goalId: string;
+  studentId: string;
+  applicationId?: string;
+  workerType: AgentWorkerType;
+  kind: AgentTaskKind;
+  status: AgentTaskStatus;
+  title: string;
+  priority: number;
+  payload: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  runAfter: string;
+  attemptCount: number;
+  maxAttempts: number;
+  leasedTo?: string;
+  leaseExpiresAt?: string;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface AgentTaskRun {
+  id: string;
+  taskId: string;
+  workerType: AgentWorkerType;
+  status: TaskRunStatus;
+  leaseOwner: string;
+  summary: string;
+  errorMessage?: string;
+  inputSnapshot?: Record<string, unknown>;
+  outputSnapshot?: Record<string, unknown>;
+  startedAt: string;
+  completedAt?: string;
+}
+
+export interface AgentHandoff {
+  id: string;
+  goalId: string;
+  studentId: string;
+  taskId?: string;
+  applicationId?: string;
+  status: AgentHandoffStatus;
+  kind: AgentHandoffKind;
+  title: string;
+  detail: string;
+  requestedAt: string;
+  resolvedAt?: string;
+}
+
+export interface PolicyDecision {
+  id: string;
+  studentId: string;
+  applicationId?: string;
+  taskId?: string;
+  scope: PolicyScope;
+  action: PolicyAction;
+  reason: string;
+  confidence: number;
+  facts: string[];
+  createdAt: string;
+}
+
+export interface StudentMemory {
+  studentId: string;
+  successfulApplicationCount: number;
+  blockedSourceTypes: string[];
+  recentHandoffKinds: AgentHandoffKind[];
+  corrections: Array<{
+    label: string;
+    value: string;
+    updatedAt: string;
+  }>;
+  notes: string[];
+  lastUpdatedAt: string;
+}
+
+export interface AgentEvent {
+  id: string;
+  studentId: string;
+  type: AgentEventType;
+  message: string;
+  goalId?: string;
+  taskId?: string;
+  applicationId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface Application {
   id: string;
   studentId: string;
@@ -238,6 +381,14 @@ export interface DashboardReport {
   metrics: DashboardMetric[];
   recentApplications: DashboardApplicationRow[];
   pendingActions: string[];
+}
+
+export interface AgentControlPlaneSnapshot {
+  goals: AgentGoal[];
+  tasks: AgentTask[];
+  handoffs: AgentHandoff[];
+  recentEvents: AgentEvent[];
+  memory?: StudentMemory;
 }
 
 export interface Recommendation {

@@ -22,7 +22,13 @@ export function getEmailOutboxStorageDir() {
     : resolve(projectRoot, "storage", "email-outbox");
 }
 
-export function getBrowserProfileStorageDir() {
+export function getBrowserWorkspaceStorageDir() {
+  return process.env.BROWSER_WORKSPACE_DIR
+    ? resolve(projectRoot, process.env.BROWSER_WORKSPACE_DIR)
+    : resolve(projectRoot, "storage", "browser");
+}
+
+export function getManagedBrowserProfileDir() {
   return process.env.BROWSER_PROFILE_DIR
     ? resolve(projectRoot, process.env.BROWSER_PROFILE_DIR)
     : resolve(projectRoot, "storage", "browser-profile");

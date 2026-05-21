@@ -7,6 +7,7 @@ import { getConfig } from "./config/env";
 import { connectToDatabase } from "./lib/db";
 import { setActiveDataMode } from "./lib/data-mode";
 import { resetMemoryDatabase } from "./repositories/in-memory-db";
+import { AgentWorkerRuntime } from "./services/agent-worker-runtime";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = dirname(currentFilePath);
@@ -19,9 +20,13 @@ async function startServer() {
   await initializeDataStore(config);
 
   const app = createApp();
+  const runtime = new AgentWorkerRuntime();
+
+  runtime.start();
 
   app.listen(config.port, () => {
     console.log(`GradLaunch API listening on http://localhost:${config.port}`);
+    console.log("[GradLaunch] Agent worker runtime started.");
   });
 }
 

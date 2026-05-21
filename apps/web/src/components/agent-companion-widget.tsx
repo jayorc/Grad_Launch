@@ -80,7 +80,7 @@ export function AgentCompanionWidget() {
       return "Manual handoff";
     }
 
-    if (panel.run?.status === "running") {
+    if (panel.run?.status === "running" || panel.run?.status === "queued") {
       return "Running";
     }
 

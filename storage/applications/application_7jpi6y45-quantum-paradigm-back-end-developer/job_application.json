@@ -2,7 +2,7 @@
   "applicationId": "application_7jpi6y45",
   "studentId": "student_tcgn9yq4",
   "jobId": "job_url_aHR0cHM6Ly93d3cucXVhbnR1",
-  "status": "ready_for_review",
+  "status": "blocked",
   "sourceLabel": "Pasted URL",
   "matchScore": 62,
   "generatedArtifacts": {
@@ -26,8 +26,8 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_50bwcdf5",
-    "status": "needs_review",
+    "id": "run_98f8adtf",
+    "status": "blocked",
     "executionMode": "browser_apply",
     "filledFields": [
       {
@@ -55,7 +55,27 @@
         "value": "a"
       },
       {
+        "label": "Location",
+        "value": "a"
+      },
+      {
+        "label": "Location (City)",
+        "value": "a"
+      },
+      {
+        "label": "Country",
+        "value": "India"
+      },
+      {
         "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Phone",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Mobile",
         "value": "+91-7320967983"
       },
       {
@@ -121,46 +141,61 @@
     ],
     "submission": {
       "intent": "browser_fill",
-      "outcome": "confirmed",
+      "outcome": "blocked",
       "externalSubmitted": false,
-      "confirmation": "GradLaunch found required fields it cannot answer safely yet: By using this form you agree with the storage and handling of your data by this website.. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
-      "submittedAt": "2026-05-21T10:38:22.389Z",
+      "confirmation": "GradLaunch could not reuse the persistent Chrome profile because it is already in use. Close the other GradLaunch-controlled Chrome session or point BROWSER_PROFILE_DIR at the signed-in profile you want to reuse. Falling back to a fresh isolated browser session is disabled so your login state is preserved.",
+      "submittedAt": "2026-05-21T13:27:32.379Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "jaynrk200211@gmail.com",
         "subject": "GradLaunch filled Quantum Paradigm - Back-End Developer",
-        "sentAt": "2026-05-21T10:38:22.389Z",
+        "sentAt": "2026-05-21T13:27:32.379Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
-        "status": "needs_manual_review",
+        "status": "blocked",
         "sourceUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
-        "openedAt": "2026-05-21T10:38:00.343Z",
-        "completedAt": "2026-05-21T10:38:22.389Z",
-        "filledLabels": [
-          "Resume upload",
-          "Full Name",
-          "Email",
-          "Phone",
-          "Cover Letter",
-          "By using this form you agree with the storage and handling of your data by this website."
-        ],
+        "openedAt": "2026-05-21T13:27:32.255Z",
+        "completedAt": "2026-05-21T13:27:32.379Z",
+        "filledLabels": [],
         "skippedLabels": [
-          "By using this form you agree with the storage and handling of your data by this website."
+          "First name",
+          "Last name",
+          "Full name",
+          "Email",
+          "Confirm your email",
+          "City",
+          "Location",
+          "Location (City)",
+          "Country",
+          "Phone number",
+          "Phone",
+          "Mobile",
+          "Degree",
+          "Graduation year",
+          "Preferred location",
+          "Target role",
+          "Work authorization",
+          "Legally authorized to work",
+          "Visa sponsorship required",
+          "Visa required",
+          "Current CTC",
+          "Current salary",
+          "Message to the Hiring Team",
+          "Primary skills",
+          "Resume context",
+          "Why are you interested in this role?",
+          "What makes you a match?"
         ],
-        "screenshots": [
-          "browser-opened.png",
-          "browser-stage-1-needs-input.png",
-          "browser-filled.png"
-        ],
-        "message": "GradLaunch found required fields it cannot answer safely yet: By using this form you agree with the storage and handling of your data by this website.. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+        "screenshots": [],
+        "message": "GradLaunch could not reuse the persistent Chrome profile because it is already in use. Close the other GradLaunch-controlled Chrome session or point BROWSER_PROFILE_DIR at the signed-in profile you want to reuse. Falling back to a fresh isolated browser session is disabled so your login state is preserved.",
         "planner": {
           "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
           "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-21T09:58:04.173Z",
           "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or final review checkpoint.",
-          "status": "needs_review",
-          "summary": "GradLaunch found required fields it cannot answer safely yet: By using this form you agree with the storage and handling of your data by this website.. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
+          "status": "blocked",
+          "summary": "GradLaunch could not reuse the persistent Chrome profile because it is already in use. Close the other GradLaunch-controlled Chrome session or point BROWSER_PROFILE_DIR at the signed-in profile you want to reuse. Falling back to a fresh isolated browser session is disabled so your login state is preserved.",
           "currentStep": "stage_1",
           "currentStageLabel": "Section 1",
           "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
@@ -175,9 +210,9 @@
               "label": "Open job page",
               "status": "completed",
               "detail": "Job page opened successfully in a visible Chrome session.",
-              "attempts": 5,
-              "lastUpdatedAt": "2026-05-21T10:38:07.812Z",
-              "completedAt": "2026-05-21T10:38:07.812Z"
+              "attempts": 9,
+              "lastUpdatedAt": "2026-05-21T13:21:26.693Z",
+              "completedAt": "2026-05-21T13:21:26.693Z"
             },
             {
               "id": "authenticate_if_needed",
@@ -190,10 +225,10 @@
             {
               "id": "finish_current_section",
               "label": "Finish active section",
-              "status": "running",
-              "detail": "Resume upload completed. Re-reading the current section.",
-              "attempts": 16,
-              "lastUpdatedAt": "2026-05-21T10:38:18.934Z"
+              "status": "blocked",
+              "detail": "GradLaunch could not reuse the persistent Chrome profile because it is already in use. Close the other GradLaunch-controlled Chrome session or point BROWSER_PROFILE_DIR at the signed-in profile you want to reuse. Falling back to a fresh isolated browser session is disabled so your login state is preserved.",
+              "attempts": 33,
+              "lastUpdatedAt": "2026-05-21T13:27:32.379Z"
             },
             {
               "id": "recover_from_validation_errors",
@@ -214,31 +249,32 @@
             {
               "id": "reach_submit_gate",
               "label": "Reach submit/review gate",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T09:58:04.173Z"
+              "status": "blocked",
+              "detail": "Reached the final step but could not safely finish the submit action.",
+              "attempts": 3,
+              "lastUpdatedAt": "2026-05-21T13:21:57.012Z",
+              "completedAt": "2026-05-21T13:21:56.295Z"
             },
             {
               "id": "save_checkpoint",
               "label": "Save checkpoint",
               "status": "completed",
-              "detail": "Saved checkpoint before handing the browser to the student.",
+              "detail": "Saved planner state at the final manual review checkpoint.",
               "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T10:23:44.191Z",
-              "completedAt": "2026-05-21T10:23:44.191Z"
+              "lastUpdatedAt": "2026-05-21T13:21:57.012Z",
+              "completedAt": "2026-05-21T13:21:57.012Z"
             }
           ],
-          "lastUpdatedAt": "2026-05-21T10:38:22.389Z"
+          "lastUpdatedAt": "2026-05-21T13:27:32.379Z"
         }
       }
     },
     "notes": [
-      "GradLaunch found required fields it cannot answer safely yet: By using this form you agree with the storage and handling of your data by this website.. Add these to the profile/resume, enable Ollama, or set APPLICATION_ANSWER_BANK_JSON.",
-      "Browser fill status: needs_manual_review.",
-      "Filled fields: 6. Skipped fields: 1."
+      "GradLaunch could not reuse the persistent Chrome profile because it is already in use. Close the other GradLaunch-controlled Chrome session or point BROWSER_PROFILE_DIR at the signed-in profile you want to reuse. Falling back to a fresh isolated browser session is disabled so your login state is preserved.",
+      "Browser fill status: blocked.",
+      "Filled fields: 0. Skipped fields: 27."
     ]
   },
   "createdAt": "2026-05-20T10:59:26.898Z",
-  "updatedAt": "2026-05-21T10:38:22.389Z"
+  "updatedAt": "2026-05-21T13:27:32.379Z"
 }

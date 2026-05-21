@@ -39,6 +39,7 @@ export function JobsPageClient() {
 
   const visibleJobs = jobs.filter((job) => !isPlaceholderJobUrl(job.sourceUrl));
   const hiddenPlaceholderCount = jobs.length - visibleJobs.length;
+  const browserApplyCapability = capabilities?.capabilities.find((capability) => capability.id === "browser_apply");
 
   return (
     <ProtectedPage>
@@ -81,7 +82,14 @@ export function JobsPageClient() {
                     <span className="tag" key={skill}>{skill}</span>
                   ))}
                 </div>
-                {session ? <BrowserFillAction jobId={job.id} token={session.token} /> : null}
+                {session ? (
+                  <BrowserFillAction
+                    jobId={job.id}
+                    token={session.token}
+                    browserReady={browserApplyCapability?.status !== "unavailable"}
+                    browserMessage={browserApplyCapability?.detail}
+                  />
+                ) : null}
                 {session ? <ApplyActions jobId={job.id} token={session.token} /> : null}
               </article>
             ))}

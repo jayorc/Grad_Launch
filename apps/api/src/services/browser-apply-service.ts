@@ -1,9 +1,10 @@
+import { request as httpRequest } from "node:http";
 import { constants as fsConstants } from "node:fs";
 import { access, appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { BrowserApplyReceipt, FilledField, Job, PlannerCheckpoint, PlannerTask, ResumeRecord } from "@gradlaunch/shared";
 import { chromium, type Browser, type BrowserContext, type Frame, type Locator, type Page } from "playwright-core";
-import { getBrowserProfileStorageDir } from "../config/storage";
+import { getBrowserWorkspaceStorageDir, getManagedBrowserProfileDir } from "../config/storage";
 import { nowIso } from "../lib/time";
 
 type BrowserApplyInput = {
@@ -136,6 +137,15 @@ const defaultChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google
 const transientLabels = ["resume context", "primary skills"];
 export class BrowserApplyService {
   async getAvailability(): Promise<BrowserAvailability> {
+    const cdpUrl = await resolveManagedChromeCdpUrl();
+
+    if (cdpUrl) {
+      return {
+        available: true,
+        message: `Browser worker can attach to the managed GradLaunch browser session at ${cdpUrl}.`
+      };
+    }
+
     if (process.env.BROWSER_AUTOFILL_ENABLED === "false") {
       return {
         available: false,
@@ -156,7 +166,7 @@ export class BrowserApplyService {
     return {
       available: true,
       chromePath,
-      message: `Browser worker can launch Chrome at ${chromePath}.`
+      message: `Browser worker can launch the managed GradLaunch browser at ${chromePath}.`
     };
   }
 
@@ -199,9 +209,10 @@ export class BrowserApplyService {
       };
     }
 
-    const workspacePath = input.workspacePath ?? join(getBrowserProfileStorageDir(), "runs");
+    const browserWorkspaceDir = getBrowserWorkspaceStorageDir();
+    const workspacePath = input.workspacePath ?? join(browserWorkspaceDir, "runs");
     await mkdir(workspacePath, { recursive: true });
-    await mkdir(getBrowserProfileStorageDir(), { recursive: true });
+    await mkdir(browserWorkspaceDir, { recursive: true });
     await writeBrowserDebug(workspacePath, "browser-apply-start", {
       sourceUrl: input.job.sourceUrl,
       job: `${input.job.title} at ${input.job.company}`,
@@ -214,6 +225,7 @@ export class BrowserApplyService {
     let browser: Browser | undefined;
     let context: BrowserContext | undefined;
     let keepContextOpen = false;
+    let attachedToExistingBrowser = false;
 
     try {
       const launchOptions = {
@@ -221,30 +233,55 @@ export class BrowserApplyService {
         headless: process.env.BROWSER_HEADLESS === "true",
         args: ["--disable-blink-features=AutomationControlled"]
       };
+      const cdpUrl = await resolveManagedChromeCdpUrl();
 
-      if (process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
+      if (cdpUrl) {
         try {
-          context = await chromium.launchPersistentContext(getBrowserProfileStorageDir(), {
+          browser = await chromium.connectOverCDP(cdpUrl);
+          context = browser.contexts()[0];
+          attachedToExistingBrowser = true;
+          keepContextOpen = true;
+
+          if (!context) {
+            throw new Error(
+              "GradLaunch attached to Chrome, but no browser context was available. Start Chrome with remote debugging enabled and keep at least one window open."
+            );
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          throw new Error(
+            `GradLaunch could not attach to the managed browser session at ${cdpUrl}. ${message}`
+          );
+        }
+      } else if (process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
+        try {
+          context = await chromium.launchPersistentContext(getManagedBrowserProfileDir(), {
             ...launchOptions,
+            args: [
+              ...launchOptions.args,
+              `--remote-debugging-port=${resolveManagedChromeDebugPort()}`
+            ],
             viewport: { width: 1280, height: 900 }
           });
+          keepContextOpen = true;
         } catch (error) {
-          if (!shouldFallbackFromLockedProfile(error)) {
-            throw error;
+          if (shouldFallbackFromLockedProfile(error)) {
+            throw new Error(
+              "GradLaunch could not reopen the managed browser profile because another GradLaunch browser session is already using it. Keep that window open and try again so GradLaunch can attach and open a new tab there."
+            );
           }
 
-          browser = await chromium.launch(launchOptions);
-          context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+          throw error;
         }
       } else {
         browser = await chromium.launch(launchOptions);
         context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
       }
 
-      const page = context.pages()[0] ?? await context.newPage();
+      const page = await context.newPage();
       page.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
-      markPlannerTask(planner, "open_job_page", "running", "Opening the target application URL in Chrome.");
-      setPlannerStatus(planner, "running", "Opening the job page and preparing the planner-executor flow.");
+      markPlannerTask(planner, "open_job_page", "running", "Opening the target application URL in a new Chrome tab.");
+      setPlannerStatus(planner, "running", "Opening the job page in a new Chrome tab and preparing the planner-executor flow.");
       await page.goto(input.job.sourceUrl, { waitUntil: "domcontentloaded", timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000) });
       let activePage = await getActivePage(context, page);
       markPlannerTask(planner, "open_job_page", "completed", "Job page opened successfully in a visible Chrome session.");
@@ -418,11 +455,11 @@ export class BrowserApplyService {
         planner
       };
     } finally {
-      if (context && !keepContextOpen) {
+      if (context && !keepContextOpen && !attachedToExistingBrowser) {
         await context.close().catch(() => undefined);
       }
 
-      if (browser && !keepContextOpen) {
+      if (browser && !keepContextOpen && !attachedToExistingBrowser) {
         await browser.close().catch(() => undefined);
       }
     }
@@ -614,7 +651,7 @@ async function fillByAgentFieldId(page: Page, field: BrowserFillField) {
         function queryFirst(selector: string, control: Element) {
           const root = control.getRootNode();
 
-          if ("querySelector" in root) {
+          if (root instanceof Document || root instanceof ShadowRoot || root instanceof Element) {
             const withinRoot = root.querySelector(selector);
 
             if (withinRoot) {
@@ -716,7 +753,9 @@ async function fillChoiceField(page: Page, field: BrowserFillField) {
         function findLabelText(control: HTMLInputElement) {
           if (control.id) {
             const root = control.getRootNode();
-            const label = ("querySelector" in root ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`) : null)
+            const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
+              ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`)
+              : null)
               ?? getSearchRoots().map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(control.id)}"]`)).find(Boolean)
               ?? null;
 
@@ -2479,7 +2518,7 @@ async function getVisibleRequiredEmptyLabels(page: Page) {
       function queryFirst(selector: string, control: Element) {
         const root = control.getRootNode();
 
-        if ("querySelector" in root) {
+        if (root instanceof Document || root instanceof ShadowRoot || root instanceof Element) {
           const withinRoot = root.querySelector(selector);
 
           if (withinRoot) {
@@ -2580,7 +2619,9 @@ async function autoResolveConsentControls(page: Page) {
       function findLabelText(control: HTMLInputElement) {
         if (control.id) {
           const root = control.getRootNode();
-          const label = ("querySelector" in root ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`) : null)
+          const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
+            ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`)
+            : null)
             ?? getSearchRoots().map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(control.id)}"]`)).find(Boolean)
             ?? null;
 
@@ -2696,7 +2737,9 @@ async function markFieldsNeedingInput(page: Page, labels: string[]) {
       if (control.id) {
         const searchRoots = getSearchRoots();
         const root = control.getRootNode();
-        const label = ("querySelector" in root ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`) : null)
+        const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
+          ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`)
+          : null)
           ?? searchRoots.map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(control.id)}"]`)).find(Boolean)
           ?? null;
 
@@ -3016,7 +3059,9 @@ async function observeBrowserPage(page: Page, visibleFields: VisibleField[]): Pr
     function findControlLabel(element: Element) {
       if (element.id) {
         const root = element.getRootNode();
-        const directLabel = ("querySelector" in root ? root.querySelector(`label[for="${CSS.escape(element.id)}"]`) : null)
+        const directLabel = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
+          ? root.querySelector(`label[for="${CSS.escape(element.id)}"]`)
+          : null)
           ?? searchRoots.map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(element.id)}"]`)).find(Boolean)
           ?? null;
 
@@ -4183,7 +4228,7 @@ async function discoverVisibleFields(page: Page) {
       function queryFirst(selector: string, control: Element) {
         const root = control.getRootNode();
 
-        if ("querySelector" in root) {
+        if (root instanceof Document || root instanceof ShadowRoot || root instanceof Element) {
           const withinRoot = root.querySelector(selector);
 
           if (withinRoot) {
@@ -4253,7 +4298,9 @@ async function discoverVisibleFields(page: Page) {
           return group.map((item) => {
             if (item.id) {
               const root = item.getRootNode();
-              const label = ("querySelector" in root ? root.querySelector(`label[for="${CSS.escape(item.id)}"]`) : null)
+              const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
+                ? root.querySelector(`label[for="${CSS.escape(item.id)}"]`)
+                : null)
                 ?? searchRoots.map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(item.id)}"]`)).find(Boolean)
                 ?? null;
 
@@ -4879,7 +4926,9 @@ async function fillByScoredDomMatch(frame: Frame, aliases: string[], value: stri
       function findLabelText(control: Element) {
         if (control.id) {
           const root = control.getRootNode();
-          const label = ("querySelector" in root ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`) : null)
+          const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
+            ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`)
+            : null)
             ?? getSearchRoots().map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(control.id)}"]`)).find(Boolean)
             ?? null;
 
@@ -5234,7 +5283,7 @@ async function hasFileUpload(page: Page) {
 async function getActivePage(context: BrowserContext, fallbackPage: Page) {
   await fallbackPage.waitForTimeout(500).catch(() => undefined);
   const pages = context.pages().filter((page) => !page.isClosed());
-  const page = pages.at(-1) ?? fallbackPage;
+  const page = pages.includes(fallbackPage) ? fallbackPage : pages.at(-1) ?? fallbackPage;
   page.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
   await page.bringToFront().catch(() => undefined);
   return page;
@@ -5372,7 +5421,7 @@ async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCheckpoin
     if ((explicitCaptchaText || visibleCaptchaWidget || iframeCaptcha) && !hasSolvedCaptchaResponse) {
       return {
         blocked: true,
-        kind: "captcha",
+        kind: "captcha" as const,
         reason: "Human intervention needed: complete the captcha or security check in the open browser. GradLaunch is monitoring the page and will resume automatically once verification clears."
       };
     }
@@ -5380,7 +5429,7 @@ async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCheckpoin
     if (visiblePasswordField && /sign in|log in|login|password|continue with email|continue with google|account/.test(bodyText)) {
       return {
         blocked: true,
-        kind: "login",
+        kind: "login" as const,
         reason: "Human intervention needed: sign in to the job portal in the open browser. GradLaunch is monitoring the page and will resume automatically after login."
       };
     }
@@ -5388,7 +5437,7 @@ async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCheckpoin
     if (visibleOtpField || /otp|verification code|one time passcode|one-time passcode|one time code|two factor|2fa|mfa|enter the code we sent|security code|authenticator app/.test(bodyText)) {
       return {
         blocked: true,
-        kind: "otp",
+        kind: "otp" as const,
         reason: "Human intervention needed: complete the OTP or verification code step in the open browser. GradLaunch is monitoring the page and will resume automatically once the code step clears."
       };
     }
@@ -5396,7 +5445,7 @@ async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCheckpoin
     if (/manual verification|manual attention|security challenge|protected checkpoint|additional verification/.test(bodyText)) {
       return {
         blocked: true,
-        kind: "verification",
+        kind: "verification" as const,
         reason: "Human intervention needed: complete the verification step in the open browser. GradLaunch is monitoring the page and will resume automatically once the page is clear."
       };
     }
@@ -5440,7 +5489,9 @@ async function saveScreenshot(page: Page, workspacePath: string, filename: strin
 
 async function maybeKeepBrowserOpen(context: BrowserContext) {
   if (shouldKeepBrowserOpenForReview()) {
-    await context.pages()[0]?.bringToFront().catch(() => undefined);
+    const pages = context.pages().filter((page) => !page.isClosed());
+    const activePage = pages.at(-1) ?? pages[0];
+    await activePage?.bringToFront().catch(() => undefined);
   }
 }
 
@@ -5449,10 +5500,6 @@ function shouldKeepBrowserOpenForReview() {
 }
 
 function shouldFallbackFromLockedProfile(error: unknown) {
-  if (process.env.BROWSER_FALLBACK_TO_FRESH_PROFILE_ON_LOCK === "false") {
-    return false;
-  }
-
   const message = error instanceof Error ? error.message : String(error);
   return /Opening in existing browser session|profile is already in use|user data directory is already in use/i.test(message);
 }
@@ -5464,6 +5511,64 @@ function shouldSkipField(field: FilledField) {
 
 function resolveChromePath() {
   return process.env.CHROME_EXECUTABLE_PATH ?? defaultChromePath;
+}
+
+async function resolveManagedChromeCdpUrl() {
+  const configuredValue = process.env.BROWSER_CDP_URL?.trim();
+
+  if (configuredValue) {
+    return configuredValue;
+  }
+
+  const autoDetectUrl = `http://127.0.0.1:${resolveManagedChromeDebugPort()}`;
+  return await canConnectToChromeCdp(autoDetectUrl) ? autoDetectUrl : undefined;
+}
+
+async function canConnectToChromeCdp(baseUrl: string) {
+  try {
+    const versionUrl = new URL("/json/version", baseUrl);
+    const response = await requestJson(versionUrl);
+    return typeof response.Browser === "string" && response.Browser.length > 0;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function requestJson(url: URL): Promise<Record<string, unknown>> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const request = httpRequest(
+      url,
+      {
+        method: "GET",
+        timeout: 500
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+
+        response.on("data", (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        response.on("end", () => {
+          try {
+            const text = Buffer.concat(chunks).toString("utf8");
+            resolvePromise(JSON.parse(text) as Record<string, unknown>);
+          } catch (error) {
+            rejectPromise(error);
+          }
+        });
+      }
+    );
+
+    request.on("timeout", () => {
+      request.destroy(new Error("Timed out probing Chrome CDP."));
+    });
+    request.on("error", rejectPromise);
+    request.end();
+  });
+}
+
+function resolveManagedChromeDebugPort() {
+  return Number(process.env.BROWSER_MANAGED_DEBUG_PORT ?? 9333);
 }
 
 function validateSourceUrl(value: string) {

@@ -48,3 +48,30 @@ export const PLANNER_STATUS_LABELS = {
   completed: "Completed",
   blocked: "Blocked"
 } as const;
+
+export const AGENT_GOAL_STATUS_LABELS = {
+  queued: "Queued",
+  running: "Running",
+  waiting: "Waiting",
+  completed: "Completed",
+  blocked: "Blocked",
+  failed: "Failed",
+  cancelled: "Cancelled"
+} as const;
+
+export const AGENT_TASK_STATUS_LABELS = {
+  queued: "Queued",
+  running: "Running",
+  waiting: "Waiting",
+  completed: "Completed",
+  blocked: "Blocked",
+  failed: "Failed",
+  cancelled: "Cancelled"
+} as const;
+
+export const POLICY_ACTION_LABELS = {
+  allow: "Allow",
+  review: "Review",
+  pause: "Pause",
+  block: "Block"
+} as const;

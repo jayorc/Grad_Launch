@@ -1,0 +1,144 @@
+import mongoose, { Schema } from "mongoose";
+
+const mixed = Schema.Types.Mixed;
+
+const agentGoalSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    studentId: { type: String, required: true, index: true },
+    applicationId: { type: String, required: false, index: true },
+    type: { type: String, required: true },
+    status: { type: String, required: true, index: true },
+    title: { type: String, required: true },
+    summary: { type: String, required: true },
+    currentTaskId: { type: String, required: false },
+    metadata: { type: mixed, required: false },
+    createdAt: { type: String, required: true },
+    updatedAt: { type: String, required: true },
+    completedAt: { type: String, required: false }
+  },
+  { timestamps: true, versionKey: false }
+);
+
+const agentTaskSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    goalId: { type: String, required: true, index: true },
+    studentId: { type: String, required: true, index: true },
+    applicationId: { type: String, required: false, index: true },
+    workerType: { type: String, required: true, index: true },
+    kind: { type: String, required: true },
+    status: { type: String, required: true, index: true },
+    title: { type: String, required: true },
+    priority: { type: Number, required: true, default: 50, index: true },
+    payload: { type: mixed, required: true, default: {} },
+    result: { type: mixed, required: false },
+    runAfter: { type: String, required: true, index: true },
+    attemptCount: { type: Number, required: true, default: 0 },
+    maxAttempts: { type: Number, required: true, default: 3 },
+    leasedTo: { type: String, required: false, index: true },
+    leaseExpiresAt: { type: String, required: false, index: true },
+    lastError: { type: String, required: false },
+    createdAt: { type: String, required: true },
+    updatedAt: { type: String, required: true },
+    completedAt: { type: String, required: false }
+  },
+  { timestamps: true, versionKey: false }
+);
+
+const agentTaskRunSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    taskId: { type: String, required: true, index: true },
+    workerType: { type: String, required: true },
+    status: { type: String, required: true, index: true },
+    leaseOwner: { type: String, required: true },
+    summary: { type: String, required: true },
+    errorMessage: { type: String, required: false },
+    inputSnapshot: { type: mixed, required: false },
+    outputSnapshot: { type: mixed, required: false },
+    startedAt: { type: String, required: true },
+    completedAt: { type: String, required: false }
+  },
+  { timestamps: true, versionKey: false }
+);
+
+const agentHandoffSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    goalId: { type: String, required: true, index: true },
+    studentId: { type: String, required: true, index: true },
+    taskId: { type: String, required: false, index: true },
+    applicationId: { type: String, required: false, index: true },
+    status: { type: String, required: true, index: true },
+    kind: { type: String, required: true },
+    title: { type: String, required: true },
+    detail: { type: String, required: true },
+    requestedAt: { type: String, required: true },
+    resolvedAt: { type: String, required: false }
+  },
+  { timestamps: true, versionKey: false }
+);
+
+const policyDecisionSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    studentId: { type: String, required: true, index: true },
+    applicationId: { type: String, required: false, index: true },
+    taskId: { type: String, required: false, index: true },
+    scope: { type: String, required: true },
+    action: { type: String, required: true, index: true },
+    reason: { type: String, required: true },
+    confidence: { type: Number, required: true },
+    facts: { type: [String], default: [] },
+    createdAt: { type: String, required: true }
+  },
+  { timestamps: true, versionKey: false }
+);
+
+const memoryCorrectionSchema = new Schema(
+  {
+    label: { type: String, required: true },
+    value: { type: String, required: true },
+    updatedAt: { type: String, required: true }
+  },
+  { _id: false }
+);
+
+const studentMemorySchema = new Schema(
+  {
+    studentId: { type: String, required: true, unique: true, index: true },
+    successfulApplicationCount: { type: Number, required: true, default: 0 },
+    blockedSourceTypes: { type: [String], default: [] },
+    recentHandoffKinds: { type: [String], default: [] },
+    corrections: { type: [memoryCorrectionSchema], default: [] },
+    notes: { type: [String], default: [] },
+    lastUpdatedAt: { type: String, required: true }
+  },
+  { timestamps: true, versionKey: false }
+);
+
+const agentEventSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    studentId: { type: String, required: true, index: true },
+    type: { type: String, required: true, index: true },
+    message: { type: String, required: true },
+    goalId: { type: String, required: false, index: true },
+    taskId: { type: String, required: false, index: true },
+    applicationId: { type: String, required: false, index: true },
+    metadata: { type: mixed, required: false },
+    createdAt: { type: String, required: true }
+  },
+  { timestamps: true, versionKey: false }
+);
+
+export const AgentGoalModel = mongoose.models.AgentGoal ?? mongoose.model("AgentGoal", agentGoalSchema);
+export const AgentTaskModel = mongoose.models.AgentTask ?? mongoose.model("AgentTask", agentTaskSchema);
+export const AgentTaskRunModel = mongoose.models.AgentTaskRun ?? mongoose.model("AgentTaskRun", agentTaskRunSchema);
+export const AgentHandoffModel = mongoose.models.AgentHandoff ?? mongoose.model("AgentHandoff", agentHandoffSchema);
+export const PolicyDecisionModel =
+  mongoose.models.PolicyDecision ?? mongoose.model("PolicyDecision", policyDecisionSchema);
+export const StudentMemoryModel =
+  mongoose.models.StudentMemory ?? mongoose.model("StudentMemory", studentMemorySchema);
+export const AgentEventModel = mongoose.models.AgentEvent ?? mongoose.model("AgentEvent", agentEventSchema);
