@@ -10,7 +10,11 @@ export function registerApplicationRoutes(app: Express) {
   const repository = new ApplicationRepository();
 
   app.get("/applications", requireAuth, async (request: AuthenticatedRequest, response: Response) => {
-    response.json(await repository.listByStudent(request.auth?.studentId ?? ""));
+    try {
+      response.json(await applications.listForStudent(request.auth?.studentId ?? ""));
+    } catch (error) {
+      response.status(400).json({ message: error instanceof Error ? error.message : "Unable to load applications." });
+    }
   });
 
   app.get("/applications/:applicationId/runs", requireAuth, async (request: Request, response: Response) => {
@@ -73,24 +77,40 @@ export function registerApplicationRoutes(app: Express) {
 
   app.post("/jobs/:jobId/fill-browser", requireAuth, async (request: AuthenticatedRequest, response: Response) => {
     try {
+      console.log("[GradLaunch][API] fill-browser start", {
+        studentId: request.auth?.studentId ?? "",
+        jobId: normalizeRouteParam(request.params.jobId),
+        submit: request.body?.submit === true
+      });
       const result = await applications.fillJobInBrowser({
         studentId: request.auth?.studentId ?? "",
         jobId: normalizeRouteParam(request.params.jobId),
         submit: request.body?.submit === true
       });
+      console.log("[GradLaunch][API] fill-browser complete", {
+        applicationId: result.application.id,
+        runId: result.run.id,
+        status: result.run.status
+      });
       response.json(result);
     } catch (error) {
+      console.error("[GradLaunch][API] fill-browser failed", {
+        jobId: normalizeRouteParam(request.params.jobId),
+        detail: error instanceof Error ? error.message : "Unable to fill this job in Chrome."
+      });
       response.status(400).json({ message: error instanceof Error ? error.message : "Unable to fill this job in Chrome." });
     }
   });
 }
 
 function normalizeRouteParam(value: string | string[] | undefined): string {
-  if (Array.isArray(value)) {
-    return value[0] ?? "";
-  }
+  const first = Array.isArray(value) ? value[0] ?? "" : value ?? "";
 
-  return value ?? "";
+  try {
+    return decodeURIComponent(first);
+  } catch (_error) {
+    return first;
+  }
 }
 
 function normalizeApplicationMode(value: unknown): CreateApplicationInput["mode"] {

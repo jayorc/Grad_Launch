@@ -24,7 +24,7 @@ export function ApplicationRunTrace({ run }: ApplicationRunTraceProps) {
                 <div>
                   <div className="agent-step-headline">
                     <strong>{step.label}</strong>
-                    <span className={`agent-source agent-source-${step.source}`}>{step.source === "aihawk" ? "AIHawk" : "GradLaunch"}</span>
+                    <span className={`agent-source agent-source-${step.source}`}>{step.source === "aihawk" ? "Browser Agent" : "GradLaunch"}</span>
                   </div>
                   <p className="muted">{step.detail}</p>
                 </div>
@@ -79,8 +79,18 @@ export function ApplicationRunTrace({ run }: ApplicationRunTraceProps) {
               <p className="detail-label">Planner checkpoint</p>
               <p className="detail-value detail-wrap">{run.planner.summary}</p>
               <p className="muted">
-                {PLANNER_STATUS_LABELS[run.planner.status]} • retries {run.planner.retryCount} • handoffs {run.planner.handoffCount}
+                {PLANNER_STATUS_LABELS[run.planner.status]} • {run.planner.formMode.replaceAll("_", " ")} • retries {run.planner.retryCount} • handoffs {run.planner.handoffCount}
               </p>
+              {run.planner.lastDecision ? (
+                <p className="detail-value detail-wrap">
+                  Current plan: {run.planner.lastDecision.kind.replaceAll("_", " ")} on {run.planner.lastDecision.stageLabel}. {run.planner.lastDecision.reason}
+                </p>
+              ) : null}
+              {run.planner.stageHistory.length > 0 ? (
+                <p className="muted">
+                  Tracked stages: {run.planner.stageHistory.length}. Latest outcome: {run.planner.stageHistory[run.planner.stageHistory.length - 1]?.outcome.replaceAll("_", " ")}.
+                </p>
+              ) : null}
               <div className="workspace-file-list">
                 {run.planner.subgoals.map((task) => (
                   <span className="file-chip" key={task.id}>{task.label}: {task.status.replaceAll("_", " ")}</span>

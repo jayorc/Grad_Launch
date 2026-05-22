@@ -4,6 +4,10 @@
   "goal": "Complete the Job Opening - Back End Developer (Intern) | DataChannel application at Datachannel autonomously until a protected or final review checkpoint.",
   "status": "needs_review",
   "summary": "Final submit requires manual review or external submit is disabled.",
+  "formMode": "unknown",
+  "currentStep": "stage_5",
+  "currentStageLabel": "Section 5",
+  "currentUrl": "https://www.datachannel.co/career/back-end-developer-intern",
   "retryCount": 0,
   "handoffCount": 0,
   "validationErrors": [],
@@ -67,8 +71,6 @@
       "completedAt": "2026-05-21T10:37:46.592Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-21T10:37:46.592Z",
-  "currentUrl": "https://www.datachannel.co/career/back-end-developer-intern",
-  "currentStep": "stage_5",
-  "currentStageLabel": "Section 5"
+  "stageHistory": [],
+  "lastUpdatedAt": "2026-05-21T10:37:46.592Z"
 }

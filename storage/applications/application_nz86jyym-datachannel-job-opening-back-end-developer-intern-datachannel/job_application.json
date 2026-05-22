@@ -2,7 +2,7 @@
   "applicationId": "application_nz86jyym",
   "studentId": "student_1",
   "jobId": "job_url_aHR0cHM6Ly93d3cuZGF0YWNo",
-  "status": "blocked",
+  "status": "ready_for_review",
   "sourceLabel": "Pasted URL",
   "matchScore": 20,
   "generatedArtifacts": {
@@ -25,8 +25,8 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_xl3nyksc",
-    "status": "blocked",
+    "id": "run_v0vi31cm",
+    "status": "needs_review",
     "executionMode": "browser_apply",
     "filledFields": [
       {
@@ -54,7 +54,27 @@
         "value": "Bengaluru"
       },
       {
+        "label": "Location",
+        "value": "Bengaluru"
+      },
+      {
+        "label": "Location (City)",
+        "value": "Bengaluru"
+      },
+      {
+        "label": "Country",
+        "value": "India"
+      },
+      {
         "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Phone",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Mobile",
         "value": "+91-7320967983"
       },
       {
@@ -128,62 +148,113 @@
     ],
     "submission": {
       "intent": "browser_fill",
-      "outcome": "blocked",
+      "outcome": "confirmed",
       "externalSubmitted": false,
-      "confirmation": "frame.evaluate: Target page, context or browser has been closed",
-      "submittedAt": "2026-05-20T10:13:27.491Z",
+      "confirmation": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+      "submittedAt": "2026-05-21T13:52:05.724Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "aarav@example.com",
         "subject": "GradLaunch filled Datachannel - Job Opening - Back End Developer (Intern) | DataChannel",
-        "sentAt": "2026-05-20T10:13:27.491Z",
+        "sentAt": "2026-05-21T13:52:05.724Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
-        "status": "blocked",
+        "status": "needs_manual_review",
         "sourceUrl": "https://www.datachannel.co/career/back-end-developer-intern",
-        "openedAt": "2026-05-20T10:13:04.093Z",
-        "completedAt": "2026-05-20T10:13:27.386Z",
-        "filledLabels": [],
-        "skippedLabels": [
-          "First name",
-          "Last name",
-          "Full name",
-          "Email",
-          "Confirm your email",
-          "City",
-          "Phone number",
-          "Degree",
-          "Graduation year",
-          "Preferred location",
-          "Target role",
-          "Work authorization",
-          "Legally authorized to work",
-          "Visa sponsorship required",
-          "Visa required",
-          "Current CTC",
-          "Current salary",
-          "Expected salary",
-          "Expected CTC",
-          "Message to the Hiring Team",
-          "Primary skills",
-          "Resume context",
-          "Why are you interested in this role?",
-          "What makes you a match?"
+        "openedAt": "2026-05-21T13:51:12.098Z",
+        "completedAt": "2026-05-21T13:52:05.724Z",
+        "filledLabels": [
+          "Resume upload"
         ],
+        "skippedLabels": [],
         "screenshots": [
           "browser-opened.png"
         ],
-        "message": "frame.evaluate: Target page, context or browser has been closed"
+        "message": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+        "planner": {
+          "sessionId": "planner-job_url_aHR0cHM6Ly93d3cuZGF0YWNo",
+          "resumeToken": "job_url_aHR0cHM6Ly93d3cuZGF0YWNo:2026-05-21T13:51:12.098Z",
+          "goal": "Complete the Job Opening - Back End Developer (Intern) | DataChannel application at Datachannel autonomously until a protected or final review checkpoint.",
+          "status": "needs_review",
+          "summary": "Final submit requires manual review or external submit is disabled.",
+          "retryCount": 0,
+          "handoffCount": 0,
+          "validationErrors": [],
+          "subgoals": [
+            {
+              "id": "open_job_page",
+              "label": "Open job page",
+              "status": "completed",
+              "detail": "Job page opened successfully in a visible Chrome session.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-21T13:51:13.329Z",
+              "completedAt": "2026-05-21T13:51:13.329Z"
+            },
+            {
+              "id": "authenticate_if_needed",
+              "label": "Handle login if needed",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T13:51:12.098Z"
+            },
+            {
+              "id": "finish_current_section",
+              "label": "Finish active section",
+              "status": "running",
+              "detail": "Reading Section 4 and planning the next safe action.",
+              "attempts": 6,
+              "lastUpdatedAt": "2026-05-21T13:52:02.683Z"
+            },
+            {
+              "id": "recover_from_validation_errors",
+              "label": "Recover from validation errors",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T13:51:12.098Z"
+            },
+            {
+              "id": "retry_alternative_path",
+              "label": "Retry alternative path",
+              "status": "running",
+              "detail": "No visible fields yet, so the planner is opening the application path.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-21T13:52:05.715Z"
+            },
+            {
+              "id": "reach_submit_gate",
+              "label": "Reach submit/review gate",
+              "status": "blocked",
+              "detail": "Reached the final step but could not safely finish the submit action.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-21T13:52:05.724Z"
+            },
+            {
+              "id": "save_checkpoint",
+              "label": "Save checkpoint",
+              "status": "completed",
+              "detail": "Saved planner state at the final manual review checkpoint.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-21T13:52:05.724Z",
+              "completedAt": "2026-05-21T13:52:05.724Z"
+            }
+          ],
+          "lastUpdatedAt": "2026-05-21T13:52:05.724Z",
+          "currentUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+          "currentStep": "stage_4",
+          "currentStageLabel": "Section 4"
+        }
       }
     },
     "notes": [
-      "frame.evaluate: Target page, context or browser has been closed",
-      "Browser fill status: blocked.",
-      "Filled fields: 0. Skipped fields: 24."
+      "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+      "Browser fill status: needs_manual_review.",
+      "Filled fields: 1. Skipped fields: 0."
     ]
   },
   "createdAt": "2026-05-20T08:10:25.721Z",
-  "updatedAt": "2026-05-20T10:13:27.491Z"
+  "updatedAt": "2026-05-21T13:52:05.724Z"
 }

@@ -1,0 +1,73 @@
+{
+  "sessionId": "planner-job_url_aHR0cHM6Ly9hbWxyaWdodHNv",
+  "resumeToken": "job_url_aHR0cHM6Ly9hbWxyaWdodHNv:2026-05-21T13:50:21.929Z",
+  "goal": "Complete the Software Engineer Contractor application at Blue Umbrella India Pvt Ltd autonomously until a protected or final review checkpoint.",
+  "status": "blocked",
+  "summary": "page.waitForTimeout: Target page, context or browser has been closed",
+  "retryCount": 0,
+  "handoffCount": 0,
+  "validationErrors": [],
+  "subgoals": [
+    {
+      "id": "open_job_page",
+      "label": "Open job page",
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 1,
+      "lastUpdatedAt": "2026-05-21T13:50:28.742Z",
+      "completedAt": "2026-05-21T13:50:28.742Z"
+    },
+    {
+      "id": "authenticate_if_needed",
+      "label": "Handle login if needed",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-21T13:50:21.929Z"
+    },
+    {
+      "id": "finish_current_section",
+      "label": "Finish active section",
+      "status": "blocked",
+      "detail": "page.waitForTimeout: Target page, context or browser has been closed",
+      "attempts": 4,
+      "lastUpdatedAt": "2026-05-21T13:51:05.845Z"
+    },
+    {
+      "id": "recover_from_validation_errors",
+      "label": "Recover from validation errors",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-21T13:50:21.929Z"
+    },
+    {
+      "id": "retry_alternative_path",
+      "label": "Retry alternative path",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-21T13:50:21.929Z"
+    },
+    {
+      "id": "reach_submit_gate",
+      "label": "Reach submit/review gate",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-21T13:50:21.929Z"
+    },
+    {
+      "id": "save_checkpoint",
+      "label": "Save checkpoint",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-21T13:50:21.929Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-21T13:51:05.845Z",
+  "currentUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+  "currentStep": "stage_3",
+  "currentStageLabel": "Section 3"
+}

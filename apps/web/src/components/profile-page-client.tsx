@@ -15,7 +15,7 @@ export function ProfilePageClient() {
       <PageHeader
         eyebrow="Setup"
         title="Set up your resume and preferences"
-        description="This replaces the confusing AIHawk-style config files with one simple profile page. Upload your resume, set preferences, choose your automation level, and let GradLaunch use that everywhere."
+        description="This keeps everything in one simple profile page. Upload your resume, set preferences, choose your automation level, and let GradLaunch use that everywhere."
       />
       <div className="grid two-up">
         <SectionCard title="Personal Profile" description="These answers are the everyday version of the agent's config and resume context.">

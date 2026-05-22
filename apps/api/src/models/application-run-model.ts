@@ -32,6 +32,70 @@ const emailDeliverySchema = new Schema(
   { _id: false }
 );
 
+const plannerDecisionSchema = new Schema(
+  {
+    kind: { type: String, required: true },
+    source: { type: String, required: true },
+    stageIndex: { type: Number, required: true },
+    stageLabel: { type: String, required: true },
+    url: { type: String, required: true },
+    reason: { type: String, required: true },
+    fieldLabels: { type: [String], default: [] },
+    createdAt: { type: String, required: true }
+  },
+  { _id: false }
+);
+
+const plannerStageSchema = new Schema(
+  {
+    stageIndex: { type: Number, required: true },
+    label: { type: String, required: true },
+    url: { type: String, required: true },
+    visibleFieldLabels: { type: [String], default: [] },
+    requiredFieldLabels: { type: [String], default: [] },
+    filledFieldLabels: { type: [String], default: [] },
+    outcome: { type: String, required: true },
+    decision: { type: plannerDecisionSchema, required: false },
+    lastUpdatedAt: { type: String, required: true }
+  },
+  { _id: false }
+);
+
+const plannerTaskSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    status: { type: String, required: true },
+    detail: { type: String, required: true },
+    attempts: { type: Number, required: true, default: 0 },
+    lastUpdatedAt: { type: String, required: true },
+    completedAt: { type: String, required: false }
+  },
+  { _id: false }
+);
+
+const plannerCheckpointSchema = new Schema(
+  {
+    sessionId: { type: String, required: true },
+    resumeToken: { type: String, required: true },
+    goal: { type: String, required: true },
+    status: { type: String, required: true },
+    summary: { type: String, required: true },
+    formMode: { type: String, required: true, default: "unknown" },
+    currentStep: { type: String, required: false },
+    currentStageLabel: { type: String, required: false },
+    currentUrl: { type: String, required: false },
+    retryCount: { type: Number, required: true, default: 0 },
+    handoffCount: { type: Number, required: true, default: 0 },
+    validationErrors: { type: [String], default: [] },
+    subgoals: { type: [plannerTaskSchema], default: [] },
+    lastDecision: { type: plannerDecisionSchema, required: false },
+    stageHistory: { type: [plannerStageSchema], default: [] },
+    lastUpdatedAt: { type: String, required: true }
+  },
+  { _id: false }
+);
+
 const submissionSchema = new Schema(
   {
     intent: { type: String, required: true },
@@ -52,40 +116,7 @@ const submissionSchema = new Schema(
           screenshots: { type: [String], default: [] },
           message: { type: String, required: true },
           planner: {
-            type: new Schema(
-              {
-                sessionId: { type: String, required: true },
-                resumeToken: { type: String, required: true },
-                goal: { type: String, required: true },
-                status: { type: String, required: true },
-                summary: { type: String, required: true },
-                currentStep: { type: String, required: false },
-                currentStageLabel: { type: String, required: false },
-                currentUrl: { type: String, required: false },
-                retryCount: { type: Number, required: true, default: 0 },
-                handoffCount: { type: Number, required: true, default: 0 },
-                validationErrors: { type: [String], default: [] },
-                subgoals: {
-                  type: [
-                    new Schema(
-                      {
-                        id: { type: String, required: true },
-                        label: { type: String, required: true },
-                        status: { type: String, required: true },
-                        detail: { type: String, required: true },
-                        attempts: { type: Number, required: true, default: 0 },
-                        lastUpdatedAt: { type: String, required: true },
-                        completedAt: { type: String, required: false }
-                      },
-                      { _id: false }
-                    )
-                  ],
-                  default: []
-                },
-                lastUpdatedAt: { type: String, required: true }
-              },
-              { _id: false }
-            ),
+            type: plannerCheckpointSchema,
             required: false
           }
         },
@@ -114,40 +145,7 @@ const applicationRunSchema = new Schema(
     timeline: { type: [timelineStepSchema], default: [] },
     notes: { type: [String], default: [] },
     planner: {
-      type: new Schema(
-        {
-          sessionId: { type: String, required: true },
-          resumeToken: { type: String, required: true },
-          goal: { type: String, required: true },
-          status: { type: String, required: true },
-          summary: { type: String, required: true },
-          currentStep: { type: String, required: false },
-          currentStageLabel: { type: String, required: false },
-          currentUrl: { type: String, required: false },
-          retryCount: { type: Number, required: true, default: 0 },
-          handoffCount: { type: Number, required: true, default: 0 },
-          validationErrors: { type: [String], default: [] },
-          subgoals: {
-            type: [
-              new Schema(
-                {
-                  id: { type: String, required: true },
-                  label: { type: String, required: true },
-                  status: { type: String, required: true },
-                  detail: { type: String, required: true },
-                  attempts: { type: Number, required: true, default: 0 },
-                  lastUpdatedAt: { type: String, required: true },
-                  completedAt: { type: String, required: false }
-                },
-                { _id: false }
-              )
-            ],
-            default: []
-          },
-          lastUpdatedAt: { type: String, required: true }
-        },
-        { _id: false }
-      ),
+      type: plannerCheckpointSchema,
       required: false
     },
     submission: { type: submissionSchema, required: false }

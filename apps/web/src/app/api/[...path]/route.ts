@@ -52,6 +52,12 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       headers: filterResponseHeaders(response.headers)
     });
   } catch (error) {
+    console.error("[GradLaunch][Web Proxy] Upstream API request failed", {
+      upstreamUrl: upstreamUrl.toString(),
+      method: request.method,
+      detail: error instanceof Error ? error.message : "Unknown proxy error."
+    });
+
     return Response.json(
       {
         message: `GradLaunch web could not reach the API server at ${API_TARGET}.`,

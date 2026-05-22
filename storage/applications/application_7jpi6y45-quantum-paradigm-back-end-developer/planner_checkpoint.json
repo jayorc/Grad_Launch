@@ -2,15 +2,18 @@
   "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
   "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-21T09:58:04.173Z",
   "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or final review checkpoint.",
-  "status": "blocked",
-  "summary": "GradLaunch could not reuse the persistent Chrome profile because it is already in use. Close the other GradLaunch-controlled Chrome session or point BROWSER_PROFILE_DIR at the signed-in profile you want to reuse. Falling back to a fresh isolated browser session is disabled so your login state is preserved.",
+  "status": "completed",
+  "summary": "Planner completed the form fill and paused at the review gate.",
+  "formMode": "multi_stage",
   "currentStep": "stage_1",
   "currentStageLabel": "Section 1",
   "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
-  "retryCount": 1,
-  "handoffCount": 1,
+  "retryCount": 2,
+  "handoffCount": 6,
   "validationErrors": [
-    "By using this form you agree with the storage and handling of your data by this website."
+    "By using this form you agree with the storage and handling of your data by this website.",
+    "Cover Letter",
+    "Upload CV/Resume"
   ],
   "subgoals": [
     {
@@ -18,60 +21,219 @@
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 9,
-      "lastUpdatedAt": "2026-05-21T13:21:26.693Z",
-      "completedAt": "2026-05-21T13:21:26.693Z"
+      "attempts": 21,
+      "lastUpdatedAt": "2026-05-22T06:39:22.554Z",
+      "completedAt": "2026-05-22T06:39:22.554Z"
     },
     {
       "id": "authenticate_if_needed",
       "label": "Handle login if needed",
       "status": "running",
       "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
-      "attempts": 2,
-      "lastUpdatedAt": "2026-05-21T10:23:45.907Z"
+      "attempts": 12,
+      "lastUpdatedAt": "2026-05-22T06:04:00.550Z"
     },
     {
       "id": "finish_current_section",
       "label": "Finish active section",
-      "status": "blocked",
-      "detail": "GradLaunch could not reuse the persistent Chrome profile because it is already in use. Close the other GradLaunch-controlled Chrome session or point BROWSER_PROFILE_DIR at the signed-in profile you want to reuse. Falling back to a fresh isolated browser session is disabled so your login state is preserved.",
-      "attempts": 33,
-      "lastUpdatedAt": "2026-05-21T13:27:32.379Z"
+      "status": "running",
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 68,
+      "lastUpdatedAt": "2026-05-22T06:39:26.297Z"
     },
     {
       "id": "recover_from_validation_errors",
       "label": "Recover from validation errors",
       "status": "blocked",
-      "detail": "Validation or required-answer blockers were found: By using this form you agree with the storage and handling of your data by this website..",
-      "attempts": 3,
-      "lastUpdatedAt": "2026-05-21T10:38:21.951Z"
+      "detail": "Validation or required-answer blockers were found: Cover Letter.",
+      "attempts": 8,
+      "lastUpdatedAt": "2026-05-22T06:03:29.870Z"
     },
     {
       "id": "retry_alternative_path",
       "label": "Retry alternative path",
       "status": "retrying",
-      "detail": "Planner saw the same screen again and is attempting a different recovery path.",
-      "attempts": 1,
-      "lastUpdatedAt": "2026-05-21T10:23:50.040Z"
+      "detail": "The agent saw the same screen repeatedly after 4 attempts and paused to avoid looping.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-22T05:58:05.642Z"
     },
     {
       "id": "reach_submit_gate",
       "label": "Reach submit/review gate",
-      "status": "blocked",
-      "detail": "Reached the final step but could not safely finish the submit action.",
-      "attempts": 3,
-      "lastUpdatedAt": "2026-05-21T13:21:57.012Z",
-      "completedAt": "2026-05-21T13:21:56.295Z"
+      "status": "completed",
+      "detail": "Reached the review/submit checkpoint safely.",
+      "attempts": 8,
+      "lastUpdatedAt": "2026-05-22T06:39:31.039Z",
+      "completedAt": "2026-05-22T06:39:31.039Z"
     },
     {
       "id": "save_checkpoint",
       "label": "Save checkpoint",
       "status": "completed",
-      "detail": "Saved planner state at the final manual review checkpoint.",
+      "detail": "Saved planner state so the run can continue from the latest checkpoint.",
       "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T13:21:57.012Z",
-      "completedAt": "2026-05-21T13:21:57.012Z"
+      "lastUpdatedAt": "2026-05-22T06:39:31.039Z",
+      "completedAt": "2026-05-22T06:39:31.039Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-21T13:27:32.379Z"
+  "lastDecision": {
+    "kind": "fill_fields",
+    "source": "llm",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+    "reason": "Back-End Developer at Quantum Paradigm",
+    "fieldLabels": [
+      "Full Name",
+      "Email",
+      "Phone",
+      "Cover Letter",
+      "Upload CV/Resume",
+      "By using this form you agree with the storage and handling of your data by this website."
+    ],
+    "createdAt": "2026-05-22T06:39:30.995Z"
+  },
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+      "visibleFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "requiredFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "filledFieldLabels": [
+        "Full Name",
+        "Email",
+        "Confirm your email",
+        "Phone number",
+        "Phone",
+        "Mobile",
+        "Message to the Hiring Team",
+        "Cover Letter",
+        "By using this form you agree with the storage and handling of your data by this website.",
+        "Resume upload"
+      ],
+      "outcome": "review",
+      "decision": {
+        "kind": "fill_fields",
+        "source": "llm",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+        "reason": "Back-End Developer at Quantum Paradigm",
+        "fieldLabels": [
+          "Full Name",
+          "Email",
+          "Phone",
+          "Cover Letter",
+          "Upload CV/Resume",
+          "By using this form you agree with the storage and handling of your data by this website."
+        ],
+        "createdAt": "2026-05-22T06:39:30.995Z"
+      },
+      "lastUpdatedAt": "2026-05-22T06:39:31.039Z"
+    },
+    {
+      "stageIndex": 1,
+      "label": "Section 2",
+      "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+      "visibleFieldLabels": [],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [],
+      "outcome": "handoff",
+      "decision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 1,
+        "stageLabel": "Section 2",
+        "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+        "reason": "Page classified as empty; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T06:04:00.554Z"
+      },
+      "lastUpdatedAt": "2026-05-22T06:04:00.554Z"
+    },
+    {
+      "stageIndex": 2,
+      "label": "Section 3",
+      "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+      "visibleFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "requiredFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "filledFieldLabels": [],
+      "outcome": "handoff",
+      "decision": {
+        "kind": "wait_for_user_input",
+        "source": "system",
+        "stageIndex": 2,
+        "stageLabel": "Section 3",
+        "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+        "reason": "GradLaunch needs your help with required answers on this screen: Cover Letter, Upload CV/Resume, By using this form you agree with the storage and handling of your data by this website..",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T05:58:00.278Z"
+      },
+      "lastUpdatedAt": "2026-05-22T05:58:00.278Z"
+    },
+    {
+      "stageIndex": 3,
+      "label": "Section 4",
+      "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+      "visibleFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "requiredFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "filledFieldLabels": [],
+      "outcome": "observed",
+      "decision": {
+        "kind": "recover_same_screen",
+        "source": "system",
+        "stageIndex": 3,
+        "stageLabel": "Section 4",
+        "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+        "reason": "The agent saw the same screen repeatedly after 4 attempts and paused to avoid looping.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T05:58:05.642Z"
+      },
+      "lastUpdatedAt": "2026-05-22T05:58:05.642Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-22T06:39:31.039Z"
 }

@@ -109,10 +109,10 @@ function createPendingSteps(mode: "draft" | "autofill" | "autopilot"): AgentTime
   return [
     {
       id: "adapter",
-      label: "Checking AIHawk adapter",
-      detail: "Verifying what the local AIHawk checkout can actually support in this run.",
+      label: "Checking browser runtime",
+      detail: "Verifying which local browser automation capabilities are available for this run.",
       state: "running",
-      source: "aihawk"
+      source: "gradlaunch"
     },
     {
       id: "profile",
@@ -144,7 +144,7 @@ function createPendingSteps(mode: "draft" | "autofill" | "autopilot"): AgentTime
         ? "Persisting the application workspace and starting the autonomous browser worker behind the scenes."
         : "The workspace will be ready for the next manual or guided step.",
       state: "queued",
-      source: mode === "autopilot" ? "aihawk" : "gradlaunch"
+      source: "gradlaunch"
     }
   ];
 }

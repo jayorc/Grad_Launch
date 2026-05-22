@@ -1,4 +1,4 @@
-import type { AgentGoalStatus, AgentTask, AgentTaskStatus, Application, Job, StudentProfile } from "@gradlaunch/shared";
+import type { AgentGoalStatus, AgentTask, AgentTaskStatus, Application, Job, PlannerCheckpoint, StudentProfile } from "@gradlaunch/shared";
 import { nowIso } from "../lib/time";
 import { ApplicationRepository } from "../repositories/application-repository";
 import { JobRepository } from "../repositories/job-repository";
@@ -279,7 +279,10 @@ export class AgentTaskHandlerService {
       };
     }
 
-    const handoffKind = inferHandoffKind(result.run.blockedReason ?? result.run.submission?.browser?.message);
+    const handoffKind = inferHandoffKind(
+      result.run.blockedReason ?? result.run.submission?.browser?.message,
+      result.run.submission?.browser?.planner
+    );
     const blocked = result.application.status === "blocked" || browserStatus === "blocked";
 
     await this.memory.recordSubmissionOutcome({
@@ -409,7 +412,29 @@ export class AgentTaskHandlerService {
   }
 }
 
-function inferHandoffKind(message: string | undefined) {
+function inferHandoffKind(message: string | undefined, planner?: PlannerCheckpoint) {
+  const plannerAction = planner?.lastDecision?.kind;
+
+  if (plannerAction === "wait_for_captcha") {
+    return "captcha" as const;
+  }
+
+  if (plannerAction === "wait_for_otp") {
+    return "otp" as const;
+  }
+
+  if (plannerAction === "wait_for_login") {
+    return "login" as const;
+  }
+
+  if (plannerAction === "wait_for_verification") {
+    return "verification" as const;
+  }
+
+  if (plannerAction === "wait_for_user_input") {
+    return "missing_data" as const;
+  }
+
   const value = (message ?? "").toLowerCase();
 
   if (value.includes("captcha")) {

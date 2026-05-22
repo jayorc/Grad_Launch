@@ -2,16 +2,16 @@
   "applicationId": "application_45vxmwkh",
   "studentId": "student_tcgn9yq4",
   "jobId": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
-  "status": "blocked",
+  "status": "autofilled",
   "sourceLabel": "Pasted URL",
   "matchScore": 8,
   "generatedArtifacts": {
     "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Oorwin role at Willwaretech.",
-    "coverLetterExcerpt": "I am excited to apply for the Oorwin role at Willwaretech, where I can bring my JavaScript, React, Next.js experience as an aspiring a.",
+    "coverLetterExcerpt": "I am excited to apply for the Oorwin role at Willwaretech. My background in JavaScript, React, Next.js and my focus on becoming a strong Oorwin make this opportunity especially compelling to me. I would be glad to contribute to Willwaretech's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with a opportunities.",
     "shortAnswers": [
       {
         "question": "Why are you interested in this role?",
-        "answer": "This role aligns with my goal of becoming a a and uses skills I have already practiced through projects and coursework."
+        "answer": "This role aligns with my goal of becoming a Oorwin and uses skills I have already practiced through projects and coursework."
       },
       {
         "question": "What makes you a match?",
@@ -26,8 +26,8 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_e76gtknl",
-    "status": "blocked",
+    "id": "run_hrzdkqlo",
+    "status": "completed",
     "executionMode": "browser_apply",
     "filledFields": [
       {
@@ -52,15 +52,15 @@
       },
       {
         "label": "City",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Location",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Location (City)",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Country",
@@ -88,11 +88,11 @@
       },
       {
         "label": "Preferred location",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Target role",
-        "value": "a"
+        "value": "Oorwin"
       },
       {
         "label": "Work authorization",
@@ -120,7 +120,7 @@
       },
       {
         "label": "Message to the Hiring Team",
-        "value": "I am excited to apply for the Oorwin role at Willwaretech, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+        "value": "I am excited to apply for the Oorwin role at Willwaretech. My background in JavaScript, React, Next.js and my focus on becoming a strong Oorwin make this opportunity especially compelling to me. I would be glad to contribute to Willwaretech's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with a opportunities."
       },
       {
         "label": "Primary skills",
@@ -132,7 +132,7 @@
       },
       {
         "label": "Why are you interested in this role?",
-        "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+        "value": "This role aligns with my goal of becoming a strong Oorwin and uses skills I have practiced through projects and coursework."
       },
       {
         "label": "What makes you a match?",
@@ -141,63 +141,47 @@
     ],
     "submission": {
       "intent": "browser_fill",
-      "outcome": "blocked",
+      "outcome": "confirmed",
       "externalSubmitted": false,
-      "confirmation": "frame.evaluate: Target page, context or browser has been closed",
-      "submittedAt": "2026-05-21T13:12:52.624Z",
+      "confirmation": "The form is filled across 1 stage and is ready for review or direct submit.",
+      "submittedAt": "2026-05-22T06:39:56.197Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "jaynrk200211@gmail.com",
         "subject": "GradLaunch filled Willwaretech - Oorwin",
-        "sentAt": "2026-05-21T13:12:52.624Z",
+        "sentAt": "2026-05-22T06:39:56.197Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
-        "status": "blocked",
+        "status": "filled",
         "sourceUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-        "openedAt": "2026-05-21T13:12:01.224Z",
-        "completedAt": "2026-05-21T13:12:52.580Z",
-        "filledLabels": [],
-        "skippedLabels": [
-          "First name",
-          "Last name",
-          "Full name",
+        "openedAt": "2026-05-22T06:39:46.467Z",
+        "completedAt": "2026-05-22T06:39:56.197Z",
+        "filledLabels": [
+          "Resume upload",
+          "Last Name",
+          "First Name",
           "Email",
-          "Confirm your email",
+          "mat-input-3",
+          "Years of Experience",
           "City",
-          "Location",
-          "Location (City)",
-          "Country",
-          "Phone number",
-          "Phone",
-          "Mobile",
-          "Degree",
-          "Graduation year",
-          "Preferred location",
-          "Target role",
-          "Work authorization",
-          "Legally authorized to work",
-          "Visa sponsorship required",
-          "Visa required",
-          "Current CTC",
-          "Current salary",
-          "Message to the Hiring Team",
-          "Primary skills",
-          "Resume context",
-          "Why are you interested in this role?",
-          "What makes you a match?"
+          "Current CTC"
         ],
+        "skippedLabels": [],
         "screenshots": [
-          "browser-opened.png"
+          "browser-opened.png",
+          "browser-stage-1-start.png",
+          "browser-filled.png"
         ],
-        "message": "frame.evaluate: Target page, context or browser has been closed",
+        "message": "The form is filled across 1 stage and is ready for review or direct submit.",
         "planner": {
           "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
           "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z",
           "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or final review checkpoint.",
-          "status": "blocked",
-          "summary": "frame.evaluate: Target page, context or browser has been closed",
+          "status": "completed",
+          "summary": "Planner completed the form fill and paused at the review gate.",
+          "formMode": "single_stage",
           "currentStep": "stage_1",
           "currentStageLabel": "Section 1",
           "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
@@ -215,9 +199,9 @@
               "label": "Open job page",
               "status": "completed",
               "detail": "Job page opened successfully in a visible Chrome session.",
-              "attempts": 6,
-              "lastUpdatedAt": "2026-05-21T13:12:04.497Z",
-              "completedAt": "2026-05-21T13:12:04.497Z"
+              "attempts": 10,
+              "lastUpdatedAt": "2026-05-22T06:39:47.408Z",
+              "completedAt": "2026-05-22T06:39:47.408Z"
             },
             {
               "id": "authenticate_if_needed",
@@ -230,10 +214,10 @@
             {
               "id": "finish_current_section",
               "label": "Finish active section",
-              "status": "blocked",
-              "detail": "frame.evaluate: Target page, context or browser has been closed",
-              "attempts": 21,
-              "lastUpdatedAt": "2026-05-21T13:12:52.580Z"
+              "status": "running",
+              "detail": "Reading Section 1 and planning the next safe action.",
+              "attempts": 28,
+              "lastUpdatedAt": "2026-05-22T06:39:51.334Z"
             },
             {
               "id": "recover_from_validation_errors",
@@ -254,32 +238,99 @@
             {
               "id": "reach_submit_gate",
               "label": "Reach submit/review gate",
-              "status": "blocked",
-              "detail": "Reached the final step but could not safely finish the submit action.",
+              "status": "completed",
+              "detail": "Reached the review/submit checkpoint safely.",
               "attempts": 2,
-              "lastUpdatedAt": "2026-05-21T10:07:15.433Z",
-              "completedAt": "2026-05-21T10:07:14.907Z"
+              "lastUpdatedAt": "2026-05-22T06:39:55.818Z",
+              "completedAt": "2026-05-22T06:39:55.818Z"
             },
             {
               "id": "save_checkpoint",
               "label": "Save checkpoint",
               "status": "completed",
-              "detail": "Saved planner state at the final manual review checkpoint.",
+              "detail": "Saved planner state so the run can continue from the latest checkpoint.",
               "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T10:07:15.433Z",
-              "completedAt": "2026-05-21T10:07:15.433Z"
+              "lastUpdatedAt": "2026-05-22T06:39:55.818Z",
+              "completedAt": "2026-05-22T06:39:55.818Z"
             }
           ],
-          "lastUpdatedAt": "2026-05-21T13:12:52.580Z"
+          "lastDecision": {
+            "kind": "fill_fields",
+            "source": "llm",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
+            "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+            "reason": "Jay Kumar Gupta is excited to apply for the Oorwin role at Willwaretech, leveraging his skills in JavaScript, React, and Next.js to contribute to the team with a practical approach.",
+            "fieldLabels": [
+              "Last Name",
+              "First Name",
+              "Email",
+              "mat-input-3",
+              "Years of Experience",
+              "City",
+              "Current CTC"
+            ],
+            "createdAt": "2026-05-22T06:39:55.736Z"
+          },
+          "stageHistory": [
+            {
+              "stageIndex": 0,
+              "label": "Section 1",
+              "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+              "visibleFieldLabels": [
+                "document_file",
+                "Last Name",
+                "First Name",
+                "Email",
+                "mat-input-3",
+                "Years of Experience",
+                "City",
+                "Current CTC",
+                "add_docs"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [
+                "Resume upload",
+                "Last Name",
+                "First Name",
+                "Email",
+                "City",
+                "Current CTC",
+                "mat-input-3",
+                "Years of Experience"
+              ],
+              "outcome": "review",
+              "decision": {
+                "kind": "fill_fields",
+                "source": "llm",
+                "stageIndex": 0,
+                "stageLabel": "Section 1",
+                "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+                "reason": "Jay Kumar Gupta is excited to apply for the Oorwin role at Willwaretech, leveraging his skills in JavaScript, React, and Next.js to contribute to the team with a practical approach.",
+                "fieldLabels": [
+                  "Last Name",
+                  "First Name",
+                  "Email",
+                  "mat-input-3",
+                  "Years of Experience",
+                  "City",
+                  "Current CTC"
+                ],
+                "createdAt": "2026-05-22T06:39:55.736Z"
+              },
+              "lastUpdatedAt": "2026-05-22T06:39:55.818Z"
+            }
+          ],
+          "lastUpdatedAt": "2026-05-22T06:39:55.818Z"
         }
       }
     },
     "notes": [
-      "frame.evaluate: Target page, context or browser has been closed",
-      "Browser fill status: blocked.",
-      "Filled fields: 0. Skipped fields: 27."
+      "The form is filled across 1 stage and is ready for review or direct submit.",
+      "Browser fill status: filled.",
+      "Filled fields: 8. Skipped fields: 0."
     ]
   },
   "createdAt": "2026-05-20T10:53:28.958Z",
-  "updatedAt": "2026-05-21T13:12:52.624Z"
+  "updatedAt": "2026-05-22T06:39:56.197Z"
 }

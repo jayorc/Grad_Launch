@@ -93,7 +93,7 @@ export function SearchSessionPanel({ token }: SearchSessionPanelProps) {
         <AgentCapabilityPanel
           capabilities={capabilities}
           title="Automation Capabilities"
-          description="This panel shows what the local AIHawk checkout can really do right now before you start a run."
+          description="This panel shows what the local browser runtime can really do right now before you start a run."
         />
       </div>
 
@@ -156,12 +156,12 @@ async function animateSearch(
   const phases: AgentActivityItem[] = [
     {
       id: "adapter",
-      label: "Checking AIHawk adapter",
+      label: "Checking browser runtime",
       detail: capabilities?.repoDetected
-        ? "Local AIHawk checkout detected. Search is using GradLaunch ranking with transparent downstream limitations."
-        : "Local AIHawk checkout not detected. Running the search in GradLaunch fallback mode.",
+        ? "Local browser runtime detected. Search is using GradLaunch ranking with transparent downstream limitations."
+        : "No local browser runtime detected. Running the search in GradLaunch fallback mode.",
       state: "running",
-      source: "aihawk"
+      source: "gradlaunch"
     },
     {
       id: "profile",
@@ -210,12 +210,12 @@ function createIdleActivity(capabilities: AgentCapabilities | null): AgentActivi
   return [
     {
       id: "adapter",
-      label: "AIHawk adapter ready",
+      label: "Browser runtime ready",
       detail: capabilities?.repoDetected
-        ? "Local AIHawk checkout detected. The capability panel shows which automation layers are truly available."
-        : "No local AIHawk checkout detected. GradLaunch can still search, rank, and package jobs transparently.",
+        ? "Local browser runtime detected. The capability panel shows which automation layers are truly available."
+        : "No local browser runtime detected. GradLaunch can still search, rank, and package jobs transparently.",
       state: capabilities?.repoDetected ? "done" : "attention",
-      source: "aihawk"
+      source: "gradlaunch"
     },
     {
       id: "profile",

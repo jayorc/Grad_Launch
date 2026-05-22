@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --exclude '../../storage/**' --exclude './storage/**' src/server.ts",
+    "dev:memory": "DATA_MODE=memory tsx watch --exclude '../../storage/**' --exclude './storage/**' src/server.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -2,16 +2,16 @@
   "applicationId": "application_99szjw6u",
   "studentId": "student_tcgn9yq4",
   "jobId": "job_url_aHR0cHM6Ly9hbWxyaWdodHNv",
-  "status": "blocked",
+  "status": "ready_for_review",
   "sourceLabel": "Pasted URL",
   "matchScore": 54,
   "generatedArtifacts": {
     "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd.",
-    "coverLetterExcerpt": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd, where I can bring my JavaScript, React, Next.js experience as an aspiring a.",
+    "coverLetterExcerpt": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd. My background in JavaScript, React, Next.js and my focus on becoming a strong Software Engineer make this opportunity especially compelling to me. I would be glad to contribute to Blue Umbrella India Pvt Ltd's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Noida, India, India opportunities.",
     "shortAnswers": [
       {
         "question": "Why are you interested in this role?",
-        "answer": "This role aligns with my goal of becoming a a and uses skills I have already practiced through projects and coursework."
+        "answer": "This role aligns with my goal of becoming a strong Software Engineer and uses skills I have already practiced through projects and coursework."
       },
       {
         "question": "What makes you a match?",
@@ -26,8 +26,8 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_591mdmhe",
-    "status": "blocked",
+    "id": "run_1wygh8f3",
+    "status": "needs_review",
     "executionMode": "browser_apply",
     "filledFields": [
       {
@@ -52,10 +52,30 @@
       },
       {
         "label": "City",
-        "value": "a"
+        "value": "Noida"
+      },
+      {
+        "label": "Location",
+        "value": "Noida, India, India"
+      },
+      {
+        "label": "Location (City)",
+        "value": "Noida"
+      },
+      {
+        "label": "Country",
+        "value": "India"
       },
       {
         "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Phone",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Mobile",
         "value": "+91-7320967983"
       },
       {
@@ -68,11 +88,11 @@
       },
       {
         "label": "Preferred location",
-        "value": "a"
+        "value": "Noida, India, India"
       },
       {
         "label": "Target role",
-        "value": "a"
+        "value": "Software Engineer"
       },
       {
         "label": "Work authorization",
@@ -100,7 +120,7 @@
       },
       {
         "label": "Message to the Hiring Team",
-        "value": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+        "value": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd. My background in JavaScript, React, Next.js and my focus on becoming a strong Software Engineer make this opportunity especially compelling to me. I would be glad to contribute to Blue Umbrella India Pvt Ltd's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Noida, India, India opportunities."
       },
       {
         "label": "Primary skills",
@@ -112,7 +132,7 @@
       },
       {
         "label": "Why are you interested in this role?",
-        "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+        "value": "This role aligns with my goal of becoming a strong Software Engineer and uses skills I have practiced through projects and coursework."
       },
       {
         "label": "What makes you a match?",
@@ -121,67 +141,52 @@
     ],
     "submission": {
       "intent": "browser_fill",
-      "outcome": "blocked",
+      "outcome": "confirmed",
       "externalSubmitted": false,
-      "confirmation": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
-      "submittedAt": "2026-05-21T10:40:48.912Z",
+      "confirmation": "GradLaunch found validation blockers after filling: Software Engineer Contractor page is loaded.",
+      "submittedAt": "2026-05-22T06:36:45.054Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "jaynrk200211@gmail.com",
         "subject": "GradLaunch filled Blue Umbrella India Pvt Ltd - Software Engineer Contractor",
-        "sentAt": "2026-05-21T10:40:48.912Z",
+        "sentAt": "2026-05-22T06:36:45.054Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
-        "status": "blocked",
+        "status": "needs_manual_review",
         "sourceUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
-        "openedAt": "2026-05-21T10:40:47.089Z",
-        "completedAt": "2026-05-21T10:40:48.901Z",
+        "openedAt": "2026-05-22T06:36:38.042Z",
+        "completedAt": "2026-05-22T06:36:45.054Z",
         "filledLabels": [],
-        "skippedLabels": [
-          "First name",
-          "Last name",
-          "Full name",
-          "Email",
-          "Confirm your email",
-          "City",
-          "Phone number",
-          "Degree",
-          "Graduation year",
-          "Preferred location",
-          "Target role",
-          "Work authorization",
-          "Legally authorized to work",
-          "Visa sponsorship required",
-          "Visa required",
-          "Current CTC",
-          "Current salary",
-          "Message to the Hiring Team",
-          "Primary skills",
-          "Resume context",
-          "Why are you interested in this role?",
-          "What makes you a match?"
+        "skippedLabels": [],
+        "screenshots": [
+          "browser-opened.png",
+          "browser-stage-1-start.png"
         ],
-        "screenshots": [],
-        "message": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
+        "message": "GradLaunch found validation blockers after filling: Software Engineer Contractor page is loaded.",
         "planner": {
           "sessionId": "planner-job_url_aHR0cHM6Ly9hbWxyaWdodHNv",
           "resumeToken": "job_url_aHR0cHM6Ly9hbWxyaWdodHNv:2026-05-21T10:40:47.089Z",
           "goal": "Complete the Software Engineer Contractor application at Blue Umbrella India Pvt Ltd autonomously until a protected or final review checkpoint.",
-          "status": "blocked",
-          "summary": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
-          "retryCount": 0,
+          "status": "running",
+          "summary": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
+          "formMode": "single_stage",
+          "currentStep": "stage_1",
+          "currentStageLabel": "Section 1",
+          "currentUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+          "retryCount": 1,
           "handoffCount": 0,
           "validationErrors": [],
           "subgoals": [
             {
               "id": "open_job_page",
               "label": "Open job page",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+              "status": "completed",
+              "detail": "Job page opened successfully in a visible Chrome session.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-22T06:36:40.101Z",
+              "completedAt": "2026-05-22T06:36:40.101Z"
             },
             {
               "id": "authenticate_if_needed",
@@ -194,18 +199,18 @@
             {
               "id": "finish_current_section",
               "label": "Finish active section",
-              "status": "blocked",
-              "detail": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
-              "attempts": 1,
-              "lastUpdatedAt": "2026-05-21T10:40:48.901Z"
+              "status": "running",
+              "detail": "Reading Section 1 and planning the next safe action.",
+              "attempts": 2,
+              "lastUpdatedAt": "2026-05-22T06:36:44.739Z"
             },
             {
               "id": "recover_from_validation_errors",
               "label": "Recover from validation errors",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+              "status": "retrying",
+              "detail": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-22T06:36:45.054Z"
             },
             {
               "id": "retry_alternative_path",
@@ -232,16 +237,48 @@
               "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
             }
           ],
-          "lastUpdatedAt": "2026-05-21T10:40:48.901Z"
+          "lastDecision": {
+            "kind": "recover_validation",
+            "source": "system",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
+            "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+            "reason": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T06:36:45.054Z"
+          },
+          "stageHistory": [
+            {
+              "stageIndex": 0,
+              "label": "Section 1",
+              "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+              "visibleFieldLabels": [],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "observed",
+              "lastUpdatedAt": "2026-05-22T06:36:45.054Z",
+              "decision": {
+                "kind": "recover_validation",
+                "source": "system",
+                "stageIndex": 0,
+                "stageLabel": "Section 1",
+                "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+                "reason": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-22T06:36:45.054Z"
+              }
+            }
+          ],
+          "lastUpdatedAt": "2026-05-22T06:36:45.054Z"
         }
       }
     },
     "notes": [
-      "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
-      "Browser fill status: blocked.",
-      "Filled fields: 0. Skipped fields: 22."
+      "GradLaunch found validation blockers after filling: Software Engineer Contractor page is loaded.",
+      "Browser fill status: needs_manual_review.",
+      "Filled fields: 0. Skipped fields: 0."
     ]
   },
   "createdAt": "2026-05-20T10:47:37.896Z",
-  "updatedAt": "2026-05-21T10:40:48.912Z"
+  "updatedAt": "2026-05-22T06:36:45.054Z"
 }

@@ -173,12 +173,30 @@ function mapPlanner(planner: Record<string, unknown> | undefined): ApplicationRu
     return undefined;
   }
 
+  const mapPlannerDecision = (decision: Record<string, unknown> | undefined) => {
+    if (!decision) {
+      return undefined;
+    }
+
+    return {
+      kind: String(decision.kind ?? "scan_page") as NonNullable<NonNullable<ApplicationRun["planner"]>["lastDecision"]>["kind"],
+      source: String(decision.source ?? "system") as NonNullable<NonNullable<ApplicationRun["planner"]>["lastDecision"]>["source"],
+      stageIndex: Number(decision.stageIndex ?? 0),
+      stageLabel: String(decision.stageLabel ?? ""),
+      url: String(decision.url ?? ""),
+      reason: String(decision.reason ?? ""),
+      fieldLabels: Array.isArray(decision.fieldLabels) ? decision.fieldLabels.map(String) : [],
+      createdAt: String(decision.createdAt ?? "")
+    };
+  };
+
   return {
     sessionId: String(planner.sessionId ?? ""),
     resumeToken: String(planner.resumeToken ?? ""),
     goal: String(planner.goal ?? ""),
     status: String(planner.status ?? "idle") as NonNullable<ApplicationRun["planner"]>["status"],
     summary: String(planner.summary ?? ""),
+    formMode: String(planner.formMode ?? "unknown") as NonNullable<ApplicationRun["planner"]>["formMode"],
     currentStep: typeof planner.currentStep === "string" ? planner.currentStep : undefined,
     currentStageLabel: typeof planner.currentStageLabel === "string" ? planner.currentStageLabel : undefined,
     currentUrl: typeof planner.currentUrl === "string" ? planner.currentUrl : undefined,
@@ -196,6 +214,23 @@ function mapPlanner(planner: Record<string, unknown> | undefined): ApplicationRu
             attempts: Number(nextTask.attempts ?? 0),
             lastUpdatedAt: String(nextTask.lastUpdatedAt ?? ""),
             completedAt: typeof nextTask.completedAt === "string" ? nextTask.completedAt : undefined
+          };
+        })
+      : [],
+    lastDecision: mapPlannerDecision(planner.lastDecision as Record<string, unknown> | undefined),
+    stageHistory: Array.isArray(planner.stageHistory)
+      ? planner.stageHistory.map((stage) => {
+          const nextStage = stage as Record<string, unknown>;
+          return {
+            stageIndex: Number(nextStage.stageIndex ?? 0),
+            label: String(nextStage.label ?? ""),
+            url: String(nextStage.url ?? ""),
+            visibleFieldLabels: Array.isArray(nextStage.visibleFieldLabels) ? nextStage.visibleFieldLabels.map(String) : [],
+            requiredFieldLabels: Array.isArray(nextStage.requiredFieldLabels) ? nextStage.requiredFieldLabels.map(String) : [],
+            filledFieldLabels: Array.isArray(nextStage.filledFieldLabels) ? nextStage.filledFieldLabels.map(String) : [],
+            outcome: String(nextStage.outcome ?? "observed") as NonNullable<ApplicationRun["planner"]>["stageHistory"][number]["outcome"],
+            decision: mapPlannerDecision(nextStage.decision as Record<string, unknown> | undefined),
+            lastUpdatedAt: String(nextStage.lastUpdatedAt ?? "")
           };
         })
       : [],

@@ -3,7 +3,7 @@
   "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-21T10:48:13.843Z",
   "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or final review checkpoint.",
   "status": "blocked",
-  "summary": "GradLaunch could not reuse your signed-in Chrome profile because Chrome is already using it. To open a new controlled tab in the same live browser session, start Chrome with remote debugging enabled and set BROWSER_CDP_URL, or fully quit Chrome and let GradLaunch relaunch your real profile.",
+  "summary": "page.waitForTimeout: Target page, context or browser has been closed",
   "currentStep": "stage_1",
   "currentStageLabel": "Section 1",
   "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
@@ -16,9 +16,9 @@
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 4,
-      "lastUpdatedAt": "2026-05-21T13:29:38.251Z",
-      "completedAt": "2026-05-21T13:29:38.251Z"
+      "attempts": 6,
+      "lastUpdatedAt": "2026-05-21T13:50:06.227Z",
+      "completedAt": "2026-05-21T13:50:06.227Z"
     },
     {
       "id": "authenticate_if_needed",
@@ -32,9 +32,9 @@
       "id": "finish_current_section",
       "label": "Finish active section",
       "status": "blocked",
-      "detail": "GradLaunch could not reuse your signed-in Chrome profile because Chrome is already using it. To open a new controlled tab in the same live browser session, start Chrome with remote debugging enabled and set BROWSER_CDP_URL, or fully quit Chrome and let GradLaunch relaunch your real profile.",
-      "attempts": 17,
-      "lastUpdatedAt": "2026-05-21T13:38:46.478Z"
+      "detail": "page.waitForTimeout: Target page, context or browser has been closed",
+      "attempts": 22,
+      "lastUpdatedAt": "2026-05-21T13:50:13.670Z"
     },
     {
       "id": "recover_from_validation_errors",
@@ -71,5 +71,5 @@
       "completedAt": "2026-05-21T11:17:32.734Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-21T13:38:46.478Z"
+  "lastUpdatedAt": "2026-05-21T13:50:13.670Z"
 }

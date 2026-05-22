@@ -49,5 +49,5 @@ export function AgentActivityCard({ eyebrow, title, summary, items }: AgentActiv
 }
 
 function formatSource(source: AgentTimelineStep["source"]) {
-  return source === "aihawk" ? "AIHawk" : "GradLaunch";
+  return source === "aihawk" ? "Browser Agent" : "GradLaunch";
 }

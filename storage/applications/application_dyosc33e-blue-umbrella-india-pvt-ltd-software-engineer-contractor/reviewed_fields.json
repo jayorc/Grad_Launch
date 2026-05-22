@@ -24,7 +24,27 @@
     "value": "Bengaluru"
   },
   {
+    "label": "Location",
+    "value": "Bengaluru"
+  },
+  {
+    "label": "Location (City)",
+    "value": "Bengaluru"
+  },
+  {
+    "label": "Country",
+    "value": "India"
+  },
+  {
     "label": "Phone number",
+    "value": "+91-7320967983"
+  },
+  {
+    "label": "Phone",
+    "value": "+91-7320967983"
+  },
+  {
+    "label": "Mobile",
     "value": "+91-7320967983"
   },
   {

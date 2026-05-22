@@ -7,11 +7,11 @@
   "matchScore": 38,
   "generatedArtifacts": {
     "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Jobs At Aftershoot role at Careers.",
-    "coverLetterExcerpt": "I am excited to apply for the Jobs At Aftershoot role at Careers, where I can bring my JavaScript, React, Next.js experience as an aspiring a.",
+    "coverLetterExcerpt": "I am excited to apply for the Jobs At Aftershoot role at Careers. My background in JavaScript, React, Next.js and my focus on becoming a strong Jobs At Aftershoot make this opportunity especially compelling to me. I would be glad to contribute to Careers's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Remote opportunities.",
     "shortAnswers": [
       {
         "question": "Why are you interested in this role?",
-        "answer": "This role aligns with my goal of becoming a a and uses skills I have already practiced through projects and coursework."
+        "answer": "This role aligns with my goal of becoming a strong Jobs At Aftershoot and uses skills I have already practiced through projects and coursework."
       },
       {
         "question": "What makes you a match?",
@@ -26,7 +26,7 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_g8snqzu1",
+    "id": "run_7kcswk8e",
     "status": "needs_review",
     "executionMode": "browser_apply",
     "filledFields": [
@@ -52,15 +52,15 @@
       },
       {
         "label": "City",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Location",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Location (City)",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Country",
@@ -88,11 +88,11 @@
       },
       {
         "label": "Preferred location",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Target role",
-        "value": "a"
+        "value": "Jobs At Aftershoot"
       },
       {
         "label": "Work authorization",
@@ -120,7 +120,7 @@
       },
       {
         "label": "Message to the Hiring Team",
-        "value": "I am excited to apply for the Jobs At Aftershoot role at Careers, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+        "value": "I am excited to apply for the Jobs At Aftershoot role at Careers. My background in JavaScript, React, Next.js and my focus on becoming a strong Jobs At Aftershoot make this opportunity especially compelling to me. I would be glad to contribute to Careers's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Remote opportunities."
       },
       {
         "label": "Primary skills",
@@ -132,7 +132,7 @@
       },
       {
         "label": "Why are you interested in this role?",
-        "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+        "value": "This role aligns with my goal of becoming a strong Jobs At Aftershoot and uses skills I have practiced through projects and coursework."
       },
       {
         "label": "What makes you a match?",
@@ -143,37 +143,48 @@
       "intent": "browser_fill",
       "outcome": "confirmed",
       "externalSubmitted": false,
-      "confirmation": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
-      "submittedAt": "2026-05-21T13:27:23.382Z",
+      "confirmation": "GradLaunch found validation blockers after filling: Importing information and autofilling fields..",
+      "submittedAt": "2026-05-22T06:46:45.085Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "jaynrk200211@gmail.com",
         "subject": "GradLaunch filled Careers - Jobs At Aftershoot",
-        "sentAt": "2026-05-21T13:27:23.382Z",
+        "sentAt": "2026-05-22T06:46:45.085Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
         "status": "needs_manual_review",
         "sourceUrl": "https://careers.kula.ai/aftershoot/24629/apply/?source=linkedin",
-        "openedAt": "2026-05-21T13:27:14.272Z",
-        "completedAt": "2026-05-21T13:27:23.382Z",
-        "filledLabels": [],
-        "skippedLabels": [],
-        "screenshots": [
-          "browser-opened.png"
+        "openedAt": "2026-05-22T06:46:33.521Z",
+        "completedAt": "2026-05-22T06:46:45.085Z",
+        "filledLabels": [
+          "Resume upload",
+          "Enter first name",
+          "Enter last name",
+          "Enter email",
+          "Phone",
+          "Enter current ctc"
         ],
-        "message": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+        "skippedLabels": [
+          "Resume"
+        ],
+        "screenshots": [
+          "browser-opened.png",
+          "browser-stage-1-start.png"
+        ],
+        "message": "GradLaunch found validation blockers after filling: Importing information and autofilling fields..",
         "planner": {
           "sessionId": "planner-job_url_aHR0cHM6Ly9jYXJlZXJzLmt1",
           "resumeToken": "job_url_aHR0cHM6Ly9jYXJlZXJzLmt1:2026-05-21T10:29:25.602Z",
           "goal": "Complete the Jobs At Aftershoot application at Careers autonomously until a protected or final review checkpoint.",
-          "status": "needs_review",
-          "summary": "Final submit requires manual review or external submit is disabled.",
+          "status": "running",
+          "summary": "Validation blockers appeared: Importing information and autofilling fields..",
+          "formMode": "single_stage",
           "currentStep": "stage_1",
           "currentStageLabel": "Section 1",
           "currentUrl": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
-          "retryCount": 0,
+          "retryCount": 3,
           "handoffCount": 0,
           "validationErrors": [],
           "subgoals": [
@@ -182,9 +193,9 @@
               "label": "Open job page",
               "status": "completed",
               "detail": "Job page opened successfully in a visible Chrome session.",
-              "attempts": 3,
-              "lastUpdatedAt": "2026-05-21T13:27:19.522Z",
-              "completedAt": "2026-05-21T13:27:19.522Z"
+              "attempts": 6,
+              "lastUpdatedAt": "2026-05-22T06:46:36.149Z",
+              "completedAt": "2026-05-22T06:46:36.149Z"
             },
             {
               "id": "authenticate_if_needed",
@@ -199,16 +210,16 @@
               "label": "Finish active section",
               "status": "running",
               "detail": "Reading Section 1 and planning the next safe action.",
-              "attempts": 10,
-              "lastUpdatedAt": "2026-05-21T13:27:22.975Z"
+              "attempts": 13,
+              "lastUpdatedAt": "2026-05-22T06:46:39.928Z"
             },
             {
               "id": "recover_from_validation_errors",
               "label": "Recover from validation errors",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T10:29:25.602Z"
+              "status": "retrying",
+              "detail": "Validation blockers appeared: Importing information and autofilling fields..",
+              "attempts": 3,
+              "lastUpdatedAt": "2026-05-22T06:46:45.085Z"
             },
             {
               "id": "retry_alternative_path",
@@ -236,16 +247,59 @@
               "completedAt": "2026-05-21T13:27:23.382Z"
             }
           ],
-          "lastUpdatedAt": "2026-05-21T13:27:23.382Z"
+          "lastDecision": {
+            "kind": "recover_validation",
+            "source": "system",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
+            "url": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
+            "reason": "Validation blockers appeared: Importing information and autofilling fields..",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T06:46:45.085Z"
+          },
+          "stageHistory": [
+            {
+              "stageIndex": 0,
+              "label": "Section 1",
+              "url": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
+              "visibleFieldLabels": [
+                "Enter first name",
+                "Enter last name",
+                "Enter email",
+                "Phone",
+                "Resume",
+                "Enter current ctc",
+                "Enter expected ctc"
+              ],
+              "requiredFieldLabels": [
+                "Phone",
+                "Resume"
+              ],
+              "filledFieldLabels": [],
+              "outcome": "observed",
+              "decision": {
+                "kind": "recover_validation",
+                "source": "system",
+                "stageIndex": 0,
+                "stageLabel": "Section 1",
+                "url": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
+                "reason": "Validation blockers appeared: Importing information and autofilling fields..",
+                "fieldLabels": [],
+                "createdAt": "2026-05-22T06:46:45.085Z"
+              },
+              "lastUpdatedAt": "2026-05-22T06:46:45.085Z"
+            }
+          ],
+          "lastUpdatedAt": "2026-05-22T06:46:45.085Z"
         }
       }
     },
     "notes": [
-      "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
+      "GradLaunch found validation blockers after filling: Importing information and autofilling fields..",
       "Browser fill status: needs_manual_review.",
-      "Filled fields: 0. Skipped fields: 0."
+      "Filled fields: 6. Skipped fields: 1."
     ]
   },
   "createdAt": "2026-05-20T10:43:55.253Z",
-  "updatedAt": "2026-05-21T13:27:23.382Z"
+  "updatedAt": "2026-05-22T06:46:45.085Z"
 }

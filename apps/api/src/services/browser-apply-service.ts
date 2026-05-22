@@ -2,16 +2,34 @@ import { request as httpRequest } from "node:http";
 import { constants as fsConstants } from "node:fs";
 import { access, appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { BrowserApplyReceipt, FilledField, Job, PlannerCheckpoint, PlannerTask, ResumeRecord } from "@gradlaunch/shared";
+import type {
+  AgentHandoffKind,
+  BrowserApplyReceipt,
+  FilledField,
+  Job,
+  PlannerActionKind,
+  PlannerCheckpoint,
+  PlannerDecision,
+  PlannerDecisionSource,
+  PlannerStageOutcome,
+  PlannerStageSnapshot,
+  PlannerTask,
+  ResumeRecord,
+  StudentMemory,
+  StudentProfile
+} from "@gradlaunch/shared";
 import { chromium, type Browser, type BrowserContext, type Frame, type Locator, type Page } from "playwright-core";
 import { getBrowserWorkspaceStorageDir, getManagedBrowserProfileDir } from "../config/storage";
 import { nowIso } from "../lib/time";
+import { BrowserAgentEngine } from "./browser-agent/engine";
 
 type BrowserApplyInput = {
   job: Job;
   fields: FilledField[];
   workspacePath?: string;
   resume?: ResumeRecord;
+  student?: StudentProfile;
+  memory?: StudentMemory;
   submit: boolean;
   planner?: PlannerCheckpoint;
 };
@@ -58,6 +76,7 @@ type DynamicFillPlan = {
   unresolvedRequiredLabels: string[];
   llmSummary?: string;
   llmAnswerCount: number;
+  nextActionAfterFill?: "click_next" | "pause" | "submit_gate";
 };
 
 type LlmStageFillAnswer = {
@@ -95,20 +114,48 @@ type ObservedControl = {
   disabled: boolean;
 };
 
+type BrowserPageState =
+  | "start"
+  | "resume_upload"
+  | "login"
+  | "questionnaire"
+  | "consent"
+  | "review"
+  | "submit"
+  | "account_gate"
+  | "empty"
+  | "unknown";
+
+type BrowserFieldGroup = {
+  label: string;
+  fieldIds: string[];
+  fieldLabels: string[];
+  required: boolean;
+};
+
+type AtsAdapterHint = {
+  id: string;
+  label: string;
+};
+
 type BrowserAgentObservation = {
   url: string;
   title: string;
   pageText: string;
   visibleFields: VisibleField[];
   controls: ObservedControl[];
+  pageState: BrowserPageState;
+  validationMessages: string[];
+  groupedFields: BrowserFieldGroup[];
+  adapter?: AtsAdapterHint;
 };
 
 type BrowserAgentAction =
-  | { kind: "fill"; reason: string }
-  | { kind: "click"; controlId: string; reason: string }
-  | { kind: "upload_resume"; controlId?: string; reason: string }
-  | { kind: "ask_user"; fields: string[]; reason: string }
-  | { kind: "stop"; reason: string };
+  | { kind: "fill"; reason: string; source: PlannerDecisionSource }
+  | { kind: "click"; controlId: string; reason: string; source: PlannerDecisionSource }
+  | { kind: "upload_resume"; controlId?: string; reason: string; source: PlannerDecisionSource }
+  | { kind: "ask_user"; fields: string[]; reason: string; source: PlannerDecisionSource }
+  | { kind: "stop"; reason: string; source: PlannerDecisionSource };
 
 type AtsCredentials = {
   username?: string;
@@ -136,333 +183,14 @@ type ProtectedCheckpointDetection = {
 const defaultChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const transientLabels = ["resume context", "primary skills"];
 export class BrowserApplyService {
+  private readonly engine = new BrowserAgentEngine();
+
   async getAvailability(): Promise<BrowserAvailability> {
-    const cdpUrl = await resolveManagedChromeCdpUrl();
-
-    if (cdpUrl) {
-      return {
-        available: true,
-        message: `Browser worker can attach to the managed GradLaunch browser session at ${cdpUrl}.`
-      };
-    }
-
-    if (process.env.BROWSER_AUTOFILL_ENABLED === "false") {
-      return {
-        available: false,
-        message: "Browser autofill is disabled by BROWSER_AUTOFILL_ENABLED=false."
-      };
-    }
-
-    const chromePath = resolveChromePath();
-
-    if (!(await pathExists(chromePath))) {
-      return {
-        available: false,
-        chromePath,
-        message: `Chrome executable was not found at ${chromePath}.`
-      };
-    }
-
-    return {
-      available: true,
-      chromePath,
-      message: `Browser worker can launch the managed GradLaunch browser at ${chromePath}.`
-    };
+    return this.engine.getAvailability();
   }
 
   async apply(input: BrowserApplyInput): Promise<BrowserApplyReceipt> {
-    const availability = await this.getAvailability();
-    const openedAt = nowIso();
-    const screenshots: string[] = [];
-    const sourceValidation = validateSourceUrl(input.job.sourceUrl);
-    const planner = createPlannerCheckpoint(input.job, input.planner);
-
-    if (!sourceValidation.valid) {
-      markPlannerTask(planner, "open_job_page", "blocked", sourceValidation.message);
-      setPlannerStatus(planner, "blocked", sourceValidation.message);
-      return {
-        status: "blocked",
-        sourceUrl: input.job.sourceUrl,
-        openedAt,
-        completedAt: nowIso(),
-        filledLabels: [],
-        skippedLabels: input.fields.map((field) => field.label),
-        screenshots,
-        message: sourceValidation.message,
-        planner
-      };
-    }
-
-    if (!availability.available) {
-      markPlannerTask(planner, "open_job_page", "blocked", availability.message);
-      setPlannerStatus(planner, "blocked", availability.message);
-      return {
-        status: "blocked",
-        sourceUrl: input.job.sourceUrl,
-        openedAt,
-        completedAt: nowIso(),
-        filledLabels: [],
-        skippedLabels: input.fields.map((field) => field.label),
-        screenshots,
-        message: availability.message,
-        planner
-      };
-    }
-
-    const browserWorkspaceDir = getBrowserWorkspaceStorageDir();
-    const workspacePath = input.workspacePath ?? join(browserWorkspaceDir, "runs");
-    await mkdir(workspacePath, { recursive: true });
-    await mkdir(browserWorkspaceDir, { recursive: true });
-    await writeBrowserDebug(workspacePath, "browser-apply-start", {
-      sourceUrl: input.job.sourceUrl,
-      job: `${input.job.title} at ${input.job.company}`,
-      fieldCount: input.fields.length,
-      fieldLabels: input.fields.map((field) => field.label),
-      resumeAvailable: Boolean(input.resume?.storagePath),
-      llm: getLlmDebugStatus()
-    });
-
-    let browser: Browser | undefined;
-    let context: BrowserContext | undefined;
-    let keepContextOpen = false;
-    let attachedToExistingBrowser = false;
-
-    try {
-      const launchOptions = {
-        executablePath: availability.chromePath,
-        headless: process.env.BROWSER_HEADLESS === "true",
-        args: ["--disable-blink-features=AutomationControlled"]
-      };
-      const cdpUrl = await resolveManagedChromeCdpUrl();
-
-      if (cdpUrl) {
-        try {
-          browser = await chromium.connectOverCDP(cdpUrl);
-          context = browser.contexts()[0];
-          attachedToExistingBrowser = true;
-          keepContextOpen = true;
-
-          if (!context) {
-            throw new Error(
-              "GradLaunch attached to Chrome, but no browser context was available. Start Chrome with remote debugging enabled and keep at least one window open."
-            );
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          throw new Error(
-            `GradLaunch could not attach to the managed browser session at ${cdpUrl}. ${message}`
-          );
-        }
-      } else if (process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
-        try {
-          context = await chromium.launchPersistentContext(getManagedBrowserProfileDir(), {
-            ...launchOptions,
-            args: [
-              ...launchOptions.args,
-              `--remote-debugging-port=${resolveManagedChromeDebugPort()}`
-            ],
-            viewport: { width: 1280, height: 900 }
-          });
-          keepContextOpen = true;
-        } catch (error) {
-          if (shouldFallbackFromLockedProfile(error)) {
-            throw new Error(
-              "GradLaunch could not reopen the managed browser profile because another GradLaunch browser session is already using it. Keep that window open and try again so GradLaunch can attach and open a new tab there."
-            );
-          }
-
-          throw error;
-        }
-      } else {
-        browser = await chromium.launch(launchOptions);
-        context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-      }
-
-      const page = await context.newPage();
-      page.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
-      markPlannerTask(planner, "open_job_page", "running", "Opening the target application URL in a new Chrome tab.");
-      setPlannerStatus(planner, "running", "Opening the job page in a new Chrome tab and preparing the planner-executor flow.");
-      await page.goto(input.job.sourceUrl, { waitUntil: "domcontentloaded", timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000) });
-      let activePage = await getActivePage(context, page);
-      markPlannerTask(planner, "open_job_page", "completed", "Job page opened successfully in a visible Chrome session.");
-      planner.currentUrl = activePage.url();
-      planner.currentStep = "prepare_application";
-      planner.lastUpdatedAt = nowIso();
-      await updateBrowserAgent(activePage, [
-        createBrowserAgentStep("Agent started", `I loaded ${input.job.title} at ${input.job.company}.`, "running"),
-        createBrowserAgentStep("Debug trace", `I am writing browser-agent-debug.log in the application workspace. LLM: ${getLlmDebugStatus().configured ? "configured" : "not configured"}.`, "queued")
-      ]);
-      await updateBrowserAgent(activePage, [
-        createBrowserAgentStep("Open job page", "Chrome opened the exact job URL provided by the student.", "done"),
-        createBrowserAgentStep("Prepare application", "Checking page gates and getting ready to upload the resume.", "running"),
-        createBrowserAgentStep("Fill stages", "Waiting to detect the first application form step.", "queued"),
-        createBrowserAgentStep("Finish autonomously", "GradLaunch will keep going unless the portal needs a true protected checkpoint or manual review.", "queued")
-      ]);
-      await pushScreenshot(screenshots, activePage, workspacePath, "browser-opened.png");
-      await clickSoftGate(activePage);
-
-      const initialCheckpoint = await detectProtectedCheckpoint(activePage);
-
-      if (initialCheckpoint.blocked) {
-        const handoff = await waitForHumanIntervention({
-          context,
-          page: activePage,
-          workspacePath,
-          screenshots,
-          reason: initialCheckpoint.reason ?? "Human intervention needed: complete the login, captcha, OTP, or verification step in the open browser. GradLaunch is monitoring the page and will resume automatically once it clears.",
-          planner
-        });
-        activePage = handoff.activePage;
-
-        if (!handoff.resolved) {
-          setPlannerStatus(planner, "handoff_required", "Planner paused because a protected checkpoint still needs the student.");
-          return {
-            status: "handoff_required",
-            sourceUrl: input.job.sourceUrl,
-            openedAt,
-            completedAt: nowIso(),
-            filledLabels: [],
-            skippedLabels: input.fields.map((field) => field.label),
-            screenshots,
-            message: "GradLaunch paused for login or verification, but the gate did not clear before the handoff timeout.",
-            planner
-          };
-        }
-      }
-
-      const filledLabels: string[] = [];
-      const skippedLabels: string[] = [];
-
-      const multiStageResult = await fillMultiStageApplication({
-        context,
-        page: activePage,
-        fields: input.fields,
-        job: input.job,
-        resume: input.resume,
-        screenshots,
-        workspacePath,
-        allowFinalSubmit: input.submit,
-        planner
-      });
-      activePage = multiStageResult.activePage;
-      filledLabels.push(...multiStageResult.filledLabels);
-      skippedLabels.push(...multiStageResult.skippedLabels);
-
-      await pushScreenshot(screenshots, activePage, workspacePath, "browser-filled.png");
-
-      if (multiStageResult.blockedReason) {
-        keepContextOpen = shouldKeepBrowserOpenForReview();
-        await maybeKeepBrowserOpen(context);
-        setPlannerStatus(
-          planner,
-          multiStageResult.handoffRequired ? "handoff_required" : "needs_review",
-          multiStageResult.blockedReason
-        );
-        return {
-          status: multiStageResult.handoffRequired ? "handoff_required" : "needs_manual_review",
-          sourceUrl: input.job.sourceUrl,
-          openedAt,
-          completedAt: nowIso(),
-          filledLabels,
-          skippedLabels,
-          screenshots,
-          message: multiStageResult.blockedReason,
-          planner
-        };
-      }
-
-      if (!input.submit) {
-        await updateBrowserAgent(activePage, createCompletionOverlaySteps(
-          multiStageResult.stageCount,
-          "The form is filled and ready for your final review. You can inspect it now or submit directly from this page."
-        ));
-        keepContextOpen = shouldKeepBrowserOpenForReview();
-        await maybeKeepBrowserOpen(context);
-        markPlannerTask(planner, "reach_submit_gate", "completed", "Reached the review/submit checkpoint and paused safely.");
-        markPlannerTask(planner, "save_checkpoint", "completed", "Saved planner state so the run can continue from the latest checkpoint.");
-        setPlannerStatus(planner, "completed", "Planner completed the form fill and paused at the review gate.");
-
-        return {
-          status: "filled",
-          sourceUrl: input.job.sourceUrl,
-          openedAt,
-          completedAt: nowIso(),
-          filledLabels,
-          skippedLabels,
-          screenshots,
-          message: `The form is filled across ${multiStageResult.stageCount} stage${multiStageResult.stageCount === 1 ? "" : "s"} and is ready for review or direct submit.`,
-          planner
-        };
-      }
-
-      const clicked = input.submit && process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
-        ? await clickFinalSubmit(activePage)
-        : false;
-
-      if (!clicked) {
-        keepContextOpen = shouldKeepBrowserOpenForReview();
-        await maybeKeepBrowserOpen(context);
-        await pushScreenshot(screenshots, activePage, workspacePath, "manual-review-needed.png");
-        markPlannerTask(planner, "reach_submit_gate", "blocked", "Reached the final step but could not safely finish the submit action.");
-        markPlannerTask(planner, "save_checkpoint", "completed", "Saved planner state at the final manual review checkpoint.");
-        setPlannerStatus(planner, "needs_review", "Final submit requires manual review or external submit is disabled.");
-        return {
-          status: "needs_manual_review",
-          sourceUrl: input.job.sourceUrl,
-          openedAt,
-          completedAt: nowIso(),
-          filledLabels,
-          skippedLabels,
-          screenshots,
-          message: input.submit
-            ? "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions."
-            : "GradLaunch filled the recognized fields, but could not confidently find the final submit button. The browser was left open for manual review when supported.",
-          planner
-        };
-      }
-
-      await activePage.waitForLoadState("domcontentloaded", { timeout: 8000 }).catch(() => undefined);
-      await activePage.waitForTimeout(2000);
-      await pushScreenshot(screenshots, activePage, workspacePath, "browser-submitted.png");
-      markPlannerTask(planner, "reach_submit_gate", "completed", "Final submit action completed.");
-      markPlannerTask(planner, "save_checkpoint", "completed", "Saved the final submitted planner state.");
-      setPlannerStatus(planner, "completed", "Planner completed the submission flow successfully.");
-
-      return {
-        status: "submitted",
-        sourceUrl: input.job.sourceUrl,
-        openedAt,
-        completedAt: nowIso(),
-        filledLabels,
-        skippedLabels,
-        screenshots,
-        message: "Chrome opened the job page, filled recognized fields, clicked the final submit control, and saved screenshots.",
-        planner
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Browser worker failed during the application flow.";
-      markPlannerTask(planner, "finish_current_section", "blocked", message);
-      setPlannerStatus(planner, "blocked", message);
-      return {
-        status: "blocked",
-        sourceUrl: input.job.sourceUrl,
-        openedAt,
-        completedAt: nowIso(),
-        filledLabels: [],
-        skippedLabels: input.fields.map((field) => field.label),
-        screenshots,
-        message,
-        planner
-      };
-    } finally {
-      if (context && !keepContextOpen && !attachedToExistingBrowser) {
-        await context.close().catch(() => undefined);
-      }
-
-      if (browser && !keepContextOpen && !attachedToExistingBrowser) {
-        await browser.close().catch(() => undefined);
-      }
-    }
+    return this.engine.apply(input);
   }
 }
 
@@ -846,6 +574,8 @@ async function fillMultiStageApplication(input: {
   fields: FilledField[];
   job: Job;
   resume?: ResumeRecord;
+  student?: StudentProfile;
+  memory?: StudentMemory;
   screenshots: string[];
   workspacePath: string;
   allowFinalSubmit: boolean;
@@ -873,6 +603,14 @@ async function fillMultiStageApplication(input: {
     const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
 
     if (protectedCheckpoint.blocked) {
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: plannerActionFromHandoffKind(protectedCheckpoint.kind ?? inferHandoffKindFromReason(protectedCheckpoint.reason ?? "")),
+        source: "system",
+        reason: protectedCheckpoint.reason ?? "A protected checkpoint needs the student before GradLaunch can continue."
+      });
       const handoff = await waitForHumanIntervention({
         context: input.context,
         page: activePage,
@@ -880,6 +618,7 @@ async function fillMultiStageApplication(input: {
         workspacePath: input.workspacePath,
         screenshots: input.screenshots,
         reason: protectedCheckpoint.reason ?? "Human intervention needed: complete the login, captcha, OTP, or verification step in the open browser. GradLaunch is monitoring the page and will resume automatically once it clears.",
+        handoffKind: protectedCheckpoint.kind,
         planner: input.planner
       });
       activePage = handoff.activePage;
@@ -936,9 +675,27 @@ async function fillMultiStageApplication(input: {
     await updateBrowserAgent(activePage, createStageOverlaySteps(
       stageIndex,
       "running",
-      `I can see ${visibleFields.length} field${visibleFields.length === 1 ? "" : "s"}: ${summarizeVisibleFields(visibleFields)}. I am asking the LLM how to fill this screen.`
+      `I can see ${visibleFields.length} field${visibleFields.length === 1 ? "" : "s"}: ${summarizeVisibleFields(visibleFields)}. I am classifying this screen and asking the LLM how to fill it.`
     ));
+    recordPlannerObservation({
+      planner: input.planner,
+      page: activePage,
+      stageIndex,
+      visibleFieldLabels: visibleFields.map((field) => field.label)
+    });
     const observation = await observeBrowserPage(activePage, visibleFields);
+    await writeBrowserDebug(input.workspacePath, "page-observation", {
+      stage: stageIndex + 1,
+      pageState: observation.pageState,
+      adapter: observation.adapter?.id,
+      validationMessages: observation.validationMessages,
+      groupedFields: observation.groupedFields
+    });
+    await updateBrowserAgent(activePage, createStageOverlaySteps(
+      stageIndex,
+      "running",
+      `This screen looks like ${observation.pageState.replaceAll("_", " ")}${observation.adapter ? ` on ${observation.adapter.label}` : ""}.`
+    ));
     const agentAction = await decideBrowserAgentAction({
       observation,
       fields: input.fields,
@@ -948,6 +705,15 @@ async function fillMultiStageApplication(input: {
     });
 
     if (agentAction.kind !== "fill") {
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: mapAgentActionToPlannerAction(agentAction.kind),
+        source: agentAction.source,
+        reason: agentAction.reason,
+        fieldLabels: agentAction.kind === "ask_user" ? agentAction.fields : []
+      });
       await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, agentAction.kind === "ask_user" ? "attention" : "running", agentAction.reason));
 
       if (agentAction.kind === "ask_user") {
@@ -960,11 +726,19 @@ async function fillMultiStageApplication(input: {
           screenshots: input.screenshots,
           reason: agentAction.reason,
           watchFields: agentAction.fields,
+          handoffKind: inferHandoffKindFromReason(agentAction.reason),
           planner: input.planner
         });
         activePage = handoff.activePage;
 
         if (!handoff.resolved) {
+          recordPlannerStageOutcome({
+            planner: input.planner,
+            page: activePage,
+            stageIndex,
+            outcome: "handoff",
+            requiredFieldLabels: agentAction.fields
+          });
           markPlannerTask(input.planner, "save_checkpoint", "completed", "Saved the planner state while waiting for user-supplied form values.");
           return {
             activePage,
@@ -980,6 +754,12 @@ async function fillMultiStageApplication(input: {
       }
 
       if (agentAction.kind === "stop") {
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: "review"
+        });
         markPlannerTask(input.planner, "save_checkpoint", "completed", "Saved the latest planner checkpoint before pausing for review.");
         setPlannerStatus(input.planner, "needs_review", agentAction.reason);
         return {
@@ -992,6 +772,12 @@ async function fillMultiStageApplication(input: {
 
       if (agentAction.kind === "upload_resume") {
         if (!input.resume?.storagePath || !await pathExists(input.resume.storagePath)) {
+          recordPlannerStageOutcome({
+            planner: input.planner,
+            page: activePage,
+            stageIndex,
+            outcome: "blocked"
+          });
           return {
             activePage,
             filledLabels,
@@ -1004,6 +790,12 @@ async function fillMultiStageApplication(input: {
         const uploaded = await attachResume(activePage, input.resume.storagePath, agentAction.controlId);
 
         if (!uploaded) {
+          recordPlannerStageOutcome({
+            planner: input.planner,
+            page: activePage,
+            stageIndex,
+            outcome: "blocked"
+          });
           markPlannerTask(input.planner, "finish_current_section", "blocked", "Resume upload path was detected but the upload could not be completed automatically.");
           return {
             activePage,
@@ -1023,6 +815,13 @@ async function fillMultiStageApplication(input: {
 
         await activePage.waitForTimeout(Number(process.env.BROWSER_RESUME_PARSE_WAIT_MS ?? 1200));
         activePage = await getActivePage(input.context, activePage);
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: "filled",
+          filledFieldLabels: ["Resume upload"]
+        });
         markPlannerTask(input.planner, "finish_current_section", "running", "Resume upload completed. Continuing the current section.");
         continue;
       }
@@ -1039,6 +838,12 @@ async function fillMultiStageApplication(input: {
         activePage = clicked.activePage;
 
         if (!clicked.moved && !await hasApplicationStartModal(activePage)) {
+          recordPlannerStageOutcome({
+            planner: input.planner,
+            page: activePage,
+            stageIndex,
+            outcome: "blocked"
+          });
           markPlannerTask(input.planner, "retry_alternative_path", "blocked", `A visible control was clicked but the flow did not advance: ${agentAction.reason}`);
           return {
             activePage,
@@ -1049,6 +854,12 @@ async function fillMultiStageApplication(input: {
           };
         }
 
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: "advanced"
+        });
         continue;
       }
     }
@@ -1076,6 +887,15 @@ async function fillMultiStageApplication(input: {
 
       if (accountGate.blockedReason) {
         if (shouldOfferHumanHandoff(accountGate.blockedReason)) {
+          recordPlannerDecision({
+            planner: input.planner,
+            page: activePage,
+            stageIndex,
+            kind: plannerActionFromHandoffKind(inferHandoffKindFromReason(accountGate.blockedReason)),
+            source: "system",
+            reason: accountGate.blockedReason,
+            fieldLabels: visibleFields.map((field) => field.label)
+          });
           const handoff = await waitForHumanIntervention({
             context: input.context,
             page: activePage,
@@ -1083,6 +903,7 @@ async function fillMultiStageApplication(input: {
             workspacePath: input.workspacePath,
             screenshots: input.screenshots,
             reason: accountGate.blockedReason,
+            handoffKind: inferHandoffKindFromReason(accountGate.blockedReason),
             planner: input.planner
           });
           activePage = handoff.activePage;
@@ -1093,6 +914,12 @@ async function fillMultiStageApplication(input: {
         }
 
         await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "attention", accountGate.blockedReason));
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: shouldOfferHumanHandoff(accountGate.blockedReason) ? "handoff" : "blocked"
+        });
         return {
           activePage,
           filledLabels,
@@ -1107,6 +934,14 @@ async function fillMultiStageApplication(input: {
     }
 
     if (visibleFields.length === 0) {
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: "navigate_apply",
+        source: "system",
+        reason: "No visible form fields are on the page yet, so the planner is opening the application entry path."
+      });
       await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "running", "No form fields are visible yet. Clicking the job site's Apply/start button to open the application form."));
       markPlannerTask(input.planner, "retry_alternative_path", "running", "No visible fields yet, so the planner is opening the application path.");
       await pushScreenshot(input.screenshots, activePage, input.workspacePath, `browser-stage-${stageIndex + 1}-start.png`);
@@ -1116,6 +951,12 @@ async function fillMultiStageApplication(input: {
 
       if (!startResult.clicked) {
         await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "done", "No form fields or start/apply button were found. GradLaunch is pausing for review."));
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: "review"
+        });
         return {
           activePage,
           filledLabels,
@@ -1136,6 +977,14 @@ async function fillMultiStageApplication(input: {
         const blockedReason = "GradLaunch clicked Apply, but the application form did not open. The job site may require login, may have blocked a popup, or may need manual interaction.";
 
         if (shouldOfferHumanHandoff(blockedReason)) {
+          recordPlannerDecision({
+            planner: input.planner,
+            page: activePage,
+            stageIndex,
+            kind: plannerActionFromHandoffKind(inferHandoffKindFromReason(blockedReason)),
+            source: "system",
+            reason: blockedReason
+          });
           const handoff = await waitForHumanIntervention({
             context: input.context,
             page: activePage,
@@ -1143,6 +992,7 @@ async function fillMultiStageApplication(input: {
             workspacePath: input.workspacePath,
             screenshots: input.screenshots,
             reason: blockedReason,
+            handoffKind: inferHandoffKindFromReason(blockedReason),
             planner: input.planner
           });
           activePage = handoff.activePage;
@@ -1153,6 +1003,12 @@ async function fillMultiStageApplication(input: {
         }
 
         await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "attention", "The Apply button did not open the application form. Login, popup blocking, or site validation may need manual attention."));
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: "handoff"
+        });
         return {
           activePage,
           filledLabels,
@@ -1164,9 +1020,21 @@ async function fillMultiStageApplication(input: {
       }
 
       if (await hasApplicationStartModal(activePage)) {
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: "advanced"
+        });
         continue;
       }
 
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        outcome: "advanced"
+      });
       continue;
     }
 
@@ -1176,17 +1044,38 @@ async function fillMultiStageApplication(input: {
       visibleFields,
       job: input.job,
       resume: input.resume,
+      student: input.student,
+      memory: input.memory,
       workspacePath: input.workspacePath
     });
     let filledOnStage = 0;
+    const filledOnStageLabels: string[] = [];
 
     if (screenKey === lastScreenKey) {
       sameScreenAttempts += 1;
-      bumpPlannerRetries(input.planner, "retry_alternative_path", "Planner saw the same screen again and is attempting a different recovery path.");
+      bumpPlannerRetries(
+        input.planner,
+        "retry_alternative_path",
+        "Planner saw the same screen again and is attempting a different recovery path.",
+        activePage,
+        stageIndex
+      );
     } else {
       sameScreenAttempts = 0;
       lastScreenKey = screenKey;
     }
+
+    recordPlannerDecision({
+      planner: input.planner,
+      page: activePage,
+      stageIndex,
+      kind: "fill_fields",
+      source: fillPlan.llmSummary ? "llm" : "system",
+      reason: fillPlan.llmSummary
+        ? `Prepared a field-fill plan for ${visibleFields.length} visible field${visibleFields.length === 1 ? "" : "s"}. ${fillPlan.llmSummary}`
+        : `Prepared a fallback field-fill plan for ${visibleFields.length} visible field${visibleFields.length === 1 ? "" : "s"}.`,
+      fieldLabels: visibleFields.map((field) => field.label)
+    });
 
     await updateBrowserAgent(activePage, createStageOverlaySteps(
       stageIndex,
@@ -1221,6 +1110,7 @@ async function fillMultiStageApplication(input: {
 
       if (filled) {
         filledOnStage += 1;
+        filledOnStageLabels.push(field.label);
 
         if (!filledKeys.has(key)) {
           filledKeys.add(key);
@@ -1264,6 +1154,20 @@ async function fillMultiStageApplication(input: {
 
     if (sameScreenAttempts >= Number(process.env.BROWSER_MAX_SAME_SCREEN_ATTEMPTS ?? 2) && filledOnStage === 0 && hasOutstandingRequiredFields) {
       await markFieldsNeedingInput(activePage, visibleFields.map((field) => field.label));
+      recordPlannerObservation({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        visibleFieldLabels: visibleFields.map((field) => field.label),
+        requiredFieldLabels: dedupeLabels([...visibleRequiredEmptyLabels, ...unresolvedRequiredLabels])
+      });
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        outcome: "blocked",
+        requiredFieldLabels: dedupeLabels([...visibleRequiredEmptyLabels, ...unresolvedRequiredLabels])
+      });
       await updateBrowserAgent(activePage, createStageOverlaySteps(
         stageIndex,
         "attention",
@@ -1290,6 +1194,20 @@ async function fillMultiStageApplication(input: {
         ));
       } else {
         await markFieldsNeedingInput(activePage, labels);
+        recordPlannerObservation({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          visibleFieldLabels: visibleFields.map((field) => field.label),
+          requiredFieldLabels: labels
+        });
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: "blocked",
+          requiredFieldLabels: labels
+        });
         await updateBrowserAgent(activePage, createStageOverlaySteps(
           stageIndex,
           "attention",
@@ -1329,6 +1247,22 @@ async function fillMultiStageApplication(input: {
         const reason = createManualFieldHandoffReason(manualResolvableLabels);
 
         await markFieldsNeedingInput(activePage, manualResolvableLabels);
+        recordPlannerObservation({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          visibleFieldLabels: visibleFields.map((field) => field.label),
+          requiredFieldLabels: requiredLabels
+        });
+        recordPlannerDecision({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          kind: "wait_for_user_input",
+          source: "system",
+          reason,
+          fieldLabels: manualResolvableLabels
+        });
         await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "attention", reason));
         await pushScreenshot(input.screenshots, activePage, input.workspacePath, `browser-stage-${stageIndex + 1}-manual-handoff.png`);
         const handoff = await waitForHumanIntervention({
@@ -1340,6 +1274,7 @@ async function fillMultiStageApplication(input: {
           reason,
           watchFields: manualResolvableLabels,
           resolveWhenWatchFieldsClear: true,
+          handoffKind: "missing_data",
           planner: input.planner
         });
         activePage = handoff.activePage;
@@ -1360,6 +1295,29 @@ async function fillMultiStageApplication(input: {
       }
 
       await markFieldsNeedingInput(activePage, requiredLabels);
+      recordPlannerObservation({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        visibleFieldLabels: visibleFields.map((field) => field.label),
+        requiredFieldLabels: requiredLabels
+      });
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: "recover_validation",
+        source: "system",
+        reason: `Required fields still need safe answers: ${requiredLabels.join(", ")}.`,
+        fieldLabels: requiredLabels
+      });
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        outcome: "blocked",
+        requiredFieldLabels: requiredLabels
+      });
       await updateBrowserAgent(activePage, createStageOverlaySteps(
         stageIndex,
         "attention",
@@ -1396,6 +1354,22 @@ async function fillMultiStageApplication(input: {
         const reason = createManualFieldHandoffReason(manualResolvableLabels);
 
         await markFieldsNeedingInput(activePage, manualResolvableLabels);
+        recordPlannerObservation({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          visibleFieldLabels: visibleFields.map((field) => field.label),
+          requiredFieldLabels: unresolvedRequiredLabels
+        });
+        recordPlannerDecision({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          kind: "wait_for_user_input",
+          source: "system",
+          reason,
+          fieldLabels: manualResolvableLabels
+        });
         await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "attention", reason));
         await pushScreenshot(input.screenshots, activePage, input.workspacePath, `browser-stage-${stageIndex + 1}-manual-handoff.png`);
         const handoff = await waitForHumanIntervention({
@@ -1407,6 +1381,7 @@ async function fillMultiStageApplication(input: {
           reason,
           watchFields: manualResolvableLabels,
           resolveWhenWatchFieldsClear: true,
+          handoffKind: "missing_data",
           planner: input.planner
         });
         activePage = handoff.activePage;
@@ -1427,6 +1402,29 @@ async function fillMultiStageApplication(input: {
       }
 
       await markFieldsNeedingInput(activePage, unresolvedRequiredLabels);
+      recordPlannerObservation({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        visibleFieldLabels: visibleFields.map((field) => field.label),
+        requiredFieldLabels: unresolvedRequiredLabels
+      });
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: "recover_validation",
+        source: "system",
+        reason: `Planner is pausing because required fields still need trusted answers: ${unresolvedRequiredLabels.join(", ")}.`,
+        fieldLabels: unresolvedRequiredLabels
+      });
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        outcome: "blocked",
+        requiredFieldLabels: unresolvedRequiredLabels
+      });
       await updateBrowserAgent(activePage, createStageOverlaySteps(
         stageIndex,
         "attention",
@@ -1451,11 +1449,58 @@ async function fillMultiStageApplication(input: {
       "running",
       `Filled ${filledOnStage} field${filledOnStage === 1 ? "" : "s"} on ${input.planner.currentStageLabel ?? `section ${stageIndex + 1}`}.`
     );
+    recordPlannerObservation({
+      planner: input.planner,
+      page: activePage,
+      stageIndex,
+      visibleFieldLabels: visibleFields.map((field) => field.label),
+      requiredFieldLabels: dedupeLabels([...visibleRequiredEmptyLabels, ...unresolvedRequiredLabels])
+    });
+    recordPlannerStageOutcome({
+      planner: input.planner,
+      page: activePage,
+      stageIndex,
+      outcome: "filled",
+      filledFieldLabels: filledOnStageLabels
+    });
     await pushScreenshot(input.screenshots, activePage, input.workspacePath, `browser-stage-${stageIndex + 1}.png`);
+    const postFillValidationMessages = await getVisibleValidationMessages(activePage);
+
+    if (postFillValidationMessages.length > 0 && filledOnStage === 0 && fillPlan.nextActionAfterFill !== "click_next") {
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: "recover_validation",
+        source: "system",
+        reason: `Validation feedback is visible on the current screen: ${postFillValidationMessages.join(", ")}.`
+      });
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        outcome: "blocked"
+      });
+      return {
+        activePage,
+        filledLabels,
+        skippedLabels,
+        blockedReason: `The current step shows validation feedback and the agent could not safely repair it yet: ${postFillValidationMessages.join(", ")}.`,
+        stageCount
+      };
+    }
 
     const submitGateCheckpoint = await detectProtectedCheckpoint(activePage);
 
     if (submitGateCheckpoint.blocked) {
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: plannerActionFromHandoffKind(submitGateCheckpoint.kind ?? inferHandoffKindFromReason(submitGateCheckpoint.reason ?? "")),
+        source: "system",
+        reason: submitGateCheckpoint.reason ?? "Human intervention needed before GradLaunch can continue."
+      });
       await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "attention", submitGateCheckpoint.reason ?? "Human intervention needed before GradLaunch can continue."));
       const handoff = await waitForHumanIntervention({
         context: input.context,
@@ -1464,6 +1509,7 @@ async function fillMultiStageApplication(input: {
         workspacePath: input.workspacePath,
         screenshots: input.screenshots,
         reason: submitGateCheckpoint.reason ?? "Human intervention needed: complete the login, captcha, OTP, or verification step in the open browser. GradLaunch is monitoring the page and will resume automatically once it clears.",
+        handoffKind: submitGateCheckpoint.kind,
         planner: input.planner
       });
       activePage = handoff.activePage;
@@ -1485,6 +1531,20 @@ async function fillMultiStageApplication(input: {
 
     if (await hasFinalSubmitControl(activePage)) {
       if (!allowExternalSubmit) {
+        recordPlannerDecision({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          kind: "reach_review",
+          source: "system",
+          reason: "The final submit control is visible, so the planner is pausing at the review gate."
+        });
+        recordPlannerStageOutcome({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          outcome: "review"
+        });
         await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "done", "Final submit control is visible. GradLaunch is pausing here because external submit is not enabled."));
         markPlannerTask(input.planner, "reach_submit_gate", "completed", "Reached the submit gate and paused for review.");
         return {
@@ -1495,8 +1555,45 @@ async function fillMultiStageApplication(input: {
         };
       }
 
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: "submit_application",
+        source: "system",
+        reason: "The final submit control is visible and external submit is enabled, so the planner is submitting now."
+      });
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        outcome: "submitted"
+      });
       await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "running", "Final submit control is visible and external submit is enabled. Submitting now."));
       markPlannerTask(input.planner, "reach_submit_gate", "running", "Final submit control is visible. Executing the submit step.");
+      return {
+        activePage,
+        filledLabels,
+        skippedLabels,
+        stageCount
+      };
+    }
+
+    if (fillPlan.nextActionAfterFill === "pause") {
+      recordPlannerDecision({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        kind: "pause_for_review",
+        source: "llm",
+        reason: "The stage planner recommended pausing on this screen for review after filling."
+      });
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        outcome: "review"
+      });
       return {
         activePage,
         filledLabels,
@@ -1514,6 +1611,14 @@ async function fillMultiStageApplication(input: {
 
     if (!nextStage.moved) {
       if (nextStage.blockedReason && shouldOfferHumanHandoff(nextStage.blockedReason)) {
+        recordPlannerDecision({
+          planner: input.planner,
+          page: activePage,
+          stageIndex,
+          kind: plannerActionFromHandoffKind(inferHandoffKindFromReason(nextStage.blockedReason)),
+          source: "system",
+          reason: nextStage.blockedReason
+        });
         const handoff = await waitForHumanIntervention({
           context: input.context,
           page: activePage,
@@ -1521,6 +1626,7 @@ async function fillMultiStageApplication(input: {
           workspacePath: input.workspacePath,
           screenshots: input.screenshots,
           reason: nextStage.blockedReason,
+          handoffKind: inferHandoffKindFromReason(nextStage.blockedReason),
           planner: input.planner
         });
         activePage = handoff.activePage;
@@ -1531,6 +1637,12 @@ async function fillMultiStageApplication(input: {
       }
 
       await updateBrowserAgent(activePage, createStageOverlaySteps(stageIndex, "done", "No safe next button was found. GradLaunch is pausing for review."));
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex,
+        outcome: nextStage.blockedReason ? "handoff" : "review"
+      });
       return {
         activePage,
         filledLabels,
@@ -1541,6 +1653,14 @@ async function fillMultiStageApplication(input: {
       };
     }
 
+    recordPlannerDecision({
+      planner: input.planner,
+      page: nextStage.activePage,
+      stageIndex,
+      kind: "navigate_next",
+      source: "system",
+      reason: `Completed ${input.planner.currentStageLabel ?? `Section ${stageIndex + 1}`} and advanced to the next application stage.`
+    });
     activePage = nextStage.activePage;
     completePlannerStage(input.planner, activePage, stageIndex);
   }
@@ -1637,6 +1757,7 @@ async function waitForHumanIntervention(input: {
   workspacePath: string;
   screenshots?: string[];
   reason: string;
+  handoffKind?: AgentHandoffKind;
   watchFields?: string[];
   resolveWhenWatchFieldsClear?: boolean;
   planner: PlannerCheckpoint;
@@ -1649,7 +1770,7 @@ async function waitForHumanIntervention(input: {
 
   await maybeKeepBrowserOpen(input.context);
   await pushScreenshot(input.screenshots ?? [], activePage, input.workspacePath, "browser-handoff-needed.png");
-  notePlannerHandoff(input.planner, input.reason, activePage, input.stageIndex);
+  notePlannerHandoff(input.planner, input.reason, activePage, input.stageIndex, input.handoffKind);
 
   while (Date.now() - startedAt < timeoutMs) {
     const secondsRemaining = Math.max(1, Math.ceil((timeoutMs - (Date.now() - startedAt)) / 1000));
@@ -1752,8 +1873,11 @@ function createPlannerCheckpoint(job: Job, existing?: PlannerCheckpoint): Planne
   if (existing) {
     return {
       ...existing,
+      formMode: existing.formMode ?? "unknown",
       subgoals: existing.subgoals.map((task) => ({ ...task })),
-      validationErrors: [...existing.validationErrors]
+      validationErrors: [...existing.validationErrors],
+      lastDecision: existing.lastDecision ? clonePlannerDecision(existing.lastDecision) : undefined,
+      stageHistory: Array.isArray(existing.stageHistory) ? existing.stageHistory.map(clonePlannerStage) : []
     };
   }
 
@@ -1764,6 +1888,7 @@ function createPlannerCheckpoint(job: Job, existing?: PlannerCheckpoint): Planne
     goal: `Complete the ${job.title} application at ${job.company} autonomously until a protected or final review checkpoint.`,
     status: "idle",
     summary: "Planner is ready to start the application flow.",
+    formMode: "unknown",
     retryCount: 0,
     handoffCount: 0,
     validationErrors: [],
@@ -1776,7 +1901,25 @@ function createPlannerCheckpoint(job: Job, existing?: PlannerCheckpoint): Planne
       createPlannerTask("reach_submit_gate", "Reach submit/review gate", now),
       createPlannerTask("save_checkpoint", "Save checkpoint", now)
     ],
+    stageHistory: [],
     lastUpdatedAt: now
+  };
+}
+
+function clonePlannerDecision(decision: PlannerDecision): PlannerDecision {
+  return {
+    ...decision,
+    fieldLabels: [...decision.fieldLabels]
+  };
+}
+
+function clonePlannerStage(stage: PlannerStageSnapshot): PlannerStageSnapshot {
+  return {
+    ...stage,
+    visibleFieldLabels: [...stage.visibleFieldLabels],
+    requiredFieldLabels: [...stage.requiredFieldLabels],
+    filledFieldLabels: [...stage.filledFieldLabels],
+    decision: stage.decision ? clonePlannerDecision(stage.decision) : undefined
   };
 }
 
@@ -1820,16 +1963,123 @@ function setPlannerStatus(planner: PlannerCheckpoint, status: PlannerCheckpoint[
   planner.lastUpdatedAt = nowIso();
 }
 
+function ensurePlannerStage(planner: PlannerCheckpoint, page: Page, stageIndex: number) {
+  const label = `Section ${stageIndex + 1}`;
+  const existingStage = planner.stageHistory.find((stage) => stage.stageIndex === stageIndex);
+
+  if (existingStage) {
+    existingStage.label = label;
+    existingStage.url = page.url();
+    existingStage.lastUpdatedAt = nowIso();
+    return existingStage;
+  }
+
+  const stage: PlannerStageSnapshot = {
+    stageIndex,
+    label,
+    url: page.url(),
+    visibleFieldLabels: [],
+    requiredFieldLabels: [],
+    filledFieldLabels: [],
+    outcome: "observed",
+    lastUpdatedAt: nowIso()
+  };
+  planner.stageHistory.push(stage);
+  planner.lastUpdatedAt = stage.lastUpdatedAt;
+  return stage;
+}
+
+function updatePlannerFormMode(planner: PlannerCheckpoint, stageIndex: number) {
+  if (stageIndex > 0) {
+    planner.formMode = "multi_stage";
+    return;
+  }
+
+  if (planner.formMode === "unknown") {
+    planner.formMode = "single_stage";
+  }
+}
+
+function recordPlannerObservation(input: {
+  planner: PlannerCheckpoint;
+  page: Page;
+  stageIndex: number;
+  visibleFieldLabels?: string[];
+  requiredFieldLabels?: string[];
+}) {
+  const stage = ensurePlannerStage(input.planner, input.page, input.stageIndex);
+  updatePlannerFormMode(input.planner, input.stageIndex);
+  stage.visibleFieldLabels = dedupeLabels([...(input.visibleFieldLabels ?? [])]);
+  stage.requiredFieldLabels = dedupeLabels([...(input.requiredFieldLabels ?? stage.requiredFieldLabels)]);
+  stage.url = input.page.url();
+  stage.lastUpdatedAt = nowIso();
+  input.planner.lastUpdatedAt = stage.lastUpdatedAt;
+}
+
+function recordPlannerDecision(input: {
+  planner: PlannerCheckpoint;
+  page: Page;
+  stageIndex: number;
+  kind: PlannerActionKind;
+  source: PlannerDecisionSource;
+  reason: string;
+  fieldLabels?: string[];
+}) {
+  const stage = ensurePlannerStage(input.planner, input.page, input.stageIndex);
+  const decision: PlannerDecision = {
+    kind: input.kind,
+    source: input.source,
+    stageIndex: input.stageIndex,
+    stageLabel: stage.label,
+    url: input.page.url(),
+    reason: input.reason,
+    fieldLabels: dedupeLabels(input.fieldLabels ?? []),
+    createdAt: nowIso()
+  };
+
+  stage.decision = decision;
+  stage.lastUpdatedAt = decision.createdAt;
+  input.planner.lastDecision = decision;
+  input.planner.currentUrl = decision.url;
+  input.planner.currentStageLabel = stage.label;
+  input.planner.lastUpdatedAt = decision.createdAt;
+}
+
+function recordPlannerStageOutcome(input: {
+  planner: PlannerCheckpoint;
+  page: Page;
+  stageIndex: number;
+  outcome: PlannerStageOutcome;
+  filledFieldLabels?: string[];
+  requiredFieldLabels?: string[];
+}) {
+  const stage = ensurePlannerStage(input.planner, input.page, input.stageIndex);
+  stage.outcome = input.outcome;
+  stage.url = input.page.url();
+  stage.filledFieldLabels = dedupeLabels([...stage.filledFieldLabels, ...(input.filledFieldLabels ?? [])]);
+  stage.requiredFieldLabels = dedupeLabels([...stage.requiredFieldLabels, ...(input.requiredFieldLabels ?? [])]);
+  stage.lastUpdatedAt = nowIso();
+  input.planner.lastUpdatedAt = stage.lastUpdatedAt;
+}
+
 function plannerEnterStage(planner: PlannerCheckpoint, page: Page, stageIndex: number) {
   planner.currentStep = `stage_${stageIndex + 1}`;
   planner.currentStageLabel = `Section ${stageIndex + 1}`;
   planner.currentUrl = page.url();
+  updatePlannerFormMode(planner, stageIndex);
+  ensurePlannerStage(planner, page, stageIndex);
   planner.lastUpdatedAt = nowIso();
   markPlannerTask(planner, "finish_current_section", "running", `Reading ${planner.currentStageLabel} and planning the next safe action.`);
   setPlannerStatus(planner, "running", `Planner is working through ${planner.currentStageLabel}.`);
 }
 
 function completePlannerStage(planner: PlannerCheckpoint, page: Page, stageIndex: number) {
+  recordPlannerStageOutcome({
+    planner,
+    page,
+    stageIndex,
+    outcome: "advanced"
+  });
   planner.currentStep = `stage_${stageIndex + 2}`;
   planner.currentStageLabel = `Section ${stageIndex + 2}`;
   planner.currentUrl = page.url();
@@ -1839,10 +2089,32 @@ function completePlannerStage(planner: PlannerCheckpoint, page: Page, stageIndex
   setPlannerStatus(planner, "running", `Section ${stageIndex + 1} completed. Moving to the next stage.`);
 }
 
-function notePlannerHandoff(planner: PlannerCheckpoint, reason: string, page: Page, stageIndex?: number) {
+function notePlannerHandoff(
+  planner: PlannerCheckpoint,
+  reason: string,
+  page: Page,
+  stageIndex?: number,
+  handoffKind?: AgentHandoffKind
+) {
   planner.handoffCount += 1;
   planner.currentUrl = page.url();
   planner.currentStageLabel = typeof stageIndex === "number" ? `Section ${stageIndex + 1}` : planner.currentStageLabel;
+  if (typeof stageIndex === "number") {
+    recordPlannerDecision({
+      planner,
+      page,
+      stageIndex,
+      kind: plannerActionFromHandoffKind(handoffKind ?? inferHandoffKindFromReason(reason)),
+      source: "system",
+      reason
+    });
+    recordPlannerStageOutcome({
+      planner,
+      page,
+      stageIndex,
+      outcome: "handoff"
+    });
+  }
   markPlannerTask(planner, "authenticate_if_needed", "needs_user", reason);
   markPlannerTask(planner, "save_checkpoint", "completed", "Saved checkpoint before handing the browser to the student.");
   setPlannerStatus(planner, "handoff_required", reason);
@@ -1859,10 +2131,83 @@ function recordPlannerValidation(planner: PlannerCheckpoint, labels: string[]) {
   setPlannerStatus(planner, "needs_review", `Planner stopped because required inputs still need attention: ${labels.join(", ")}.`);
 }
 
-function bumpPlannerRetries(planner: PlannerCheckpoint, taskId: string, detail: string) {
+function bumpPlannerRetries(planner: PlannerCheckpoint, taskId: string, detail: string, page?: Page, stageIndex?: number) {
   planner.retryCount += 1;
   markPlannerTask(planner, taskId, "retrying", detail);
+  if (page && typeof stageIndex === "number") {
+    recordPlannerDecision({
+      planner,
+      page,
+      stageIndex,
+      kind: taskId === "recover_from_validation_errors" ? "recover_validation" : "recover_same_screen",
+      source: "system",
+      reason: detail
+    });
+  }
   setPlannerStatus(planner, "running", detail);
+}
+
+function plannerActionFromHandoffKind(kind: AgentHandoffKind): PlannerActionKind {
+  switch (kind) {
+    case "login":
+      return "wait_for_login";
+    case "captcha":
+      return "wait_for_captcha";
+    case "otp":
+      return "wait_for_otp";
+    case "verification":
+      return "wait_for_verification";
+    case "missing_data":
+      return "wait_for_user_input";
+    case "review":
+    case "policy":
+      return "pause_for_review";
+    default:
+      return "wait_for_user_input";
+  }
+}
+
+function inferHandoffKindFromReason(reason: string): AgentHandoffKind {
+  const normalizedReason = reason.toLowerCase();
+
+  if (normalizedReason.includes("captcha") || normalizedReason.includes("human")) {
+    return "captcha";
+  }
+
+  if (normalizedReason.includes("otp") || normalizedReason.includes("passcode") || normalizedReason.includes("2fa") || normalizedReason.includes("mfa")) {
+    return "otp";
+  }
+
+  if (normalizedReason.includes("verification")) {
+    return "verification";
+  }
+
+  if (normalizedReason.includes("login") || normalizedReason.includes("log in") || normalizedReason.includes("sign in") || normalizedReason.includes("password")) {
+    return "login";
+  }
+
+  if (normalizedReason.includes("missing") || normalizedReason.includes("input") || normalizedReason.includes("answer")) {
+    return "missing_data";
+  }
+
+  return "review";
+}
+
+function mapAgentActionToPlannerAction(kind: BrowserAgentAction["kind"]): PlannerActionKind {
+  switch (kind) {
+    case "fill":
+      return "fill_fields";
+    case "click":
+      return "navigate_apply";
+    case "upload_resume":
+      return "upload_resume";
+    case "ask_user":
+      return "wait_for_user_input";
+    case "stop":
+      return "pause_for_review";
+    default:
+      return "scan_page";
+  }
 }
 
 async function updateBrowserAgent(page: Page, steps: BrowserAgentStep[]) {
@@ -3015,6 +3360,7 @@ function isApplyStartText(value: string) {
 }
 
 async function observeBrowserPage(page: Page, visibleFields: VisibleField[]): Promise<BrowserAgentObservation> {
+  const validationMessages = await getVisibleValidationMessages(page);
   const domObservation = await page.evaluate(() => {
     const searchRoots = getSearchRoots();
     const candidates = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("button, a, input, textarea, select, [role='button'], [role='link']"))) as HTMLElement[];
@@ -3095,13 +3441,162 @@ async function observeBrowserPage(page: Page, visibleFields: VisibleField[]): Pr
     }
   }).catch(() => ({ title: "", pageText: "", controls: [] as ObservedControl[] }));
 
+  const adapter = resolveAtsAdapter(page.url());
+  const groupedFields = groupVisibleFields(visibleFields);
+  const pageState = classifyBrowserPageState({
+    url: page.url(),
+    title: domObservation.title,
+    pageText: domObservation.pageText,
+    visibleFields,
+    controls: domObservation.controls.filter((control) => !control.disabled),
+    validationMessages,
+    groupedFields,
+    adapter
+  });
+
   return {
     url: page.url(),
     title: domObservation.title,
     pageText: domObservation.pageText,
     visibleFields,
-    controls: domObservation.controls.filter((control) => !control.disabled)
+    controls: domObservation.controls.filter((control) => !control.disabled),
+    pageState,
+    validationMessages,
+    groupedFields,
+    adapter
   };
+}
+
+function resolveAtsAdapter(url: string): AtsAdapterHint | undefined {
+  const hostname = safeHostname(url);
+
+  if (/smartrecruiters\.com$/i.test(hostname)) {
+    return { id: "smartrecruiters", label: "SmartRecruiters" };
+  }
+
+  if (/greenhouse\.io$/i.test(hostname)) {
+    return { id: "greenhouse", label: "Greenhouse" };
+  }
+
+  if (/lever\.co$/i.test(hostname)) {
+    return { id: "lever", label: "Lever" };
+  }
+
+  if (/myworkdayjobs\.com$/i.test(hostname) || /workday/i.test(hostname)) {
+    return { id: "workday", label: "Workday" };
+  }
+
+  if (/ashbyhq\.com$/i.test(hostname)) {
+    return { id: "ashby", label: "Ashby" };
+  }
+
+  return undefined;
+}
+
+function groupVisibleFields(visibleFields: VisibleField[]): BrowserFieldGroup[] {
+  const groups = new Map<string, BrowserFieldGroup>();
+
+  for (const field of visibleFields) {
+    const groupLabel = deriveFieldGroupLabel(field);
+    const key = normalizeKey(groupLabel);
+
+    if (!key) {
+      continue;
+    }
+
+    const existing = groups.get(key) ?? {
+      label: groupLabel,
+      fieldIds: [],
+      fieldLabels: [],
+      required: false
+    };
+
+    existing.fieldIds.push(field.id);
+    existing.fieldLabels.push(field.label);
+    existing.required = existing.required || field.required;
+    groups.set(key, existing);
+  }
+
+  return [...groups.values()]
+    .filter((group) => group.fieldIds.length > 1)
+    .map((group) => ({
+      ...group,
+      fieldLabels: dedupeLabels(group.fieldLabels)
+    }))
+    .slice(0, 8);
+}
+
+function deriveFieldGroupLabel(field: VisibleField) {
+  const context = field.context.replace(/\s+/g, " ").trim();
+
+  if (context) {
+    const trimmedContext = context.split(/\.\s+/)[0]?.trim() ?? context;
+
+    if (trimmedContext.length >= 6) {
+      return trimmedContext.slice(0, 120);
+    }
+  }
+
+  const label = field.label.replace(/\s+/g, " ").trim();
+  const beforeColon = label.split(":")[0]?.trim() ?? label;
+  return beforeColon.slice(0, 120);
+}
+
+function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageState">): BrowserPageState {
+  const text = normalizeKey([
+    input.title,
+    input.pageText,
+    ...input.validationMessages
+  ].join(" "));
+  const hasVisibleFields = input.visibleFields.length > 0;
+  const hasPasswordField = input.visibleFields.some((field) => field.inputType === "password" || /\bpassword\b/i.test(field.label));
+  const hasResumeUploadField = input.visibleFields.some((field) => field.inputType === "file")
+    || input.controls.some((control) => /upload resume|upload cv|attach resume|choose file|select resume|autofill with resume/.test(normalizeKey(`${control.text} ${control.label}`)));
+  const hasConsentLanguage = /\b(privacy|terms|consent|agree|acknowledge|declaration|data processing|equal opportunity|eeo|voluntary self identification)\b/.test(text);
+  const hasReviewLanguage = /\b(review your application|review application|application review|confirm your application|preview)\b/.test(text);
+  const hasSubmitLanguage = /\b(submit application|submit my application|send application|complete application)\b/.test(text);
+  const hasApplyStart = input.controls.some((control) => isApplyStartText(`${control.text} ${control.label}`));
+  const hasQuestionnaireHints = input.groupedFields.length > 0
+    || input.visibleFields.some((field) => field.options.length > 0 || field.inputType === "radio" || field.inputType === "checkbox")
+    || /\b(questionnaire|screening question|additional question|work authorization|salary expectation|notice period)\b/.test(text);
+
+  if (hasPasswordField || /\b(sign in|log in|login|password)\b/.test(text)) {
+    return "login";
+  }
+
+  if (hasResumeUploadField && !hasVisibleFields) {
+    return "resume_upload";
+  }
+
+  if (hasSubmitLanguage) {
+    return "submit";
+  }
+
+  if (hasReviewLanguage) {
+    return "review";
+  }
+
+  if (hasConsentLanguage && hasVisibleFields) {
+    return "consent";
+  }
+
+  if (hasQuestionnaireHints && hasVisibleFields) {
+    return "questionnaire";
+  }
+
+  if (hasApplyStart && !hasVisibleFields) {
+    return "start";
+  }
+
+  if (hasVisibleFields) {
+    return "account_gate";
+  }
+
+  if (!text && input.controls.length === 0) {
+    return "empty";
+  }
+
+  return "unknown";
 }
 
 async function decideBrowserAgentAction(input: {
@@ -3113,13 +3608,30 @@ async function decideBrowserAgentAction(input: {
 }): Promise<BrowserAgentAction> {
   const hasVisiblePasswordField = input.observation.visibleFields.some((field) => field.inputType === "password" || /\bpassword\b/i.test(field.label));
 
+  if (input.observation.pageState === "submit" && !input.allowExternalSubmit) {
+    return {
+      kind: "stop",
+      reason: "The page is already at a submit/review gate, so the agent should pause instead of guessing another step.",
+      source: "system"
+    };
+  }
+
+  if (input.observation.pageState === "consent" || input.observation.pageState === "questionnaire") {
+    return {
+      kind: "fill",
+      reason: `This screen looks like a ${input.observation.pageState} step, so the agent should fill grouped questions before trying to navigate.`,
+      source: "system"
+    };
+  }
+
   // When the page already shows fillable inputs, the agent should enter the
   // field-fill planner directly instead of letting the higher-level action
   // planner invent a "wait/click elsewhere" step.
   if (input.observation.visibleFields.length > 0 && !hasVisiblePasswordField) {
     return {
       kind: "fill",
-      reason: `Visible fields detected (${summarizeVisibleFields(input.observation.visibleFields)}), so the agent is switching directly into field filling.`
+      reason: `Visible fields detected (${summarizeVisibleFields(input.observation.visibleFields)}), so the agent is switching directly into field filling.`,
+      source: "system"
     };
   }
 
@@ -3175,6 +3687,24 @@ function decideBrowserAgentActionHeuristically(input: {
   const hostname = safeHostname(input.observation.url);
   const isLinkedIn = /(^|\.)linkedin\.com$/i.test(hostname);
 
+  if (input.observation.validationMessages.length > 0 && input.observation.visibleFields.length > 0) {
+    return {
+      kind: "fill",
+      reason: `Validation errors are visible (${input.observation.validationMessages.join(", ")}), so the agent should repair the current form step before navigating.`,
+      source: "heuristic"
+    };
+  }
+
+  if (input.observation.pageState === "review" || input.observation.pageState === "submit") {
+    return {
+      kind: input.allowExternalSubmit ? "fill" : "stop",
+      reason: input.allowExternalSubmit
+        ? "The page is at a review/submit gate, so the agent will let the stage executor handle the final submission logic."
+        : "The page is already at a review/submit gate, so the agent should pause for review.",
+      source: "heuristic"
+    };
+  }
+
   if (passwordField) {
     const credentials = getAtsCredentialsForHost(hostname, input.fields);
 
@@ -3184,13 +3714,15 @@ function decideBrowserAgentActionHeuristically(input: {
         fields: ["Password"],
         reason: isLinkedIn
           ? "LinkedIn requires the student's password or an active signed-in browser session. The agent cannot guess or bypass this."
-          : "This portal requires an account password. The agent needs saved credentials or manual student input."
+          : "This portal requires an account password. The agent needs saved credentials or manual student input.",
+        source: "heuristic"
       };
     }
 
     return {
       kind: "fill",
-      reason: "Saved account credentials are available, so the form filler can populate the login fields."
+      reason: "Saved account credentials are available, so the form filler can populate the login fields.",
+      source: "heuristic"
     };
   }
 
@@ -3201,7 +3733,8 @@ function decideBrowserAgentActionHeuristically(input: {
       return {
         kind: "upload_resume",
         controlId: uploadControl.id,
-        reason: `Detected resume upload action: ${uploadControl.text || uploadControl.label}.`
+        reason: `Detected resume upload action: ${uploadControl.text || uploadControl.label}.`,
+        source: "heuristic"
       };
     }
   }
@@ -3209,7 +3742,8 @@ function decideBrowserAgentActionHeuristically(input: {
   if (input.observation.visibleFields.length > 0) {
     return {
       kind: "fill",
-      reason: "Visible form fields are available, so the agent will fill the current stage."
+      reason: "Visible form fields are available, so the agent will fill the current stage.",
+      source: "heuristic"
     };
   }
 
@@ -3219,7 +3753,8 @@ function decideBrowserAgentActionHeuristically(input: {
     return {
       kind: "click",
       controlId: startControl.id,
-      reason: `Detected application start action: ${startControl.text || startControl.label}.`
+      reason: `Detected application start action: ${startControl.text || startControl.label}.`,
+      source: "heuristic"
     };
   }
 
@@ -3229,7 +3764,8 @@ function decideBrowserAgentActionHeuristically(input: {
     return {
       kind: "click",
       controlId: nextControl.id,
-      reason: `Detected stage navigation action: ${nextControl.text || nextControl.label}.`
+      reason: `Detected stage navigation action: ${nextControl.text || nextControl.label}.`,
+      source: "heuristic"
     };
   }
 
@@ -3237,13 +3773,15 @@ function decideBrowserAgentActionHeuristically(input: {
     return {
       kind: "ask_user",
       fields: ["Human verification"],
-      reason: "Human intervention needed: complete the captcha, OTP, or security verification in the open browser. GradLaunch is monitoring the page and will resume automatically once the checkpoint clears."
+      reason: "Human intervention needed: complete the captcha, OTP, or security verification in the open browser. GradLaunch is monitoring the page and will resume automatically once the checkpoint clears.",
+      source: "heuristic"
     };
   }
 
   return {
     kind: "fill",
-    reason: "No higher-confidence action was detected; trying normal field filling."
+    reason: "No higher-confidence action was detected; trying normal field filling.",
+    source: "heuristic"
   };
 }
 
@@ -3261,9 +3799,11 @@ async function decideBrowserAgentActionWithLlm(input: {
         "You are a browser job-application agent.",
         "Choose exactly one next action from the current page observation.",
         "Never bypass captcha, OTP, passwords, payment, identity, or security checks.",
+        "Classify the page state from the observation and choose an action that matches that state.",
         "Prefer upload_resume when a resume upload/autofill control is visible and resumeAvailable is true.",
         "Prefer click for Apply/Continue/Next/Review buttons when no fields should be filled yet.",
         "Prefer fill when normal text/select/radio fields are visible.",
+        "If validation errors are visible on the current screen, prefer fill over click so the agent repairs the current state first.",
         "Prefer ask_user for password, login MFA, OTP, captcha, payment, or identity verification.",
         "Return compact JSON only: {\"kind\":\"fill|click|upload_resume|ask_user|stop\",\"controlId\":\"optional\",\"fields\":[\"optional\"],\"reason\":\"short\"}."
       ].join(" ")
@@ -3274,7 +3814,10 @@ async function decideBrowserAgentActionWithLlm(input: {
         url: input.observation.url,
         title: input.observation.title,
         pageText: input.observation.pageText,
+        pageState: input.observation.pageState,
         visibleFields: input.observation.visibleFields,
+        groupedFields: input.observation.groupedFields,
+        validationMessages: input.observation.validationMessages,
         controls: input.observation.controls.slice(0, 60),
         resumeAvailable: input.resumeAvailable,
         allowExternalSubmit: input.allowExternalSubmit,
@@ -3300,18 +3843,19 @@ async function decideBrowserAgentActionWithLlm(input: {
   }
 
   if (parsed.kind === "fill") {
-    return { kind: "fill", reason: String(parsed.reason ?? "LLM chose to fill visible fields.") };
+    return { kind: "fill", reason: String(parsed.reason ?? "LLM chose to fill visible fields."), source: "llm" };
   }
 
   if (parsed.kind === "click" && typeof parsed.controlId === "string") {
-    return { kind: "click", controlId: parsed.controlId, reason: String(parsed.reason ?? "LLM selected a navigation control.") };
+    return { kind: "click", controlId: parsed.controlId, reason: String(parsed.reason ?? "LLM selected a navigation control."), source: "llm" };
   }
 
   if (parsed.kind === "upload_resume") {
     return {
       kind: "upload_resume",
       controlId: typeof parsed.controlId === "string" ? parsed.controlId : undefined,
-      reason: String(parsed.reason ?? "LLM selected resume upload.")
+      reason: String(parsed.reason ?? "LLM selected resume upload."),
+      source: "llm"
     };
   }
 
@@ -3319,12 +3863,13 @@ async function decideBrowserAgentActionWithLlm(input: {
     return {
       kind: "ask_user",
       fields: Array.isArray(parsed.fields) ? parsed.fields.map(String) : ["Manual input"],
-      reason: String(parsed.reason ?? "LLM determined manual input is required.")
+      reason: String(parsed.reason ?? "LLM determined manual input is required."),
+      source: "llm"
     };
   }
 
   if (parsed.kind === "stop") {
-    return { kind: "stop", reason: String(parsed.reason ?? "LLM chose to stop for review.") };
+    return { kind: "stop", reason: String(parsed.reason ?? "LLM chose to stop for review."), source: "llm" };
   }
 
   return undefined;
@@ -3650,6 +4195,8 @@ async function buildDynamicFillPlan(input: {
   visibleFields: VisibleField[];
   job: Job;
   resume?: ResumeRecord;
+  student?: StudentProfile;
+  memory?: StudentMemory;
   workspacePath: string;
 }): Promise<DynamicFillPlan> {
   const valueBank = createValueBank(input.baseFields);
@@ -3661,7 +4208,7 @@ async function buildDynamicFillPlan(input: {
   const deterministicCoversAllRequired = requiredAnswerableFields.length > 0 && requiredAnswerableFields.every((field) => deterministicAnswers.has(field.id));
   const llmConfigured = process.env.LLM_ANSWER_ENABLED === "true" && isLlmProviderConfigured();
   const llmDrivenOnly = process.env.BROWSER_LLM_FIELD_FILL_MODE === "llm_only" && llmConfigured;
-  const shouldQueryLlm = llmConfigured && !deterministicCoversAllRequired;
+  const shouldQueryLlm = llmConfigured && answerableVisibleFields.length > 0;
   const llmStagePlan = shouldQueryLlm
     ? await buildLlmStageFillPlan(input).catch(async (error) => {
       await writeBrowserDebug(input.workspacePath, "stage-fill-plan-error", {
@@ -3721,7 +4268,9 @@ async function buildDynamicFillPlan(input: {
           field: discoveredField,
           fields: input.baseFields,
           job: input.job,
-          resume: input.resume
+          resume: input.resume,
+          student: input.student,
+          memory: input.memory
         }));
     const resolvedField = deterministicResolvedField ?? llmResolvedField ?? (fallbackValue
       ? {
@@ -3759,7 +4308,8 @@ async function buildDynamicFillPlan(input: {
         .map((item) => item.label)
     ]),
     llmSummary: llmStagePlan?.summary ?? (usedProfileFallback ? "Using stored GradLaunch profile facts first for obvious fields so the form can move faster." : undefined),
-    llmAnswerCount: llmAnswers.size
+    llmAnswerCount: llmAnswers.size,
+    nextActionAfterFill: llmStagePlan?.nextActionAfterFill
   };
 }
 
@@ -3798,6 +4348,8 @@ async function buildLlmStageFillPlan(input: {
   visibleFields: VisibleField[];
   job: Job;
   resume?: ResumeRecord;
+  student?: StudentProfile;
+  memory?: StudentMemory;
   workspacePath: string;
 }): Promise<LlmStageFillPlan | undefined> {
   if (process.env.LLM_ANSWER_ENABLED !== "true" || !isLlmProviderConfigured()) {
@@ -3829,15 +4381,17 @@ async function buildLlmStageFillPlan(input: {
     inputType: field.inputType,
     options: field.options
   }));
-  const knowledgebase = createProfileKnowledgeBase(input.baseFields, input.resume, input.job);
-  const studentKnowledgeText = createStudentKnowledgeText(input.baseFields, input.resume, input.job);
+  const knowledgebase = createProfileKnowledgeBase(input.baseFields, input.resume, input.job, input.student, input.memory);
+  const studentKnowledgeText = createStudentKnowledgeText(input.baseFields, input.resume, input.job, input.student, input.memory);
+  const pageObservation = await observeBrowserPage(input.page, input.visibleFields);
   const messages = [
     {
       role: "system",
       content: [
         "You are the GradLaunch autonomous browser form-filling brain.",
-        "You receive the current web application stage, the student's profile/resume knowledgebase, the job description, and visible form fields.",
+        "You receive the current web application stage, the student's stored GradLaunch profile, memory corrections, resume knowledgebase, the job description, and visible form fields.",
         "Return a concrete fill plan for this exact screen.",
+        "Use the stored GradLaunch student facts and corrections before relying on looser resume inference.",
         "Use only provided facts. Do not invent degrees, employers, legal/work authorization, certifications, compensation, dates, identity numbers, or contact details.",
         "If a field is normal and answerable, include it in answers using the exact visible fieldId and exact visible field label.",
         "If a field has options, the value must be exactly one option string.",
@@ -3851,9 +4405,13 @@ async function buildLlmStageFillPlan(input: {
       content: JSON.stringify({
         currentPage: {
           url: input.page.url(),
-          text: pageText
+          text: pageText,
+          state: pageObservation.pageState,
+          adapter: pageObservation.adapter,
+          validationMessages: pageObservation.validationMessages
         },
         visibleFields: visibleFieldPayload,
+        groupedFields: pageObservation.groupedFields,
         studentKnowledgeText,
         knowledgebase,
         job: {
@@ -3913,7 +4471,13 @@ async function buildLlmStageFillPlan(input: {
   return plan;
 }
 
-function createProfileKnowledgeBase(fields: FilledField[], resume: ResumeRecord | undefined, job: Job) {
+function createProfileKnowledgeBase(
+  fields: FilledField[],
+  resume: ResumeRecord | undefined,
+  job: Job,
+  student?: StudentProfile,
+  memory?: StudentMemory
+) {
   const answerBank = Object.fromEntries(getApplicationAnswerBank().entries());
   const profileFacts = fields
     .filter((field) => !shouldSkipField(field))
@@ -3923,7 +4487,30 @@ function createProfileKnowledgeBase(fields: FilledField[], resume: ResumeRecord 
     }));
 
   return {
+    storedStudentProfile: student
+      ? {
+        fullName: student.fullName,
+        email: student.email,
+        degree: student.degree,
+        graduationYear: student.graduationYear,
+        targetRoles: student.targetRoles,
+        preferredLocations: student.preferredLocations,
+        workModes: student.workModes,
+        skills: student.skills,
+        expectedSalaryLpa: student.expectedSalaryLpa,
+        visaRequired: student.visaRequired,
+        automationMode: student.automationMode,
+        bio: student.bio
+      }
+      : undefined,
     profileFacts,
+    memory: memory
+      ? {
+        recentCorrections: memory.corrections.slice(0, 12),
+        recentHandoffKinds: memory.recentHandoffKinds,
+        notes: memory.notes.slice(0, 8)
+      }
+      : undefined,
     answerBank,
     resume: {
       filename: resume?.filename,
@@ -3937,18 +4524,57 @@ function createProfileKnowledgeBase(fields: FilledField[], resume: ResumeRecord 
   };
 }
 
-function createStudentKnowledgeText(fields: FilledField[], resume: ResumeRecord | undefined, job: Job) {
+function createStudentKnowledgeText(
+  fields: FilledField[],
+  resume: ResumeRecord | undefined,
+  job: Job,
+  student?: StudentProfile,
+  memory?: StudentMemory
+) {
   const profileLines = fields
     .filter((field) => !shouldSkipField(field))
     .map((field) => `- ${field.label}: ${field.value}`)
     .join("\n");
+  const storedProfileLines = student
+    ? [
+      `- Full name: ${student.fullName}`,
+      `- Email: ${student.email}`,
+      `- Degree: ${student.degree}`,
+      `- Graduation year: ${student.graduationYear}`,
+      `- Target roles: ${student.targetRoles.join(", ") || "Not provided"}`,
+      `- Preferred locations: ${student.preferredLocations.join(", ") || "Not provided"}`,
+      `- Work modes: ${student.workModes.join(", ") || "Not provided"}`,
+      `- Skills: ${student.skills.join(", ") || "Not provided"}`,
+      `- Expected salary (LPA): ${student.expectedSalaryLpa ?? "Not provided"}`,
+      `- Visa required: ${student.visaRequired ? "Yes" : "No"}`,
+      `- Bio: ${student.bio || "Not provided"}`
+    ].join("\n")
+    : "";
+  const correctionLines = memory?.corrections.length
+    ? memory.corrections
+      .slice(0, 12)
+      .map((item) => `- ${item.label}: ${item.value}`)
+      .join("\n")
+    : "";
+  const memoryNotes = memory?.notes.length
+    ? memory.notes.slice(0, 8).map((note) => `- ${note}`).join("\n")
+    : "";
   const answerBankLines = [...getApplicationAnswerBank().entries()]
     .map(([label, value]) => `- ${label}: ${value}`)
     .join("\n");
 
   return [
+    "Stored GradLaunch student profile:",
+    storedProfileLines || "- No stored student profile available.",
+    "",
     "Logged-in student / prepared application facts:",
     profileLines || "- No prepared profile facts available.",
+    "",
+    "Memory corrections from past applications:",
+    correctionLines || "- No saved corrections available.",
+    "",
+    "Recent memory notes:",
+    memoryNotes || "- No recent notes available.",
     "",
     "Answer bank:",
     answerBankLines || "- No answer bank configured.",
@@ -4573,6 +5199,8 @@ async function resolveLlmFieldValue(input: {
   fields: FilledField[];
   job: Job;
   resume?: ResumeRecord;
+  student?: StudentProfile;
+  memory?: StudentMemory;
 }) {
   if (process.env.LLM_ANSWER_ENABLED !== "true" || !isLlmProviderConfigured()) {
     return resolveHeuristicUnknownValue(input.field, input.fields, input.job);
@@ -4619,6 +5247,8 @@ async function callLlmAnswerService(input: {
   fields: FilledField[];
   job: Job;
   resume?: ResumeRecord;
+  student?: StudentProfile;
+  memory?: StudentMemory;
 }) {
   const provider = getLlmProvider();
   const profileFacts = input.fields
@@ -4626,6 +5256,24 @@ async function callLlmAnswerService(input: {
     .slice(0, 24)
     .map((field) => `${field.label}: ${field.value}`)
     .join("\n");
+  const storedProfileFacts = input.student
+    ? [
+      `Full name: ${input.student.fullName}`,
+      `Email: ${input.student.email}`,
+      `Degree: ${input.student.degree}`,
+      `Graduation year: ${input.student.graduationYear}`,
+      `Target roles: ${input.student.targetRoles.join(", ") || "Not provided"}`,
+      `Preferred locations: ${input.student.preferredLocations.join(", ") || "Not provided"}`,
+      `Work modes: ${input.student.workModes.join(", ") || "Not provided"}`,
+      `Skills: ${input.student.skills.join(", ") || "Not provided"}`,
+      `Expected salary (LPA): ${input.student.expectedSalaryLpa ?? "Not provided"}`,
+      `Visa required: ${input.student.visaRequired ? "Yes" : "No"}`,
+      `Bio: ${input.student.bio || "Not provided"}`
+    ].join("\n")
+    : "No stored student profile available.";
+  const correctionFacts = input.memory?.corrections.length
+    ? input.memory.corrections.slice(0, 12).map((item) => `${item.label}: ${item.value}`).join("\n")
+    : "No saved corrections available.";
   const resumeText = input.resume?.extractedText?.slice(0, Number(process.env.LLM_RESUME_CONTEXT_CHARS ?? 4000)) ?? "No resume text available.";
   const options = input.field.options.length ? `\nAllowed options: ${input.field.options.join(" | ")}` : "";
   const messages = [
@@ -4633,6 +5281,7 @@ async function callLlmAnswerService(input: {
       role: "system",
       content: [
         "You answer job application form fields for a student using only the provided profile, resume, and job description.",
+        "Prefer the stored GradLaunch student profile and saved corrections before using looser resume inference.",
         "Be truthful. Do not invent degrees, employers, dates, legal status, certifications, salary, or work authorization.",
         "If the answer is unknown, return an empty string.",
         "If the field asks for private/sensitive information, return an empty string.",
@@ -4648,6 +5297,12 @@ async function callLlmAnswerService(input: {
         `Field/question: ${input.field.label}`,
         `Input type: ${input.field.inputType}${options}`,
         `Required: ${input.field.required ? "yes" : "no"}`,
+        "",
+        "Stored GradLaunch student profile:",
+        storedProfileFacts,
+        "",
+        "Saved corrections from past application runs:",
+        correctionFacts,
         "",
         "Student/profile facts:",
         profileFacts,

@@ -51,7 +51,7 @@ export function DashboardPageClient() {
           <p className="eyebrow">Agent workspace</p>
           <h3 className="hero-title">One control room for a background agent that keeps applying while you move on.</h3>
           <p className="muted">
-            AIHawk-style automation still powers the backbone, but GradLaunch now treats it like an autonomous worker: prepare context once, launch autopilot, and only step in when a portal truly requires you.
+            GradLaunch now runs as an autonomous worker: prepare context once, launch autopilot, and only step in when a portal truly requires you.
           </p>
           <div className="hero-tags">
             <span className="tag">{student?.degree}</span>

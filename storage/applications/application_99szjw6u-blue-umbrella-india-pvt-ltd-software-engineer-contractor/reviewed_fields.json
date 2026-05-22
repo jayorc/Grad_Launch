@@ -21,10 +21,30 @@
   },
   {
     "label": "City",
-    "value": "a"
+    "value": "Noida"
+  },
+  {
+    "label": "Location",
+    "value": "Noida, India, India"
+  },
+  {
+    "label": "Location (City)",
+    "value": "Noida"
+  },
+  {
+    "label": "Country",
+    "value": "India"
   },
   {
     "label": "Phone number",
+    "value": "+91-7320967983"
+  },
+  {
+    "label": "Phone",
+    "value": "+91-7320967983"
+  },
+  {
+    "label": "Mobile",
     "value": "+91-7320967983"
   },
   {
@@ -37,11 +57,11 @@
   },
   {
     "label": "Preferred location",
-    "value": "a"
+    "value": "Noida, India, India"
   },
   {
     "label": "Target role",
-    "value": "a"
+    "value": "Software Engineer"
   },
   {
     "label": "Work authorization",
@@ -69,7 +89,7 @@
   },
   {
     "label": "Message to the Hiring Team",
-    "value": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+    "value": "I am excited to apply for the Software Engineer Contractor role at Blue Umbrella India Pvt Ltd. My background in JavaScript, React, Next.js and my focus on becoming a strong Software Engineer make this opportunity especially compelling to me. I would be glad to contribute to Blue Umbrella India Pvt Ltd's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Noida, India, India opportunities."
   },
   {
     "label": "Primary skills",
@@ -81,7 +101,7 @@
   },
   {
     "label": "Why are you interested in this role?",
-    "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+    "value": "This role aligns with my goal of becoming a strong Software Engineer and uses skills I have practiced through projects and coursework."
   },
   {
     "label": "What makes you a match?",

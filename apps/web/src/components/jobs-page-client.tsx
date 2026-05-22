@@ -51,7 +51,7 @@ export function JobsPageClient() {
       <AgentCapabilityPanel
         capabilities={capabilities}
         title="Automation Capabilities"
-        description="GradLaunch checks the local AIHawk adapter here so you can see whether the next step can be a real autonomous browser action or only a review-first package."
+        description="GradLaunch checks the local browser runtime here so you can see whether the next step can be a real autonomous browser action or only a review-first package."
       />
       <SectionCard title="Add Job from Link" description="Paste any real company job URL and GradLaunch will normalize it into a clean workspace card.">
         {session ? <JobIntakeForm onJobCreated={handleJobCreated} token={session.token} /> : null}

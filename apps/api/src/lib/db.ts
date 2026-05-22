@@ -12,3 +12,11 @@ export function connectToDatabase(uri: string) {
 
   return connectionPromise;
 }
+
+export async function disconnectFromDatabase() {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
+
+  connectionPromise = null;
+}

@@ -2,12 +2,13 @@
   "sessionId": "planner-job_url_aHR0cHM6Ly9jYXJlZXJzLmt1",
   "resumeToken": "job_url_aHR0cHM6Ly9jYXJlZXJzLmt1:2026-05-21T10:29:25.602Z",
   "goal": "Complete the Jobs At Aftershoot application at Careers autonomously until a protected or final review checkpoint.",
-  "status": "needs_review",
-  "summary": "Final submit requires manual review or external submit is disabled.",
+  "status": "running",
+  "summary": "Validation blockers appeared: Importing information and autofilling fields..",
+  "formMode": "single_stage",
   "currentStep": "stage_1",
   "currentStageLabel": "Section 1",
   "currentUrl": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
-  "retryCount": 0,
+  "retryCount": 3,
   "handoffCount": 0,
   "validationErrors": [],
   "subgoals": [
@@ -16,9 +17,9 @@
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 3,
-      "lastUpdatedAt": "2026-05-21T13:27:19.522Z",
-      "completedAt": "2026-05-21T13:27:19.522Z"
+      "attempts": 6,
+      "lastUpdatedAt": "2026-05-22T06:46:36.149Z",
+      "completedAt": "2026-05-22T06:46:36.149Z"
     },
     {
       "id": "authenticate_if_needed",
@@ -33,16 +34,16 @@
       "label": "Finish active section",
       "status": "running",
       "detail": "Reading Section 1 and planning the next safe action.",
-      "attempts": 10,
-      "lastUpdatedAt": "2026-05-21T13:27:22.975Z"
+      "attempts": 13,
+      "lastUpdatedAt": "2026-05-22T06:46:39.928Z"
     },
     {
       "id": "recover_from_validation_errors",
       "label": "Recover from validation errors",
-      "status": "pending",
-      "detail": "Waiting to start.",
-      "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:29:25.602Z"
+      "status": "retrying",
+      "detail": "Validation blockers appeared: Importing information and autofilling fields..",
+      "attempts": 3,
+      "lastUpdatedAt": "2026-05-22T06:46:45.085Z"
     },
     {
       "id": "retry_alternative_path",
@@ -70,5 +71,48 @@
       "completedAt": "2026-05-21T13:27:23.382Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-21T13:27:23.382Z"
+  "lastDecision": {
+    "kind": "recover_validation",
+    "source": "system",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
+    "reason": "Validation blockers appeared: Importing information and autofilling fields..",
+    "fieldLabels": [],
+    "createdAt": "2026-05-22T06:46:45.085Z"
+  },
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
+      "visibleFieldLabels": [
+        "Enter first name",
+        "Enter last name",
+        "Enter email",
+        "Phone",
+        "Resume",
+        "Enter current ctc",
+        "Enter expected ctc"
+      ],
+      "requiredFieldLabels": [
+        "Phone",
+        "Resume"
+      ],
+      "filledFieldLabels": [],
+      "outcome": "observed",
+      "decision": {
+        "kind": "recover_validation",
+        "source": "system",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://careers.kula.ai/aftershoot/24629/apply?source=linkedin",
+        "reason": "Validation blockers appeared: Importing information and autofilling fields..",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T06:46:45.085Z"
+      },
+      "lastUpdatedAt": "2026-05-22T06:46:45.085Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-22T06:46:45.085Z"
 }

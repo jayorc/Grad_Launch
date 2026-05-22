@@ -118,16 +118,45 @@ export class ApplicationService {
   }
 
   async listForStudent(studentId: string) {
-    return this.applications.listByStudent(studentId);
+    const [student, resume, applications] = await Promise.all([
+      this.students.getById(studentId),
+      this.resumes.getLatestByStudent(studentId),
+      this.applications.listByStudent(studentId)
+    ]);
+
+    if (!student || applications.length === 0) {
+      return applications;
+    }
+
+    const jobs = await Promise.all(applications.map((application) => this.jobs.getById(application.jobId)));
+    const refreshedApplications = await Promise.all(applications.map(async (application, index) => {
+      const job = jobs[index];
+
+      if (!job) {
+        return application;
+      }
+
+      const refreshed = refreshApplicationArtifactsIfNeeded(application, student, job, resume);
+
+      if (refreshed !== application) {
+        await this.applications.update(refreshed);
+      }
+
+      return refreshed;
+    }));
+
+    return refreshedApplications;
   }
 
   async fillJobInBrowser(input: { studentId: string; jobId: string; submit?: boolean }) {
-    const [student, job, existingApplication, capabilities, resume] = await Promise.all([
+    console.log("[GradLaunch][ApplicationService] fillJobInBrowser invoked", input);
+    const [student, job, existingApplication, capabilities, resume, memory] = await Promise.all([
       this.students.getById(input.studentId),
       this.jobs.getById(input.jobId),
       this.applications.getByStudentAndJob(input.studentId, input.jobId),
       this.aihawk.getCapabilities(),
-      this.resumes.getLatestByStudent(input.studentId)
+      this.resumes.getLatestByStudent(input.studentId),
+      this.memory.get(input.studentId)
     ]);
 
     if (!student || !job) {
@@ -136,7 +165,9 @@ export class ApplicationService {
 
     const now = nowIso();
     const recommendation = this.matching.scoreJob(student, job, student.defaultStrictness);
-    const application: Application = existingApplication ?? {
+    const application: Application = existingApplication
+      ? refreshApplicationArtifactsIfNeeded(existingApplication, student, job, resume)
+      : {
       id: createId("application"),
       studentId: student.id,
       jobId: job.id,
@@ -175,12 +206,13 @@ export class ApplicationService {
       notes: ["Opening the exact job URL in Chrome and filling known fields in front of the student."]
     };
 
-    const preparationPackage = await this.aihawk.createStructuredApplicationPackage({
-      application,
-      run: preparingRun,
-      job,
-      student,
-      resume
+    const preparationPackage = await this.aihawk.prepareWorkspaceDirectory({
+      applicationId: application.id,
+      job
+    });
+    console.log("[GradLaunch][ApplicationService] preparation package ready", {
+      applicationId: application.id,
+      directory: preparationPackage.directory
     });
 
     const browserReceipt = await this.aihawk.applyWithBrowser({
@@ -188,8 +220,15 @@ export class ApplicationService {
       fields,
       workspacePath: preparationPackage.directory,
       resume,
+      student,
+      memory,
       submit: input.submit === true,
       planner: existingRuns[0]?.planner
+    });
+    console.log("[GradLaunch][ApplicationService] browser receipt", {
+      applicationId: application.id,
+      status: browserReceipt.status,
+      message: browserReceipt.message
     });
     const completedAt = nowIso();
     const blocked = browserReceipt.status === "blocked";
@@ -246,6 +285,11 @@ export class ApplicationService {
       student,
       resume
     });
+    console.log("[GradLaunch][ApplicationService] final package ready", {
+      applicationId: application.id,
+      directory: finalPackage.directory,
+      status: finalRun.status
+    });
     const savedRun: ApplicationRun = {
       ...finalRun,
       workspaceFiles: finalPackage.files,
@@ -277,11 +321,12 @@ export class ApplicationService {
       throw new Error("Application not found.");
     }
 
-    const [student, job, runs, resume] = await Promise.all([
+    const [student, job, runs, resume, memory] = await Promise.all([
       this.students.getById(application.studentId),
       this.jobs.getById(application.jobId),
       this.applications.listRunsByApplication(application.id),
-      this.resumes.getLatestByStudent(application.studentId)
+      this.resumes.getLatestByStudent(application.studentId),
+      this.memory.get(application.studentId)
     ]);
 
     if (!student || !job) {
@@ -289,17 +334,23 @@ export class ApplicationService {
     }
 
     const latestRun = runs[0];
+    const refreshedApplication = refreshApplicationArtifactsIfNeeded(application, student, job, resume);
     const browserCapability = capabilities.capabilities.find((capability) => capability.id === "browser_apply");
     const wantsAutoSubmit = input.intent === "auto_submit";
     const canAutoSubmit = wantsAutoSubmit && (browserCapability?.status === "available" || browserCapability?.status === "partial");
     const now = nowIso();
-    const reviewedFields = normalizeReviewedFields(input.reviewedFields, latestRun?.filledFields ?? buildFilledFields(student, job, resume, application.generatedArtifacts));
+    const reviewedFields = normalizeReviewedFields(
+      input.reviewedFields,
+      latestRun?.filledFields ?? buildFilledFields(student, job, resume, refreshedApplication.generatedArtifacts)
+    );
     const browserReceipt = canAutoSubmit
       ? await this.aihawk.applyWithBrowser({
           job,
           fields: reviewedFields,
           workspacePath: latestRun?.workspacePath,
           resume,
+          student,
+          memory,
           submit: true,
           planner: latestRun?.planner
         })
@@ -342,7 +393,7 @@ export class ApplicationService {
     };
 
     const updatedApplication: Application = {
-      ...application,
+      ...refreshedApplication,
       status: browserSubmitBlocked ? "ready_for_review" : externalSubmitted ? "submitted" : "ready_for_review",
       lastUpdatedAt: now
     };
@@ -358,7 +409,7 @@ export class ApplicationService {
       workspacePath: latestRun?.workspacePath,
       workspaceFiles: latestRun?.workspaceFiles ?? [],
       screenshots: mergeScreenshots(latestRun?.screenshots, browserReceipt?.screenshots),
-      blockedReason: browserSubmitBlocked ? (browserReceipt?.message ?? "AIHawk browser auto-submit is unavailable in this checkout.") : undefined,
+      blockedReason: browserSubmitBlocked ? (browserReceipt?.message ?? "Browser auto-submit is unavailable in this checkout.") : undefined,
       filledFields: reviewedFields,
       planner: browserReceipt?.planner ?? latestRun?.planner,
       timeline: buildSubmissionTimeline({
@@ -522,7 +573,10 @@ function mergeFilledFields(primaryFields: ApplicationRun["filledFields"], genera
   }
 
   for (const field of primaryFields) {
-    if (field.value.trim()) {
+    const normalizedLabel = normalizeFieldKey(field.label);
+    const generatedField = merged.get(normalizedLabel);
+
+    if (shouldUsePrimaryFieldValue(field, generatedField)) {
       merged.set(normalizeFieldKey(field.label), field);
     }
   }
@@ -547,11 +601,11 @@ function buildSubmissionConfirmation(input: {
   browserReceipt?: BrowserApplyReceipt;
 }) {
   if (input.blocked) {
-    return input.browserReceipt?.message ?? "Auto-submit was blocked because the connected AIHawk browser apply worker is unavailable.";
+    return input.browserReceipt?.message ?? "Auto-submit was blocked because the connected browser apply worker is unavailable.";
   }
 
   if (input.externalSubmitted && input.wantsAutoSubmit) {
-    return input.browserReceipt?.message ?? "AIHawk browser apply completed the final submit step and GradLaunch recorded the receipt.";
+    return input.browserReceipt?.message ?? "The browser agent completed the final submit step and GradLaunch recorded the receipt.";
   }
 
   if (input.externalSubmitted) {
@@ -589,7 +643,7 @@ function buildSubmissionTimeline(input: {
       label: input.submission.externalSubmitted ? "Final submit recorded" : "Auto-submit blocked",
       detail: input.submission.confirmation,
       state: blocked ? "attention" : "done",
-      source: input.submission.intent === "auto_submit" ? "aihawk" : "gradlaunch"
+      source: "gradlaunch"
     },
     {
       id: "workspace",
@@ -621,6 +675,9 @@ function buildBrowserFillTimeline(input: {
   const handoffRequired = receipt?.status === "handoff_required";
   const filled = receipt?.status === "filled";
   const submitted = receipt?.status === "submitted";
+  const plannerAction = input.planner?.lastDecision?.kind;
+  const plannerActionReason = input.planner?.lastDecision?.reason;
+  const stageCount = input.planner?.stageHistory.length ?? 0;
 
   return [
     {
@@ -634,7 +691,9 @@ function buildBrowserFillTimeline(input: {
       id: "fill",
       label: "Filling visible form fields",
       detail: receipt
-        ? receipt.message
+        ? plannerActionReason
+          ? `${receipt.message} Planner action: ${plannerActionReason}`
+          : receipt.message
         : "GradLaunch is matching profile values to labels, placeholders, and form names on the page.",
       state: blocked || handoffRequired ? "attention" : receipt ? "done" : "queued",
       source: "gradlaunch"
@@ -656,7 +715,7 @@ function buildBrowserFillTimeline(input: {
       id: "planner",
       label: "Planner checkpoint updated",
       detail: input.planner
-        ? `${input.planner.summary} Resume token: ${input.planner.resumeToken}.`
+        ? `${input.planner.summary} Form mode: ${input.planner.formMode}. Stages tracked: ${stageCount}. Last action: ${plannerAction ?? "none"}. Resume token: ${input.planner.resumeToken}.`
         : "The planner will save a resumable checkpoint after the browser worker updates the workspace.",
       state: input.planner ? "done" : "queued",
       source: "gradlaunch"
@@ -682,17 +741,19 @@ function buildSubmissionNotes(submission: ApplicationSubmission, workspacePath?:
 }
 
 function createArtifacts(student: StudentProfile, job: Job, resume?: ResumeRecord) {
-  const roleTarget = student.targetRoles[0] ?? "software engineer";
+  const roleTarget = getPreferredRoleTarget(student, job);
+  const preferredLocation = getPreferredLocation(student, job);
   const leadSkills = student.skills.slice(0, 4);
   const resumeSource = resume ? `Uploaded resume ${resume.filename} was used as the primary context.` : "No uploaded resume was available, so GradLaunch used the saved profile.";
+  const coverLetterExcerpt = buildCoverLetterExcerpt(student, job, roleTarget, preferredLocation);
 
   return {
     tailoredResumeSummary: `${resumeSource} Focused ${leadSkills.join(", ")} to match the ${job.title} role at ${job.company}.`,
-    coverLetterExcerpt: `I am excited to apply for the ${job.title} role at ${job.company}, where I can bring my ${student.skills.slice(0, 3).join(", ")} experience as an aspiring ${roleTarget}.`,
+    coverLetterExcerpt,
     shortAnswers: [
       {
         question: "Why are you interested in this role?",
-        answer: `This role aligns with my goal of becoming a ${student.targetRoles[0]} and uses skills I have already practiced through projects and coursework.`
+        answer: `This role aligns with my goal of becoming a strong ${roleTarget} and uses skills I have already practiced through projects and coursework.`
       },
       {
         question: "What makes you a match?",
@@ -716,13 +777,14 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
   const nameParts = student.fullName.trim().split(/\s+/).filter(Boolean);
   const firstName = nameParts[0] ?? student.fullName;
   const lastName = nameParts.slice(1).join(" ");
-  const preferredLocation = student.preferredLocations[0] ?? job.location;
+  const preferredLocation = getPreferredLocation(student, job);
   const city = preferredLocation.split(",")[0]?.trim() || preferredLocation;
   const phoneNumber = extractPhoneNumber(resume?.extractedText) ?? process.env.DEFAULT_STUDENT_PHONE;
   const country = process.env.DEFAULT_STUDENT_COUNTRY
     ?? inferCountryFromPhone(phoneNumber)
     ?? inferCountryFromLocation(preferredLocation)
     ?? "India";
+  const roleTarget = getPreferredRoleTarget(student, job);
   const linkedInUrl = extractUrl(resume?.extractedText, /linkedin\.com\/[^\s)>,]+/i) ?? process.env.DEFAULT_STUDENT_LINKEDIN;
   const websiteUrl = extractUrl(resume?.extractedText, /(github\.com|portfolio|https?:\/\/(?!.*linkedin)[^\s)>,]+)/i) ?? process.env.DEFAULT_STUDENT_WEBSITE;
   const currentCtc = extractCompensation(resume?.extractedText, /current\s+(?:ctc|salary|compensation)[:\s-]*([^\n,;]+)/i) ?? process.env.DEFAULT_CURRENT_CTC ?? "0 LPA";
@@ -742,10 +804,10 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
     { label: "Phone number", value: phoneNumber ?? "" },
     { label: "Phone", value: phoneNumber ?? "" },
     { label: "Mobile", value: phoneNumber ?? "" },
-    { label: "Degree", value: student.degree },
-    { label: "Graduation year", value: String(student.graduationYear) },
+    { label: "Degree", value: sanitizeDegree(student.degree) ?? student.degree },
+    { label: "Graduation year", value: sanitizeGraduationYear(student.graduationYear) },
     { label: "Preferred location", value: preferredLocation },
-    { label: "Target role", value: student.targetRoles[0] ?? job.title },
+    { label: "Target role", value: roleTarget },
     { label: "LinkedIn", value: linkedInUrl ?? "" },
     { label: "Website", value: websiteUrl ?? "" },
     { label: "Work authorization", value: student.visaRequired ? "No" : "Yes" },
@@ -761,7 +823,7 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
     { label: "Resume context", value: resume?.filename ?? "Profile data only" },
     {
       label: "Why are you interested in this role?",
-      value: `This role aligns with my goal of becoming a ${student.targetRoles[0] ?? job.title} and uses skills I have practiced through projects and coursework.`
+      value: `This role aligns with my goal of becoming a strong ${roleTarget} and uses skills I have practiced through projects and coursework.`
     },
     {
       label: "What makes you a match?",
@@ -852,7 +914,7 @@ function buildApplicationTimeline(input: {
   const browserCapability = input.capabilities.capabilities.find((capability) => capability.id === "browser_apply");
   const packageStepState = input.packageError ? "attention" : input.packageResult ? "done" : "running";
   const packageDetail = input.packageError
-    ? `GradLaunch created the run trace, but writing the AIHawk-style package failed: ${input.packageError}`
+    ? `GradLaunch created the run trace, but writing the structured package failed: ${input.packageError}`
     : input.packageResult
       ? `Saved ${input.packageResult.files.join(", ")} to ${input.packageResult.directory}.`
       : "Saving the structured application package to the workspace.";
@@ -860,14 +922,14 @@ function buildApplicationTimeline(input: {
   return [
     {
       id: "adapter",
-      label: "AIHawk adapter checked",
+      label: "Browser runtime checked",
       detail: input.capabilities.repoDetected
         ? browserCapability?.status === "unavailable"
-          ? "Local AIHawk modules were detected, but the provider/apply engine is missing in this checkout."
-          : "Local AIHawk modules were detected and the adapter is ready for guided execution."
-        : "Local AIHawk repo was not detected, so GradLaunch is using its built-in fallback flow.",
+          ? "Local browser automation modules were detected, but the apply engine is missing in this checkout."
+          : "Local browser automation modules were detected and the runtime is ready for guided execution."
+        : "No local browser runtime was detected, so GradLaunch is using its built-in fallback flow.",
       state: input.capabilities.repoDetected ? "done" : "attention",
-      source: "aihawk"
+      source: "gradlaunch"
     },
     {
       id: "profile",
@@ -915,13 +977,221 @@ function buildApplicationTimeline(input: {
           : "GradLaunch queued the autonomous browser run and will continue in the background until submit or a true protected checkpoint."
         : input.mode === "autofill"
           ? browserCapability?.status === "unavailable"
-            ? "GradLaunch prepared the autofill data but stopped before browser submission because the local AIHawk checkout does not include the apply engine."
+            ? "GradLaunch prepared the autofill data but stopped before browser submission because the local browser runtime does not include the apply engine."
             : "GradLaunch prepared the autofill data and paused at the student review gate before final submission."
           : "The structured draft is ready to inspect, edit, and submit.",
       state: input.mode === "draft" ? "done" : input.mode === "autopilot" ? "running" : "attention",
-      source: input.mode === "draft" ? "gradlaunch" : "aihawk"
+      source: "gradlaunch"
     }
   ];
+}
+
+function getPreferredRoleTarget(student: StudentProfile, job: Job) {
+  const normalizedTargetRole = normalizeRoleLabel(student.targetRoles[0]);
+  return normalizedTargetRole ?? normalizeRoleLabel(job.title) ?? "Software Engineer";
+}
+
+function getPreferredLocation(student: StudentProfile, job: Job) {
+  const candidate = sanitizeLocationLabel(student.preferredLocations[0]);
+  return candidate ?? sanitizeLocationLabel(job.location) ?? "India";
+}
+
+function normalizeRoleLabel(value: string | undefined) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const compact = trimmed.replace(/\s+/g, " ");
+  const lower = compact.toLowerCase();
+
+  if (lower.length <= 2 || /^(a|an|sw|sde|dev|role)$/i.test(lower)) {
+    return undefined;
+  }
+
+  if (/backend|back end|back-end/i.test(compact)) {
+    return "Back-End Developer";
+  }
+
+  if (/frontend|front end|front-end/i.test(compact)) {
+    return "Front-End Developer";
+  }
+
+  if (/full stack|full-stack/i.test(compact)) {
+    return "Full-Stack Developer";
+  }
+
+  if (/software engineer|software developer/i.test(compact)) {
+    return "Software Engineer";
+  }
+
+  return compact
+    .split(" ")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function sanitizeLocationLabel(value: string | undefined) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const compact = trimmed.replace(/\s+/g, " ");
+  const lower = compact.toLowerCase();
+
+  if (lower.length <= 2 || /^(a|an|na|n a|none|unknown|city|location)$/i.test(lower)) {
+    return undefined;
+  }
+
+  return compact;
+}
+
+function sanitizeDegree(value: string | undefined) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return trimmed.replace(/\s+/g, " ").replace(/cgpa[:\s-]*[0-9.]+/i, "").trim();
+}
+
+function sanitizeGraduationYear(value: number | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const currentYear = new Date().getUTCFullYear();
+
+  if (value < 2015 || value > currentYear + 6) {
+    return "";
+  }
+
+  return String(value);
+}
+
+function buildCoverLetterExcerpt(student: StudentProfile, job: Job, roleTarget: string, preferredLocation: string) {
+  const skillList = student.skills.filter(Boolean).slice(0, 3);
+  const skillsText = skillList.length > 0 ? skillList.join(", ") : "modern software development";
+  const workModeText = job.workMode === "remote"
+    ? "remote collaboration"
+    : job.workMode === "hybrid"
+      ? "hybrid product teams"
+      : "onsite engineering environments";
+
+  return [
+    `I am excited to apply for the ${job.title} role at ${job.company}.`,
+    `My background in ${skillsText} and my focus on becoming a strong ${roleTarget} make this opportunity especially compelling to me.`,
+    `I would be glad to contribute to ${job.company}'s team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in ${workModeText}.`,
+    `With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with ${preferredLocation} opportunities.`
+  ].join(" ");
+}
+
+function shouldUsePrimaryFieldValue(
+  primaryField: ApplicationRun["filledFields"][number],
+  generatedField: ApplicationRun["filledFields"][number] | undefined
+) {
+  const primaryValue = primaryField.value.trim();
+
+  if (!primaryValue) {
+    return false;
+  }
+
+  if (!generatedField) {
+    return true;
+  }
+
+  const labelKey = normalizeFieldKey(primaryField.label);
+  const generatedValue = generatedField.value.trim();
+
+  if (isWeakFieldValue(labelKey, primaryValue) && !isWeakFieldValue(labelKey, generatedValue)) {
+    return false;
+  }
+
+  return true;
+}
+
+function isWeakFieldValue(labelKey: string, value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) {
+    return true;
+  }
+
+  if (["a", "an", "na", "n a", "none", "unknown"].includes(normalized)) {
+    return true;
+  }
+
+  if (labelKey === "target role") {
+    return normalizeRoleLabel(value) === undefined;
+  }
+
+  if (labelKey === "preferred location" || labelKey === "location" || labelKey === "location city" || labelKey === "city") {
+    return sanitizeLocationLabel(value) === undefined;
+  }
+
+  if (labelKey === "message to the hiring team" || labelKey === "why are you interested in this role") {
+    return /\baspiring\s+(a|an|sw|sde|dev)\b/i.test(value) || /\bbecoming a a\b/i.test(value);
+  }
+
+  return false;
+}
+
+function refreshApplicationArtifactsIfNeeded(
+  application: Application,
+  student: StudentProfile,
+  job: Job,
+  resume?: ResumeRecord
+) {
+  const nextArtifacts = createArtifacts(student, job, resume);
+  const nextUploadedDocuments = createUploadedDocumentList(resume);
+
+  if (!shouldRefreshGeneratedArtifacts(application.generatedArtifacts, nextArtifacts) && sameDocuments(application.uploadedDocuments, nextUploadedDocuments)) {
+    return application;
+  }
+
+  return {
+    ...application,
+    generatedArtifacts: shouldRefreshGeneratedArtifacts(application.generatedArtifacts, nextArtifacts)
+      ? nextArtifacts
+      : application.generatedArtifacts,
+    uploadedDocuments: nextUploadedDocuments,
+    lastUpdatedAt: nowIso()
+  };
+}
+
+function shouldRefreshGeneratedArtifacts(current: Application["generatedArtifacts"], next: Application["generatedArtifacts"]) {
+  const coverLetter = current.coverLetterExcerpt.trim();
+  const shortAnswer = current.shortAnswers[0]?.answer?.trim() ?? "";
+
+  if (!coverLetter) {
+    return true;
+  }
+
+  if (
+    coverLetter.includes("where I can bring my")
+    || /\baspiring\s+(a|an|sw|sde|dev)\b/i.test(coverLetter)
+    || coverLetter.split(/[.!?]+/).filter(Boolean).length < 3
+  ) {
+    return true;
+  }
+
+  if (/\b(becoming a|becoming an)\s+(a|an|sw|sde|dev)\b/i.test(shortAnswer)) {
+    return true;
+  }
+
+  return false;
+}
+
+function sameDocuments(left: string[], right: string[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((item, index) => item === right[index]);
 }
 
 function buildRunNotes(input: {
@@ -941,8 +1211,8 @@ function buildRunNotes(input: {
   if (browserCapability?.status === "unavailable") {
     notes.push(
       input.mode === "autopilot"
-        ? "Browser auto-apply is unavailable in this AIHawk checkout, so the background agent may stop before the full submit flow."
-        : "Browser auto-apply is unavailable in this AIHawk checkout, so autofill stays review-first."
+        ? "Browser auto-apply is unavailable in this browser runtime, so the background agent may stop before the full submit flow."
+        : "Browser auto-apply is unavailable in this browser runtime, so autofill stays review-first."
     );
   }
 
@@ -979,7 +1249,7 @@ function buildAutopilotFailureTimeline(job: Job, message: string, workspacePath?
       label: "Browser agent blocked",
       detail: message,
       state: "attention",
-      source: "aihawk"
+      source: "gradlaunch"
     },
     {
       id: "workspace",

@@ -8,9 +8,9 @@
   ],
   "scripts": {
     "dev:api": "npm run dev -w @gradlaunch/api",
+    "dev:api:memory": "npm run dev:memory -w @gradlaunch/api",
     "dev:web": "npm run dev -w @gradlaunch/web",
     "build": "npm run build -w @gradlaunch/shared && npm run build -w @gradlaunch/api && npm run build -w @gradlaunch/web",
     "typecheck": "npm run typecheck -w @gradlaunch/shared && npm run typecheck -w @gradlaunch/api && npm run typecheck -w @gradlaunch/web"
   }
 }
-

@@ -49,7 +49,7 @@ export function AgentExecutionPanel({ mode, pendingSteps, run, notice, variant }
               <div>
                 <div className="agent-step-headline">
                   <strong>{step.label}</strong>
-                  <span className={`agent-source agent-source-${step.source}`}>{step.source === "aihawk" ? "AIHawk" : "GradLaunch"}</span>
+                  <span className={`agent-source agent-source-${step.source}`}>{step.source === "aihawk" ? "Browser Agent" : "GradLaunch"}</span>
                 </div>
                 <p className="muted">{step.detail}</p>
               </div>

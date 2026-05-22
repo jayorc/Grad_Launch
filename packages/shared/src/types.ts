@@ -22,6 +22,27 @@ export type EmailDeliveryStatus = "sent" | "queued" | "skipped" | "failed";
 export type BrowserApplyStatus = "filled" | "submitted" | "needs_manual_review" | "handoff_required" | "blocked";
 export type PlannerStatus = "idle" | "running" | "handoff_required" | "needs_review" | "completed" | "blocked";
 export type PlannerTaskStatus = "pending" | "running" | "completed" | "blocked" | "needs_user" | "retrying" | "skipped";
+export type PlannerFormMode = "unknown" | "single_stage" | "multi_stage";
+export type PlannerDecisionSource = "system" | "heuristic" | "llm";
+export type PlannerActionKind =
+  | "open_job_page"
+  | "scan_page"
+  | "fill_fields"
+  | "upload_resume"
+  | "navigate_apply"
+  | "navigate_next"
+  | "reach_review"
+  | "submit_application"
+  | "wait_for_login"
+  | "wait_for_captcha"
+  | "wait_for_otp"
+  | "wait_for_verification"
+  | "wait_for_user_input"
+  | "pause_for_review"
+  | "recover_same_screen"
+  | "recover_validation"
+  | "stop";
+export type PlannerStageOutcome = "observed" | "filled" | "advanced" | "handoff" | "review" | "submitted" | "blocked";
 export type AgentGoalType = "autonomous_application" | "job_discovery";
 export type AgentGoalStatus = "queued" | "running" | "waiting" | "completed" | "blocked" | "failed" | "cancelled";
 export type AgentWorkerType =
@@ -207,12 +228,36 @@ export interface PlannerTask {
   completedAt?: string;
 }
 
+export interface PlannerDecision {
+  kind: PlannerActionKind;
+  source: PlannerDecisionSource;
+  stageIndex: number;
+  stageLabel: string;
+  url: string;
+  reason: string;
+  fieldLabels: string[];
+  createdAt: string;
+}
+
+export interface PlannerStageSnapshot {
+  stageIndex: number;
+  label: string;
+  url: string;
+  visibleFieldLabels: string[];
+  requiredFieldLabels: string[];
+  filledFieldLabels: string[];
+  outcome: PlannerStageOutcome;
+  decision?: PlannerDecision;
+  lastUpdatedAt: string;
+}
+
 export interface PlannerCheckpoint {
   sessionId: string;
   resumeToken: string;
   goal: string;
   status: PlannerStatus;
   summary: string;
+  formMode: PlannerFormMode;
   currentStep?: string;
   currentStageLabel?: string;
   currentUrl?: string;
@@ -220,6 +265,8 @@ export interface PlannerCheckpoint {
   handoffCount: number;
   validationErrors: string[];
   subgoals: PlannerTask[];
+  lastDecision?: PlannerDecision;
+  stageHistory: PlannerStageSnapshot[];
   lastUpdatedAt: string;
 }
 

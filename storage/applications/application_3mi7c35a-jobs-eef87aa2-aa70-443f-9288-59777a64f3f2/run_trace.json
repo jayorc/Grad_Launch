@@ -1,11 +1,10 @@
 {
-  "id": "run_v3cqhobl",
-  "status": "blocked",
+  "id": "run_wnndf3lx",
+  "status": "completed",
   "executionMode": "browser_apply",
-  "adapterId": "aihawk-local",
-  "startedAt": "2026-05-21T12:29:33.484Z",
-  "completedAt": "2026-05-21T12:31:38.431Z",
-  "blockedReason": "page.waitForTimeout: Target page, context or browser has been closed",
+  "adapterId": "gradlaunch-browser-agent",
+  "startedAt": "2026-05-22T06:45:13.542Z",
+  "completedAt": "2026-05-22T06:46:10.364Z",
   "filledFields": [
     {
       "label": "First name",
@@ -29,15 +28,15 @@
     },
     {
       "label": "City",
-      "value": "a"
+      "value": "Bengaluru"
     },
     {
       "label": "Location",
-      "value": "a"
+      "value": "Bengaluru"
     },
     {
       "label": "Location (City)",
-      "value": "a"
+      "value": "Bengaluru"
     },
     {
       "label": "Country",
@@ -65,11 +64,11 @@
     },
     {
       "label": "Preferred location",
-      "value": "a"
+      "value": "Bengaluru"
     },
     {
       "label": "Target role",
-      "value": "a"
+      "value": "Eef87aa2 Aa70 443f 9288 59777a64f3f2"
     },
     {
       "label": "Work authorization",
@@ -97,7 +96,7 @@
     },
     {
       "label": "Message to the Hiring Team",
-      "value": "I am excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+      "value": "I am excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs. My background in JavaScript, React, Next.js and my focus on becoming a strong Eef87aa2 Aa70 443f 9288 59777a64f3f2 make this opportunity especially compelling to me. I would be glad to contribute to Jobs's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in remote collaboration. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with a opportunities."
     },
     {
       "label": "Primary skills",
@@ -109,7 +108,7 @@
     },
     {
       "label": "Why are you interested in this role?",
-      "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+      "value": "This role aligns with my goal of becoming a strong Eef87aa2 Aa70 443f 9288 59777a64f3f2 and uses skills I have practiced through projects and coursework."
     },
     {
       "label": "What makes you a match?",
@@ -127,21 +126,21 @@
     {
       "id": "fill",
       "label": "Filling visible form fields",
-      "detail": "page.waitForTimeout: Target page, context or browser has been closed",
-      "state": "attention",
+      "detail": "The form is filled across 2 stages and is ready for review or direct submit. Planner action: Jay Kumar Gupta is excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, leveraging his skills in JavaScript, React, Next.js, and Node.js to contribute to the team with a practical approach.",
+      "state": "done",
       "source": "gradlaunch"
     },
     {
       "id": "pause",
       "label": "Pausing before submit",
-      "detail": "page.waitForTimeout: Target page, context or browser has been closed",
-      "state": "attention",
+      "detail": "Chrome stays open so the student can inspect the filled form and submit manually.",
+      "state": "done",
       "source": "gradlaunch"
     },
     {
       "id": "planner",
       "label": "Planner checkpoint updated",
-      "detail": "page.waitForTimeout: Target page, context or browser has been closed Resume token: job_u13nx3ht:2026-05-21T10:30:48.952Z.",
+      "detail": "Planner completed the form fill and paused at the review gate. Form mode: multi_stage. Stages tracked: 3. Last action: fill_fields. Resume token: job_u13nx3ht:2026-05-21T10:30:48.952Z.",
       "state": "done",
       "source": "gradlaunch"
     },
@@ -149,7 +148,7 @@
       "id": "workspace",
       "label": "Saving screenshots and receipt",
       "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_3mi7c35a-jobs-eef87aa2-aa70-443f-9288-59777a64f3f2.",
-      "state": "attention",
+      "state": "done",
       "source": "gradlaunch"
     }
   ],
@@ -157,212 +156,557 @@
     "sessionId": "planner-job_u13nx3ht",
     "resumeToken": "job_u13nx3ht:2026-05-21T10:30:48.952Z",
     "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or final review checkpoint.",
-    "status": "blocked",
-    "summary": "page.waitForTimeout: Target page, context or browser has been closed",
-    "currentStep": "stage_3",
-    "currentStageLabel": "Section 3",
-    "currentUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-    "retryCount": 2,
-    "handoffCount": 2,
-    "validationErrors": [],
+    "status": "completed",
+    "summary": "Planner completed the form fill and paused at the review gate.",
+    "formMode": "multi_stage",
+    "currentStep": "stage_2",
+    "currentStageLabel": "Section 2",
+    "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+    "retryCount": 4,
+    "handoffCount": 6,
+    "validationErrors": [
+      "First name",
+      "Last name",
+      "Email",
+      "Confirm your email",
+      "City",
+      "Phone number"
+    ],
     "subgoals": [
       {
         "id": "open_job_page",
         "label": "Open job page",
         "status": "completed",
         "detail": "Job page opened successfully in a visible Chrome session.",
-        "attempts": 3,
-        "lastUpdatedAt": "2026-05-21T12:29:38.264Z",
-        "completedAt": "2026-05-21T12:29:38.264Z"
+        "attempts": 6,
+        "lastUpdatedAt": "2026-05-22T06:45:15.681Z",
+        "completedAt": "2026-05-22T06:45:15.681Z"
       },
       {
         "id": "authenticate_if_needed",
         "label": "Handle login if needed",
         "status": "running",
         "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
-        "attempts": 4,
-        "lastUpdatedAt": "2026-05-21T12:31:06.991Z"
+        "attempts": 12,
+        "lastUpdatedAt": "2026-05-22T06:46:05.440Z"
       },
       {
         "id": "finish_current_section",
         "label": "Finish active section",
-        "status": "blocked",
-        "detail": "page.waitForTimeout: Target page, context or browser has been closed",
-        "attempts": 15,
-        "lastUpdatedAt": "2026-05-21T12:31:38.309Z"
+        "status": "running",
+        "detail": "Reading Section 2 and planning the next safe action.",
+        "attempts": 27,
+        "lastUpdatedAt": "2026-05-22T06:46:05.845Z"
       },
       {
         "id": "recover_from_validation_errors",
         "label": "Recover from validation errors",
-        "status": "pending",
-        "detail": "Waiting to start.",
-        "attempts": 0,
-        "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+        "status": "blocked",
+        "detail": "Validation or required-answer blockers were found: First name, Last name, Email, Confirm your email, City, Phone number.",
+        "attempts": 2,
+        "lastUpdatedAt": "2026-05-22T06:45:25.791Z"
       },
       {
         "id": "retry_alternative_path",
         "label": "Retry alternative path",
         "status": "retrying",
         "detail": "Planner saw the same screen again and is attempting a different recovery path.",
-        "attempts": 4,
-        "lastUpdatedAt": "2026-05-21T12:31:13.034Z"
+        "attempts": 6,
+        "lastUpdatedAt": "2026-05-22T05:30:29.857Z"
       },
       {
         "id": "reach_submit_gate",
         "label": "Reach submit/review gate",
-        "status": "pending",
-        "detail": "Waiting to start.",
+        "status": "completed",
+        "detail": "Reached the review/submit checkpoint safely.",
         "attempts": 0,
-        "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+        "lastUpdatedAt": "2026-05-22T06:46:10.059Z",
+        "completedAt": "2026-05-22T06:46:10.059Z"
       },
       {
         "id": "save_checkpoint",
         "label": "Save checkpoint",
         "status": "completed",
-        "detail": "Saved checkpoint before handing the browser to the student.",
+        "detail": "Saved planner state so the run can continue from the latest checkpoint.",
         "attempts": 0,
-        "lastUpdatedAt": "2026-05-21T12:31:05.272Z",
-        "completedAt": "2026-05-21T12:31:05.272Z"
+        "lastUpdatedAt": "2026-05-22T06:46:10.059Z",
+        "completedAt": "2026-05-22T06:46:10.059Z"
       }
     ],
-    "lastUpdatedAt": "2026-05-21T12:31:38.309Z"
+    "lastDecision": {
+      "kind": "fill_fields",
+      "source": "llm",
+      "stageIndex": 1,
+      "stageLabel": "Section 2",
+      "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+      "reason": "Jay Kumar Gupta is excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, leveraging his skills in JavaScript, React, Next.js, and Node.js to contribute to the team with a practical approach.",
+      "fieldLabels": [
+        "Last Name",
+        "First Name",
+        "Email",
+        "Years of Experience",
+        "City",
+        "Current CTC"
+      ],
+      "createdAt": "2026-05-22T06:46:10.003Z"
+    },
+    "stageHistory": [
+      {
+        "stageIndex": 0,
+        "label": "Section 1",
+        "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+        "visibleFieldLabels": [
+          "Choose a file or drop it here",
+          "First name",
+          "Last name",
+          "Email",
+          "Confirm your email",
+          "LinkedIn",
+          "Facebook",
+          "X (fka Twitter)",
+          "Website",
+          "Let the company know about your interest working there",
+          "City",
+          "Phone number"
+        ],
+        "requiredFieldLabels": [
+          "First name",
+          "Last name",
+          "Email",
+          "Confirm your email",
+          "City",
+          "Phone number"
+        ],
+        "filledFieldLabels": [
+          "First name",
+          "Last name",
+          "Email",
+          "Confirm your email",
+          "City",
+          "Location",
+          "Location (City)",
+          "Phone number",
+          "Phone",
+          "Mobile",
+          "Preferred location",
+          "Let the company know about your interest working there"
+        ],
+        "outcome": "handoff",
+        "decision": {
+          "kind": "wait_for_user_input",
+          "source": "system",
+          "stageIndex": 0,
+          "stageLabel": "Section 1",
+          "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+          "reason": "GradLaunch needs your help with required answers on this screen: First name, Last name, Email, Confirm your email, City, Phone number.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T06:45:25.955Z"
+        },
+        "lastUpdatedAt": "2026-05-22T06:45:25.955Z"
+      },
+      {
+        "stageIndex": 1,
+        "label": "Section 2",
+        "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+        "visibleFieldLabels": [
+          "document_file",
+          "Last Name",
+          "First Name",
+          "Email",
+          "mat-input-3",
+          "Years of Experience",
+          "City",
+          "Current CTC",
+          "add_docs"
+        ],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [
+          "First name",
+          "Last name",
+          "Email",
+          "Confirm your email",
+          "City",
+          "Location",
+          "Location (City)",
+          "Phone number",
+          "Phone",
+          "Mobile",
+          "Preferred location",
+          "Let the company know about your interest working there",
+          "Resume upload",
+          "mat-input-3",
+          "Years of Experience",
+          "Current CTC"
+        ],
+        "outcome": "review",
+        "decision": {
+          "kind": "fill_fields",
+          "source": "llm",
+          "stageIndex": 1,
+          "stageLabel": "Section 2",
+          "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+          "reason": "Jay Kumar Gupta is excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, leveraging his skills in JavaScript, React, Next.js, and Node.js to contribute to the team with a practical approach.",
+          "fieldLabels": [
+            "Last Name",
+            "First Name",
+            "Email",
+            "Years of Experience",
+            "City",
+            "Current CTC"
+          ],
+          "createdAt": "2026-05-22T06:46:10.003Z"
+        },
+        "lastUpdatedAt": "2026-05-22T06:46:10.059Z"
+      },
+      {
+        "stageIndex": 2,
+        "label": "Section 3",
+        "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+        "visibleFieldLabels": [
+          "First name",
+          "Last name",
+          "Email",
+          "Confirm your email",
+          "LinkedIn",
+          "Facebook",
+          "X (fka Twitter)",
+          "Website",
+          "Let the company know about your interest working there",
+          "City",
+          "Phone number"
+        ],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "observed",
+        "decision": {
+          "kind": "fill_fields",
+          "source": "llm",
+          "stageIndex": 2,
+          "stageLabel": "Section 3",
+          "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+          "reason": "Prepared a field-fill plan for 11 visible fields. Filled in first name, last name, email, confirm email, city, and phone number. Needs LinkedIn profile and a message to the hiring team.",
+          "fieldLabels": [
+            "First name",
+            "Last name",
+            "Email",
+            "Confirm your email",
+            "LinkedIn",
+            "Facebook",
+            "X (fka Twitter)",
+            "Website",
+            "Let the company know about your interest working there",
+            "City",
+            "Phone number"
+          ],
+          "createdAt": "2026-05-22T05:30:29.857Z"
+        },
+        "lastUpdatedAt": "2026-05-22T05:30:29.857Z"
+      }
+    ],
+    "lastUpdatedAt": "2026-05-22T06:46:10.059Z"
   },
   "notes": [
-    "page.waitForTimeout: Target page, context or browser has been closed",
-    "Browser fill status: blocked.",
-    "Filled fields: 0. Skipped fields: 27."
+    "The form is filled across 2 stages and is ready for review or direct submit.",
+    "Browser fill status: filled.",
+    "Filled fields: 7. Skipped fields: 7."
   ],
   "submission": {
     "intent": "browser_fill",
-    "outcome": "blocked",
+    "outcome": "confirmed",
     "externalSubmitted": false,
-    "confirmation": "page.waitForTimeout: Target page, context or browser has been closed",
-    "submittedAt": "2026-05-21T12:31:38.431Z",
+    "confirmation": "The form is filled across 2 stages and is ready for review or direct submit.",
+    "submittedAt": "2026-05-22T06:46:10.364Z",
     "email": {
       "status": "skipped",
       "provider": "outbox",
       "to": "jaynrk200211@gmail.com",
       "subject": "GradLaunch filled Jobs - Eef87aa2 Aa70 443f 9288 59777a64f3f2",
-      "sentAt": "2026-05-21T12:31:38.431Z",
+      "sentAt": "2026-05-22T06:46:10.364Z",
       "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
     },
     "browser": {
-      "status": "blocked",
+      "status": "filled",
       "sourceUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-      "openedAt": "2026-05-21T12:29:33.637Z",
-      "completedAt": "2026-05-21T12:31:38.309Z",
-      "filledLabels": [],
+      "openedAt": "2026-05-22T06:45:13.742Z",
+      "completedAt": "2026-05-22T06:46:10.364Z",
+      "filledLabels": [
+        "Resume upload",
+        "Last Name",
+        "First Name",
+        "Email",
+        "Years of Experience",
+        "City",
+        "Current CTC"
+      ],
       "skippedLabels": [
         "First name",
         "Last name",
-        "Full name",
         "Email",
         "Confirm your email",
+        "Let the company know about your interest working there",
         "City",
-        "Location",
-        "Location (City)",
-        "Country",
-        "Phone number",
-        "Phone",
-        "Mobile",
-        "Degree",
-        "Graduation year",
-        "Preferred location",
-        "Target role",
-        "Work authorization",
-        "Legally authorized to work",
-        "Visa sponsorship required",
-        "Visa required",
-        "Current CTC",
-        "Current salary",
-        "Message to the Hiring Team",
-        "Primary skills",
-        "Resume context",
-        "Why are you interested in this role?",
-        "What makes you a match?"
+        "Phone number"
       ],
       "screenshots": [
         "browser-opened.png",
-        "browser-stage-1.png",
+        "browser-stage-1-start.png",
         "browser-handoff-needed.png",
-        "browser-stage-2.png",
-        "browser-handoff-needed.png",
-        "browser-stage-3.png"
+        "browser-stage-2-start.png",
+        "browser-filled.png"
       ],
-      "message": "page.waitForTimeout: Target page, context or browser has been closed",
+      "message": "The form is filled across 2 stages and is ready for review or direct submit.",
       "planner": {
         "sessionId": "planner-job_u13nx3ht",
         "resumeToken": "job_u13nx3ht:2026-05-21T10:30:48.952Z",
         "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or final review checkpoint.",
-        "status": "blocked",
-        "summary": "page.waitForTimeout: Target page, context or browser has been closed",
-        "currentStep": "stage_3",
-        "currentStageLabel": "Section 3",
-        "currentUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-        "retryCount": 2,
-        "handoffCount": 2,
-        "validationErrors": [],
+        "status": "completed",
+        "summary": "Planner completed the form fill and paused at the review gate.",
+        "formMode": "multi_stage",
+        "currentStep": "stage_2",
+        "currentStageLabel": "Section 2",
+        "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+        "retryCount": 4,
+        "handoffCount": 6,
+        "validationErrors": [
+          "First name",
+          "Last name",
+          "Email",
+          "Confirm your email",
+          "City",
+          "Phone number"
+        ],
         "subgoals": [
           {
             "id": "open_job_page",
             "label": "Open job page",
             "status": "completed",
             "detail": "Job page opened successfully in a visible Chrome session.",
-            "attempts": 3,
-            "lastUpdatedAt": "2026-05-21T12:29:38.264Z",
-            "completedAt": "2026-05-21T12:29:38.264Z"
+            "attempts": 6,
+            "lastUpdatedAt": "2026-05-22T06:45:15.681Z",
+            "completedAt": "2026-05-22T06:45:15.681Z"
           },
           {
             "id": "authenticate_if_needed",
             "label": "Handle login if needed",
             "status": "running",
             "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
-            "attempts": 4,
-            "lastUpdatedAt": "2026-05-21T12:31:06.991Z"
+            "attempts": 12,
+            "lastUpdatedAt": "2026-05-22T06:46:05.440Z"
           },
           {
             "id": "finish_current_section",
             "label": "Finish active section",
-            "status": "blocked",
-            "detail": "page.waitForTimeout: Target page, context or browser has been closed",
-            "attempts": 15,
-            "lastUpdatedAt": "2026-05-21T12:31:38.309Z"
+            "status": "running",
+            "detail": "Reading Section 2 and planning the next safe action.",
+            "attempts": 27,
+            "lastUpdatedAt": "2026-05-22T06:46:05.845Z"
           },
           {
             "id": "recover_from_validation_errors",
             "label": "Recover from validation errors",
-            "status": "pending",
-            "detail": "Waiting to start.",
-            "attempts": 0,
-            "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+            "status": "blocked",
+            "detail": "Validation or required-answer blockers were found: First name, Last name, Email, Confirm your email, City, Phone number.",
+            "attempts": 2,
+            "lastUpdatedAt": "2026-05-22T06:45:25.791Z"
           },
           {
             "id": "retry_alternative_path",
             "label": "Retry alternative path",
             "status": "retrying",
             "detail": "Planner saw the same screen again and is attempting a different recovery path.",
-            "attempts": 4,
-            "lastUpdatedAt": "2026-05-21T12:31:13.034Z"
+            "attempts": 6,
+            "lastUpdatedAt": "2026-05-22T05:30:29.857Z"
           },
           {
             "id": "reach_submit_gate",
             "label": "Reach submit/review gate",
-            "status": "pending",
-            "detail": "Waiting to start.",
+            "status": "completed",
+            "detail": "Reached the review/submit checkpoint safely.",
             "attempts": 0,
-            "lastUpdatedAt": "2026-05-21T10:30:48.952Z"
+            "lastUpdatedAt": "2026-05-22T06:46:10.059Z",
+            "completedAt": "2026-05-22T06:46:10.059Z"
           },
           {
             "id": "save_checkpoint",
             "label": "Save checkpoint",
             "status": "completed",
-            "detail": "Saved checkpoint before handing the browser to the student.",
+            "detail": "Saved planner state so the run can continue from the latest checkpoint.",
             "attempts": 0,
-            "lastUpdatedAt": "2026-05-21T12:31:05.272Z",
-            "completedAt": "2026-05-21T12:31:05.272Z"
+            "lastUpdatedAt": "2026-05-22T06:46:10.059Z",
+            "completedAt": "2026-05-22T06:46:10.059Z"
           }
         ],
-        "lastUpdatedAt": "2026-05-21T12:31:38.309Z"
+        "lastDecision": {
+          "kind": "fill_fields",
+          "source": "llm",
+          "stageIndex": 1,
+          "stageLabel": "Section 2",
+          "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+          "reason": "Jay Kumar Gupta is excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, leveraging his skills in JavaScript, React, Next.js, and Node.js to contribute to the team with a practical approach.",
+          "fieldLabels": [
+            "Last Name",
+            "First Name",
+            "Email",
+            "Years of Experience",
+            "City",
+            "Current CTC"
+          ],
+          "createdAt": "2026-05-22T06:46:10.003Z"
+        },
+        "stageHistory": [
+          {
+            "stageIndex": 0,
+            "label": "Section 1",
+            "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+            "visibleFieldLabels": [
+              "Choose a file or drop it here",
+              "First name",
+              "Last name",
+              "Email",
+              "Confirm your email",
+              "LinkedIn",
+              "Facebook",
+              "X (fka Twitter)",
+              "Website",
+              "Let the company know about your interest working there",
+              "City",
+              "Phone number"
+            ],
+            "requiredFieldLabels": [
+              "First name",
+              "Last name",
+              "Email",
+              "Confirm your email",
+              "City",
+              "Phone number"
+            ],
+            "filledFieldLabels": [
+              "First name",
+              "Last name",
+              "Email",
+              "Confirm your email",
+              "City",
+              "Location",
+              "Location (City)",
+              "Phone number",
+              "Phone",
+              "Mobile",
+              "Preferred location",
+              "Let the company know about your interest working there"
+            ],
+            "outcome": "handoff",
+            "decision": {
+              "kind": "wait_for_user_input",
+              "source": "system",
+              "stageIndex": 0,
+              "stageLabel": "Section 1",
+              "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+              "reason": "GradLaunch needs your help with required answers on this screen: First name, Last name, Email, Confirm your email, City, Phone number.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T06:45:25.955Z"
+            },
+            "lastUpdatedAt": "2026-05-22T06:45:25.955Z"
+          },
+          {
+            "stageIndex": 1,
+            "label": "Section 2",
+            "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+            "visibleFieldLabels": [
+              "document_file",
+              "Last Name",
+              "First Name",
+              "Email",
+              "mat-input-3",
+              "Years of Experience",
+              "City",
+              "Current CTC",
+              "add_docs"
+            ],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [
+              "First name",
+              "Last name",
+              "Email",
+              "Confirm your email",
+              "City",
+              "Location",
+              "Location (City)",
+              "Phone number",
+              "Phone",
+              "Mobile",
+              "Preferred location",
+              "Let the company know about your interest working there",
+              "Resume upload",
+              "mat-input-3",
+              "Years of Experience",
+              "Current CTC"
+            ],
+            "outcome": "review",
+            "decision": {
+              "kind": "fill_fields",
+              "source": "llm",
+              "stageIndex": 1,
+              "stageLabel": "Section 2",
+              "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+              "reason": "Jay Kumar Gupta is excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, leveraging his skills in JavaScript, React, Next.js, and Node.js to contribute to the team with a practical approach.",
+              "fieldLabels": [
+                "Last Name",
+                "First Name",
+                "Email",
+                "Years of Experience",
+                "City",
+                "Current CTC"
+              ],
+              "createdAt": "2026-05-22T06:46:10.003Z"
+            },
+            "lastUpdatedAt": "2026-05-22T06:46:10.059Z"
+          },
+          {
+            "stageIndex": 2,
+            "label": "Section 3",
+            "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+            "visibleFieldLabels": [
+              "First name",
+              "Last name",
+              "Email",
+              "Confirm your email",
+              "LinkedIn",
+              "Facebook",
+              "X (fka Twitter)",
+              "Website",
+              "Let the company know about your interest working there",
+              "City",
+              "Phone number"
+            ],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "observed",
+            "decision": {
+              "kind": "fill_fields",
+              "source": "llm",
+              "stageIndex": 2,
+              "stageLabel": "Section 3",
+              "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+              "reason": "Prepared a field-fill plan for 11 visible fields. Filled in first name, last name, email, confirm email, city, and phone number. Needs LinkedIn profile and a message to the hiring team.",
+              "fieldLabels": [
+                "First name",
+                "Last name",
+                "Email",
+                "Confirm your email",
+                "LinkedIn",
+                "Facebook",
+                "X (fka Twitter)",
+                "Website",
+                "Let the company know about your interest working there",
+                "City",
+                "Phone number"
+              ],
+              "createdAt": "2026-05-22T05:30:29.857Z"
+            },
+            "lastUpdatedAt": "2026-05-22T05:30:29.857Z"
+          }
+        ],
+        "lastUpdatedAt": "2026-05-22T06:46:10.059Z"
       }
     }
   },
@@ -373,6 +717,8 @@
     "browser-stage-1.png",
     "browser-handoff-needed.png",
     "browser-stage-2.png",
-    "browser-stage-3.png"
+    "browser-stage-3.png",
+    "browser-stage-1-start.png",
+    "browser-stage-2-start.png"
   ]
 }

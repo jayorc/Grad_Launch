@@ -2,19 +2,24 @@
   "sessionId": "planner-job_url_aHR0cHM6Ly9hbWxyaWdodHNv",
   "resumeToken": "job_url_aHR0cHM6Ly9hbWxyaWdodHNv:2026-05-21T10:40:47.089Z",
   "goal": "Complete the Software Engineer Contractor application at Blue Umbrella India Pvt Ltd autonomously until a protected or final review checkpoint.",
-  "status": "blocked",
-  "summary": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
-  "retryCount": 0,
+  "status": "running",
+  "summary": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
+  "formMode": "single_stage",
+  "currentStep": "stage_1",
+  "currentStageLabel": "Section 1",
+  "currentUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+  "retryCount": 1,
   "handoffCount": 0,
   "validationErrors": [],
   "subgoals": [
     {
       "id": "open_job_page",
       "label": "Open job page",
-      "status": "pending",
-      "detail": "Waiting to start.",
-      "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 1,
+      "lastUpdatedAt": "2026-05-22T06:36:40.101Z",
+      "completedAt": "2026-05-22T06:36:40.101Z"
     },
     {
       "id": "authenticate_if_needed",
@@ -27,18 +32,18 @@
     {
       "id": "finish_current_section",
       "label": "Finish active section",
-      "status": "blocked",
-      "detail": "browserContext.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --disable-blink-features=AutomationControlled --user-data-dir=/Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile --remote-debugging-pipe about:blank\n<launched> pid=1888\n[pid=1888] <gracefully close start>",
-      "attempts": 1,
-      "lastUpdatedAt": "2026-05-21T10:40:48.901Z"
+      "status": "running",
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-22T06:36:44.739Z"
     },
     {
       "id": "recover_from_validation_errors",
       "label": "Recover from validation errors",
-      "status": "pending",
-      "detail": "Waiting to start.",
-      "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
+      "status": "retrying",
+      "detail": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
+      "attempts": 1,
+      "lastUpdatedAt": "2026-05-22T06:36:45.054Z"
     },
     {
       "id": "retry_alternative_path",
@@ -65,5 +70,37 @@
       "lastUpdatedAt": "2026-05-21T10:40:47.089Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-21T10:40:48.901Z"
+  "lastDecision": {
+    "kind": "recover_validation",
+    "source": "system",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+    "reason": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
+    "fieldLabels": [],
+    "createdAt": "2026-05-22T06:36:45.054Z"
+  },
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+      "visibleFieldLabels": [],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [],
+      "outcome": "observed",
+      "lastUpdatedAt": "2026-05-22T06:36:45.054Z",
+      "decision": {
+        "kind": "recover_validation",
+        "source": "system",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
+        "reason": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T06:36:45.054Z"
+      }
+    }
+  ],
+  "lastUpdatedAt": "2026-05-22T06:36:45.054Z"
 }

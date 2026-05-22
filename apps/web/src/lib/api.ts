@@ -81,7 +81,7 @@ export function getApplications(token: string) {
 }
 
 export function getApplicationRuns(token: string, applicationId: string) {
-  return request<ApplicationRun[]>(`/applications/${applicationId}/runs`, {
+  return request<ApplicationRun[]>(`/applications/${encodeURIComponent(applicationId)}/runs`, {
     headers: authHeaders(token)
   });
 }
@@ -158,7 +158,7 @@ export function createApplication(token: string, jobId: string, mode: "draft" | 
 }
 
 export function fillJobInBrowser(token: string, jobId: string, submit = false) {
-  return request<CreateApplicationResult>(`/jobs/${jobId}/fill-browser`, {
+  return request<CreateApplicationResult>(`/jobs/${encodeURIComponent(jobId)}/fill-browser`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({ submit })
@@ -166,7 +166,7 @@ export function fillJobInBrowser(token: string, jobId: string, submit = false) {
 }
 
 export function resumeApplicationInBrowser(token: string, applicationId: string, submit = false) {
-  return request<CreateApplicationResult>(`/applications/${applicationId}/resume-browser`, {
+  return request<CreateApplicationResult>(`/applications/${encodeURIComponent(applicationId)}/resume-browser`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({ submit })
@@ -178,7 +178,7 @@ export function submitApplication(
   applicationId: string,
   input: Omit<SubmitApplicationInput, "applicationId" | "studentId">
 ) {
-  return request<SubmitApplicationResult>(`/applications/${applicationId}/submit`, {
+  return request<SubmitApplicationResult>(`/applications/${encodeURIComponent(applicationId)}/submit`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(input)

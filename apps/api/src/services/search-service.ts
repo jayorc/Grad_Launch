@@ -77,14 +77,14 @@ function buildSearchTimeline(input: {
   return [
     {
       id: "adapter",
-      label: "AIHawk adapter checked",
+      label: "Browser runtime checked",
       detail: input.capabilities.repoDetected
         ? browserCapability?.status === "unavailable"
-          ? "Local AIHawk modules were detected, but search is running in GradLaunch mode because browser/apply plugins are missing."
-          : "Local AIHawk modules were detected and the adapter is available for downstream draft flows."
-        : "No local AIHawk repo was detected, so the search session is running entirely on GradLaunch services.",
+          ? "Local browser automation modules were detected, but search is running in GradLaunch mode because browser/apply plugins are missing."
+          : "Local browser automation modules were detected and the runtime is available for downstream draft flows."
+        : "No local browser runtime was detected, so the search session is running entirely on GradLaunch services.",
       state: input.capabilities.repoDetected ? "done" : "attention",
-      source: "aihawk"
+      source: "gradlaunch"
     },
     {
       id: "profile",

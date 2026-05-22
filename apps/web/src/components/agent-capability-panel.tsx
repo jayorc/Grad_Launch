@@ -24,7 +24,7 @@ export function AgentCapabilityPanel({ capabilities, title, description }: Agent
                 : "capability-chip-subtle"
             }`}
           >
-            {capabilities ? (capabilities.repoDetected ? "Local AIHawk connected" : "Fallback mode") : "Checking adapter"}
+            {capabilities ? (capabilities.repoDetected ? "Browser runtime connected" : "Fallback mode") : "Checking runtime"}
           </span>
           {capabilities?.pythonAvailable ? <span className="capability-chip capability-chip-subtle">Python ready</span> : null}
         </div>
@@ -58,7 +58,7 @@ export function AgentCapabilityPanel({ capabilities, title, description }: Agent
         </>
       ) : (
         <div className="soft-panel">
-          <p className="muted">Checking the local AIHawk adapter and GradLaunch runtime capabilities.</p>
+          <p className="muted">Checking the local browser runtime and GradLaunch agent capabilities.</p>
         </div>
       )}
     </section>

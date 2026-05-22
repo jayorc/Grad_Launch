@@ -7,11 +7,11 @@
   "matchScore": 38,
   "generatedArtifacts": {
     "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Job Opening - Back End Developer (Intern) | DataChannel role at Datachannel.",
-    "coverLetterExcerpt": "I am excited to apply for the Job Opening - Back End Developer (Intern) | DataChannel role at Datachannel, where I can bring my JavaScript, React, Next.js experience as an aspiring a.",
+    "coverLetterExcerpt": "I am excited to apply for the Job Opening - Back End Developer (Intern) | DataChannel role at Datachannel. My background in JavaScript, React, Next.js and my focus on becoming a strong Back-End Developer make this opportunity especially compelling to me. I would be glad to contribute to Datachannel's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Remote opportunities.",
     "shortAnswers": [
       {
         "question": "Why are you interested in this role?",
-        "answer": "This role aligns with my goal of becoming a a and uses skills I have already practiced through projects and coursework."
+        "answer": "This role aligns with my goal of becoming a strong Back-End Developer and uses skills I have already practiced through projects and coursework."
       },
       {
         "question": "What makes you a match?",
@@ -26,8 +26,8 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_qhijgidx",
-    "status": "needs_review",
+    "id": "run_5qgb5rh5",
+    "status": "running",
     "executionMode": "browser_apply",
     "filledFields": [
       {
@@ -52,10 +52,30 @@
       },
       {
         "label": "City",
-        "value": "a"
+        "value": "Remote"
+      },
+      {
+        "label": "Location",
+        "value": "Remote"
+      },
+      {
+        "label": "Location (City)",
+        "value": "Remote"
+      },
+      {
+        "label": "Country",
+        "value": "India"
       },
       {
         "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Phone",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Mobile",
         "value": "+91-7320967983"
       },
       {
@@ -68,11 +88,11 @@
       },
       {
         "label": "Preferred location",
-        "value": "a"
+        "value": "Remote"
       },
       {
         "label": "Target role",
-        "value": "a"
+        "value": "Back-End Developer"
       },
       {
         "label": "Work authorization",
@@ -100,7 +120,7 @@
       },
       {
         "label": "Message to the Hiring Team",
-        "value": "I am excited to apply for the Job Opening - Back End Developer (Intern) | DataChannel role at Datachannel, where I can bring my JavaScript, React, Next.js experience as an aspiring a."
+        "value": "I am excited to apply for the Job Opening - Back End Developer (Intern) | DataChannel role at Datachannel. My background in JavaScript, React, Next.js and my focus on becoming a strong Back-End Developer make this opportunity especially compelling to me. I would be glad to contribute to Datachannel's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Remote opportunities."
       },
       {
         "label": "Primary skills",
@@ -112,122 +132,17 @@
       },
       {
         "label": "Why are you interested in this role?",
-        "value": "This role aligns with my goal of becoming a a and uses skills I have practiced through projects and coursework."
+        "value": "This role aligns with my goal of becoming a strong Back-End Developer and uses skills I have practiced through projects and coursework."
       },
       {
         "label": "What makes you a match?",
         "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
       }
     ],
-    "submission": {
-      "intent": "browser_fill",
-      "outcome": "confirmed",
-      "externalSubmitted": false,
-      "confirmation": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
-      "submittedAt": "2026-05-21T10:37:46.592Z",
-      "email": {
-        "status": "skipped",
-        "provider": "outbox",
-        "to": "jaynrk200211@gmail.com",
-        "subject": "GradLaunch filled Datachannel - Job Opening - Back End Developer (Intern) | DataChannel",
-        "sentAt": "2026-05-21T10:37:46.592Z",
-        "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
-      },
-      "browser": {
-        "status": "needs_manual_review",
-        "sourceUrl": "https://www.datachannel.co/career/back-end-developer-intern",
-        "openedAt": "2026-05-21T10:36:58.974Z",
-        "completedAt": "2026-05-21T10:37:46.592Z",
-        "filledLabels": [
-          "Resume upload"
-        ],
-        "skippedLabels": [],
-        "screenshots": [
-          "browser-opened.png"
-        ],
-        "message": "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
-        "planner": {
-          "sessionId": "planner-job_url_aHR0cHM6Ly93d3cuZGF0YWNo",
-          "resumeToken": "job_url_aHR0cHM6Ly93d3cuZGF0YWNo:2026-05-21T10:36:58.974Z",
-          "goal": "Complete the Job Opening - Back End Developer (Intern) | DataChannel application at Datachannel autonomously until a protected or final review checkpoint.",
-          "status": "needs_review",
-          "summary": "Final submit requires manual review or external submit is disabled.",
-          "retryCount": 0,
-          "handoffCount": 0,
-          "validationErrors": [],
-          "subgoals": [
-            {
-              "id": "open_job_page",
-              "label": "Open job page",
-              "status": "completed",
-              "detail": "Job page opened successfully in a visible Chrome session.",
-              "attempts": 1,
-              "lastUpdatedAt": "2026-05-21T10:37:01.609Z",
-              "completedAt": "2026-05-21T10:37:01.609Z"
-            },
-            {
-              "id": "authenticate_if_needed",
-              "label": "Handle login if needed",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T10:36:58.974Z"
-            },
-            {
-              "id": "finish_current_section",
-              "label": "Finish active section",
-              "status": "running",
-              "detail": "Reading Section 5 and planning the next safe action.",
-              "attempts": 7,
-              "lastUpdatedAt": "2026-05-21T10:37:45.789Z"
-            },
-            {
-              "id": "recover_from_validation_errors",
-              "label": "Recover from validation errors",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T10:36:58.974Z"
-            },
-            {
-              "id": "retry_alternative_path",
-              "label": "Retry alternative path",
-              "status": "running",
-              "detail": "No visible fields yet, so the planner is opening the application path.",
-              "attempts": 1,
-              "lastUpdatedAt": "2026-05-21T10:37:46.584Z"
-            },
-            {
-              "id": "reach_submit_gate",
-              "label": "Reach submit/review gate",
-              "status": "blocked",
-              "detail": "Reached the final step but could not safely finish the submit action.",
-              "attempts": 1,
-              "lastUpdatedAt": "2026-05-21T10:37:46.592Z"
-            },
-            {
-              "id": "save_checkpoint",
-              "label": "Save checkpoint",
-              "status": "completed",
-              "detail": "Saved planner state at the final manual review checkpoint.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-21T10:37:46.592Z",
-              "completedAt": "2026-05-21T10:37:46.592Z"
-            }
-          ],
-          "lastUpdatedAt": "2026-05-21T10:37:46.592Z",
-          "currentUrl": "https://www.datachannel.co/career/back-end-developer-intern",
-          "currentStep": "stage_5",
-          "currentStageLabel": "Section 5"
-        }
-      }
-    },
     "notes": [
-      "GradLaunch reached the final submit step, but external submit is disabled. Set BROWSER_ALLOW_EXTERNAL_SUBMIT=true only when you want real submissions.",
-      "Browser fill status: needs_manual_review.",
-      "Filled fields: 1. Skipped fields: 0."
+      "Opening the exact job URL in Chrome and filling known fields in front of the student."
     ]
   },
   "createdAt": "2026-05-21T10:36:58.968Z",
-  "updatedAt": "2026-05-21T10:37:46.592Z"
+  "updatedAt": "2026-05-22T06:12:26.331Z"
 }

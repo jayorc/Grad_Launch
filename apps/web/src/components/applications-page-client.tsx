@@ -239,7 +239,7 @@ export function ApplicationsPageClient() {
       <AgentCapabilityPanel
         capabilities={capabilities}
         title="Automation Capabilities"
-        description="This status applies to every saved application below, so you always know whether a run used fallback packaging or a connected AIHawk adapter."
+        description="This status applies to every saved application below, so you always know whether a run used fallback packaging or a connected browser runtime."
       />
       {applications.length > 0 ? (
         <div className="workspace-layout">
@@ -587,7 +587,7 @@ function ReviewCompletionPanel({
           title={canAutoSubmit ? "Open Chrome, fill recognized fields, and click the detected submit control" : "Chrome browser worker is not available on this machine"}
           type="button"
         >
-          Auto-submit with AIHawk
+          Auto-submit with Browser Agent
         </button>
       </div>
 
@@ -615,12 +615,12 @@ function createSubmitPendingSteps(intent: SubmissionIntent): AgentTimelineStep[]
     },
     {
       id: "submit",
-      label: intent === "auto_submit" ? "Calling AIHawk submit worker" : "Recording final submit confirmation",
+      label: intent === "auto_submit" ? "Calling browser submit worker" : "Recording final submit confirmation",
       detail: intent === "auto_submit"
         ? "GradLaunch is opening Chrome, filling recognized fields, and attempting the final submit control."
         : "GradLaunch is recording that the student reviewed the values and completed the final submit step.",
       state: "queued",
-      source: intent === "auto_submit" ? "aihawk" : "gradlaunch"
+      source: "gradlaunch"
     },
     {
       id: "email",

@@ -7,5 +7,4 @@ Files:
 - student_profile_snapshot.json
 - run_trace.json
 - reviewed_fields.json
-- submission_receipt.json
 - short_answers.json

@@ -1,0 +1,159 @@
+import type {
+  AgentHandoffKind,
+  FilledField,
+  Job,
+  PlannerCheckpoint,
+  PlannerDecisionSource,
+  ResumeRecord,
+  StudentMemory,
+  StudentProfile
+} from "@gradlaunch/shared";
+import type { BrowserContext, Page } from "playwright-core";
+
+export type BrowserApplyInput = {
+  job: Job;
+  fields: FilledField[];
+  workspacePath?: string;
+  resume?: ResumeRecord;
+  student?: StudentProfile;
+  memory?: StudentMemory;
+  submit: boolean;
+  planner?: PlannerCheckpoint;
+};
+
+export type BrowserAvailability = {
+  available: boolean;
+  chromePath?: string;
+  message: string;
+};
+
+export type VisibleField = {
+  id: string;
+  label: string;
+  required: boolean;
+  tagName: string;
+  inputType: string;
+  options: string[];
+  context: string;
+};
+
+export type ObservedControl = {
+  id: string;
+  text: string;
+  tagName: string;
+  role: string;
+  inputType: string;
+  label: string;
+  disabled: boolean;
+};
+
+export type BrowserPageState =
+  | "start"
+  | "resume_upload"
+  | "login"
+  | "questionnaire"
+  | "consent"
+  | "review"
+  | "submit"
+  | "account_gate"
+  | "empty"
+  | "unknown";
+
+export type BrowserFieldGroup = {
+  label: string;
+  fieldIds: string[];
+  fieldLabels: string[];
+  required: boolean;
+};
+
+export type AtsAdapterHint = {
+  id: string;
+  label: string;
+};
+
+export type BrowserAgentObservation = {
+  url: string;
+  title: string;
+  pageText: string;
+  visibleFields: VisibleField[];
+  controls: ObservedControl[];
+  pageState: BrowserPageState;
+  validationMessages: string[];
+  groupedFields: BrowserFieldGroup[];
+  adapter?: AtsAdapterHint;
+};
+
+export type BrowserAgentAction =
+  | { kind: "fill"; reason: string; source: PlannerDecisionSource }
+  | { kind: "click_next"; reason: string; source: PlannerDecisionSource }
+  | { kind: "upload_resume"; reason: string; source: PlannerDecisionSource }
+  | { kind: "submit"; reason: string; source: PlannerDecisionSource }
+  | { kind: "ask_user"; fields: string[]; reason: string; source: PlannerDecisionSource }
+  | { kind: "stop"; reason: string; source: PlannerDecisionSource };
+
+export type BrowserFillField = FilledField & {
+  fieldId?: string;
+  inputType?: string;
+  options?: string[];
+  required?: boolean;
+  reason?: string;
+};
+
+export type StageAnswerPlan = {
+  answers: BrowserFillField[];
+  unresolvedRequiredLabels: string[];
+  usedLlm: boolean;
+  summary?: string;
+};
+
+export type StageExecutionPlan = {
+  action: BrowserAgentAction["kind"];
+  confidence: number;
+  reason: string;
+  checklist: string[];
+};
+
+export type StageEvaluation = {
+  status: "ready_to_continue" | "needs_retry" | "needs_user" | "ready_for_review" | "ready_to_submit";
+  confidence: number;
+  reason: string;
+  missingRequiredLabels: string[];
+  validationMessages: string[];
+  suggestedAction: "fill" | "click_next" | "ask_user" | "submit" | "stop";
+};
+
+export type StageReflectionResult = {
+  answers: BrowserFillField[];
+  summary: string;
+  improved: boolean;
+};
+
+export type ProtectedCheckpointDetection = {
+  blocked: boolean;
+  kind?: "captcha" | "login" | "otp" | "verification";
+  reason?: string;
+};
+
+export type HumanInterventionWaitResult = {
+  resolved: boolean;
+  activePage: Page;
+};
+
+export type StageExecutionContext = {
+  context: BrowserContext;
+  page: Page;
+  workspacePath: string;
+  screenshots: string[];
+};
+
+export type HandoffRequest = {
+  context: BrowserContext;
+  page: Page;
+  stageIndex: number;
+  workspacePath: string;
+  screenshots: string[];
+  planner: PlannerCheckpoint;
+  reason: string;
+  handoffKind?: AgentHandoffKind;
+  watchFields?: string[];
+};

@@ -3,7 +3,18 @@ import { constants as fsConstants } from "node:fs";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AgentCapabilities, Application, ApplicationRun, BrowserApplyReceipt, FilledField, Job, PlannerCheckpoint, ResumeRecord, StudentProfile } from "@gradlaunch/shared";
+import type {
+  AgentCapabilities,
+  Application,
+  ApplicationRun,
+  BrowserApplyReceipt,
+  FilledField,
+  Job,
+  PlannerCheckpoint,
+  ResumeRecord,
+  StudentMemory,
+  StudentProfile
+} from "@gradlaunch/shared";
 import { getApplicationArtifactStorageDir } from "../config/storage";
 import { BrowserApplyService } from "./browser-apply-service";
 
@@ -20,6 +31,10 @@ export type StructuredApplicationPackageResult = {
   files: string[];
 };
 
+export type PreparedWorkspaceResult = {
+  directory: string;
+};
+
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const defaultAIHawkRepoPath = resolve(currentDir, "../../../../../Jobs_Applier_AI_Agent_AIHawk");
 
@@ -34,39 +49,39 @@ export class AIHawkAdapterService {
 
     if (!repoDetected) {
       return {
-        adapterId: "aihawk-local",
-        adapterLabel: "AIHawk Local Adapter",
+        adapterId: "gradlaunch-browser-agent",
+        adapterLabel: "GradLaunch Browser Agent",
         repoDetected: false,
         repoPath,
         pythonAvailable,
         capabilities: [
           {
             id: "local_repo",
-            label: "Local AIHawk checkout",
+            label: "External automation checkout",
             status: "unavailable",
-            source: "aihawk",
-            detail: "The AIHawk repository was not found at the configured path."
+            source: "gradlaunch",
+            detail: "No optional external automation repository was detected. GradLaunch will use its built-in browser agent."
           },
           {
             id: "structured_package",
-            label: "Structured application package",
+            label: "Agent workspace",
             status: "available",
             source: "gradlaunch",
-            detail: "GradLaunch can still save AIHawk-style application packages for each run."
+            detail: "GradLaunch can save a lightweight autonomous workspace for each run when needed."
           },
           {
             id: "browser_apply",
-            label: "Browser autofill worker",
-            status: browserAvailability.available ? "partial" : "unavailable",
-            source: "aihawk",
+            label: "Autonomous browser agent",
+            status: browserAvailability.available ? "available" : "unavailable",
+            source: "gradlaunch",
             detail: browserAvailability.available
-              ? "GradLaunch can launch Chrome and use AIHawk-style workspace packages for browser autofill."
+              ? "GradLaunch can launch Chrome and dynamically fill forms with its built-in autonomous browser agent."
               : browserAvailability.message
           }
         ],
         limitations: [
-          "GradLaunch is running its built-in matching and drafting flow because the local AIHawk checkout was not detected.",
-          "Autofill remains review-first until a real browser apply worker is connected."
+          "GradLaunch is running its built-in matching, planning, and browser automation flow.",
+          "Protected checkpoints like login, captcha, OTP, and unknown required data still pause for review."
         ]
       };
     }
@@ -96,7 +111,7 @@ export class AIHawkAdapterService {
 
     if (providerImportsCommented || !hasJobApplication) {
       limitations.push(
-        "This AIHawk checkout does not include provider-specific apply plugins, so GradLaunch uses its generic Chrome autofill worker and blocks when a portal needs human action."
+        "The optional external automation checkout does not include provider-specific apply plugins, so GradLaunch will rely on its built-in browser agent."
       );
     }
 
@@ -109,56 +124,56 @@ export class AIHawkAdapterService {
     }
 
     limitations.push(
-      "Resume and cover-letter modules exist locally, but this build only exposes capability detection plus GradLaunch packaging, not full AIHawk script execution."
+      "External helper modules may exist locally, but GradLaunch is running its own autonomous planning and browser execution path."
     );
 
     return {
-      adapterId: "aihawk-local",
-      adapterLabel: "AIHawk Local Adapter",
+      adapterId: "gradlaunch-browser-agent",
+      adapterLabel: "GradLaunch Browser Agent",
       repoDetected: true,
       repoPath,
       pythonAvailable,
       capabilities: [
         {
           id: "local_repo",
-          label: "Local AIHawk checkout",
+          label: "External automation checkout",
           status: "available",
-          source: "aihawk",
-          detail: "GradLaunch detected the local AIHawk repository and can inspect its available modules."
+          source: "gradlaunch",
+          detail: "GradLaunch detected an optional external automation repository and can inspect it if needed."
         },
         {
           id: "resume_tailoring",
-          label: "Resume tailoring modules",
+          label: "Resume helper modules",
           status: hasResumeFacade && hasResumeGenerator ? "partial" : "unavailable",
-          source: "aihawk",
+          source: "gradlaunch",
           detail:
             hasResumeFacade && hasResumeGenerator
-              ? "Resume and cover-letter generation modules exist in the AIHawk repo, but they are not yet executed automatically from GradLaunch."
-              : "The resume tailoring modules were not fully detected in the AIHawk repo."
+              ? "Optional resume and cover-letter helper modules exist locally, but GradLaunch uses its native artifact generation by default."
+              : "Optional resume helper modules were not fully detected in the external checkout."
         },
         {
           id: "job_page_parse",
-          label: "Job page fetch and parse",
+          label: "Job parsing helper modules",
           status: hasJobParser ? "partial" : "unavailable",
-          source: "aihawk",
+          source: "gradlaunch",
           detail: hasJobParser
-            ? "AIHawk job parsing code is present locally, but GradLaunch is not yet running it as a production ingestion worker."
-            : "The AIHawk job parsing module was not found."
+            ? "Optional job parsing code is present locally, but GradLaunch uses its own runtime path for live execution."
+            : "Optional job parsing helper code was not found."
         },
         {
           id: "structured_package",
-          label: "Structured application package",
+          label: "Agent workspace",
           status: "available",
           source: "gradlaunch",
-          detail: "GradLaunch saves AIHawk-style application packages and run traces for every application flow."
+          detail: "GradLaunch saves autonomous workspaces and run traces when a run needs persistence."
         },
         {
           id: "browser_apply",
-          label: "Browser autofill worker",
-          status: browserApplyReady ? "partial" : "unavailable",
+          label: "Autonomous browser agent",
+          status: browserApplyReady ? "available" : "unavailable",
           source: "gradlaunch",
           detail: browserApplyReady
-            ? `${browserAvailability.message} Provider-specific AIHawk plugins are still absent, so complex portals may pause for manual review.`
+            ? `${browserAvailability.message} GradLaunch will use its own dynamic browser agent and pause only when a protected checkpoint needs the student.`
             : browserAvailability.message
         }
       ],
@@ -171,10 +186,21 @@ export class AIHawkAdapterService {
     fields: FilledField[];
     workspacePath?: string;
     resume?: ResumeRecord;
+    student?: StudentProfile;
+    memory?: StudentMemory;
     submit: boolean;
     planner?: PlannerCheckpoint;
   }): Promise<BrowserApplyReceipt> {
     return this.browserApply.apply(input);
+  }
+
+  async prepareWorkspaceDirectory(input: { applicationId: string; job: Job }): Promise<PreparedWorkspaceResult> {
+    const directory = join(
+      getApplicationArtifactStorageDir(),
+      `${input.applicationId}-${slugify(input.job.company)}-${slugify(input.job.title)}`
+    );
+    await mkdir(directory, { recursive: true });
+    return { directory };
   }
 
   async createStructuredApplicationPackage(
@@ -279,10 +305,9 @@ export class AIHawkAdapterService {
     await writeFile(
       join(packageDir, "README.txt"),
       [
-        "GradLaunch application package",
+        "GradLaunch autonomous application workspace",
         "",
-        "This folder follows the structured application saver concept used by AIHawk.",
-        "It keeps the normalized job, profile snapshot, generated answers, and the run trace together.",
+        "This folder stores the normalized job, profile snapshot, generated answers, browser logs, screenshots, and run trace for the GradLaunch agent.",
         "",
         "Files:",
         "- job_application.json",
