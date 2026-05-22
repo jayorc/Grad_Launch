@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 
 const API_TARGET = process.env.GRADLAUNCH_API_BASE_URL ?? "http://127.0.0.1:4000";
+const proxyFailureLogWindowMs = 15000;
+const proxyFailureLogState = new Map<string, number>();
 
 export async function GET(request: NextRequest, context: RouteContext) {
   return proxyRequest(request, context);
@@ -52,16 +54,24 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       headers: filterResponseHeaders(response.headers)
     });
   } catch (error) {
-    console.error("[GradLaunch][Web Proxy] Upstream API request failed", {
-      upstreamUrl: upstreamUrl.toString(),
-      method: request.method,
-      detail: error instanceof Error ? error.message : "Unknown proxy error."
-    });
+    const detail = error instanceof Error ? error.message : "Unknown proxy error.";
+    const failureKey = `${request.method}:${upstreamUrl.pathname}`;
+    const now = Date.now();
+    const lastLoggedAt = proxyFailureLogState.get(failureKey) ?? 0;
+
+    if (now - lastLoggedAt >= proxyFailureLogWindowMs) {
+      proxyFailureLogState.set(failureKey, now);
+      console.error("[GradLaunch][Web Proxy] Upstream API request failed", {
+        upstreamUrl: upstreamUrl.toString(),
+        method: request.method,
+        detail
+      });
+    }
 
     return Response.json(
       {
         message: `GradLaunch web could not reach the API server at ${API_TARGET}.`,
-        detail: error instanceof Error ? error.message : "Unknown proxy error."
+        detail
       },
       { status: 502 }
     );

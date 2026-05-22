@@ -1,0 +1,155 @@
+{
+  "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
+  "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-22T11:36:54.842Z",
+  "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or review checkpoint.",
+  "status": "needs_review",
+  "summary": "GradLaunch could not find a confident next-step control on this page.",
+  "formMode": "multi_stage",
+  "retryCount": 0,
+  "handoffCount": 0,
+  "validationErrors": [],
+  "subgoals": [
+    {
+      "id": "open_job_page",
+      "label": "Open job page",
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 1,
+      "lastUpdatedAt": "2026-05-22T11:36:57.603Z",
+      "completedAt": "2026-05-22T11:36:57.603Z"
+    },
+    {
+      "id": "authenticate_if_needed",
+      "label": "Handle login if needed",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T11:36:54.842Z"
+    },
+    {
+      "id": "finish_current_section",
+      "label": "Finish active section",
+      "status": "running",
+      "detail": "Reading Section 2 and planning the next safe action.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-22T11:37:36.613Z"
+    },
+    {
+      "id": "recover_from_validation_errors",
+      "label": "Recover from validation errors",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T11:36:54.842Z"
+    },
+    {
+      "id": "retry_alternative_path",
+      "label": "Retry alternative path",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T11:36:54.842Z"
+    },
+    {
+      "id": "reach_submit_gate",
+      "label": "Reach submit/review gate",
+      "status": "completed",
+      "detail": "Reached the review/submit checkpoint safely.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T11:37:09.105Z",
+      "completedAt": "2026-05-22T11:37:09.105Z"
+    },
+    {
+      "id": "save_checkpoint",
+      "label": "Save checkpoint",
+      "status": "completed",
+      "detail": "Saved checkpoint while waiting for manual stage progress.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T11:37:38.078Z",
+      "completedAt": "2026-05-22T11:37:38.078Z"
+    }
+  ],
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "about:blank",
+      "visibleFieldLabels": [
+        "document_file",
+        "Last Name",
+        "First Name",
+        "Email",
+        "mat-input-3",
+        "Years of Experience",
+        "City",
+        "Current CTC",
+        "add_docs"
+      ],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [
+        "Resume upload",
+        "Last Name",
+        "First Name",
+        "Email",
+        "mat-input-3",
+        "Years of Experience",
+        "City",
+        "Current CTC"
+      ],
+      "outcome": "advanced",
+      "lastUpdatedAt": "2026-05-22T11:37:36.206Z",
+      "decision": {
+        "kind": "fill_fields",
+        "source": "llm",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+        "reason": "Computer Science final-year student at NIT Kurukshetra with hands-on experience building full-stack web applications, REST APIs, and backend systems using the MERN stack, PHP CodeIgniter, Node.js, and MySQL with strong fundamentals in DSA, OOP, DBMS, and Operating Systems.",
+        "fieldLabels": [
+          "Last Name",
+          "First Name",
+          "Email",
+          "mat-input-3",
+          "Years of Experience",
+          "City",
+          "Current CTC"
+        ],
+        "createdAt": "2026-05-22T11:37:08.362Z"
+      }
+    },
+    {
+      "stageIndex": 1,
+      "label": "Section 2",
+      "url": "about:blank",
+      "visibleFieldLabels": [],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [],
+      "outcome": "observed",
+      "lastUpdatedAt": "2026-05-22T11:37:38.076Z",
+      "decision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 1,
+        "stageLabel": "Section 2",
+        "url": "about:blank",
+        "reason": "Page classified as empty; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T11:37:38.076Z"
+      }
+    }
+  ],
+  "lastUpdatedAt": "2026-05-22T11:37:38.078Z",
+  "currentUrl": "about:blank",
+  "currentStep": "stage_2",
+  "currentStageLabel": "Section 2",
+  "lastDecision": {
+    "kind": "navigate_next",
+    "source": "heuristic",
+    "stageIndex": 1,
+    "stageLabel": "Section 2",
+    "url": "about:blank",
+    "reason": "Page classified as empty; continuing to the next logical stage.",
+    "fieldLabels": [],
+    "createdAt": "2026-05-22T11:37:38.076Z"
+  }
+}

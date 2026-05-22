@@ -1,7 +1,9 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AgentTimelineStep, ApplicationRun } from "@gradlaunch/shared";
+import type { AgentTimelineStep, ApplicationRun, BrowserExecutionSession } from "@gradlaunch/shared";
+import { getAgentControlPlane } from "../lib/api";
+import { useAuth } from "./auth-provider";
 
 type AgentConsoleMode = "draft" | "autofill" | "autopilot" | "browser_fill" | null;
 type AgentConsoleVariant = "success" | "duplicate" | "error" | null;
@@ -56,11 +58,13 @@ const defaultPanel: AgentConsoleState = {
 };
 
 const storageKey = "gradlaunch_agent_console";
+const liveBrowserStatuses = new Set<BrowserExecutionSession["status"]>(["running", "waiting"]);
 
 const AgentConsoleContext = createContext<AgentConsoleContextValue | null>(null);
 
 export function AgentConsoleProvider({ children }: { children: ReactNode }) {
   const [panel, setPanel] = useState<AgentConsoleState>(defaultPanel);
+  const { session } = useAuth();
 
   useEffect(() => {
     try {
@@ -83,6 +87,84 @@ export function AgentConsoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     window.sessionStorage.setItem(storageKey, JSON.stringify(panel));
   }, [panel]);
+
+  useEffect(() => {
+    const token = session?.token;
+    const shouldTrackBrowserRun = panel.open && panel.mode === "browser_fill" && panel.run === null && panel.variant !== "error";
+
+    if (!token) {
+      return undefined;
+    }
+
+    const authToken = token;
+
+    let cancelled = false;
+    let pollTimer: number | undefined;
+    let requestInFlight = false;
+    let failureCount = 0;
+
+    function scheduleNextPoll(delayMs: number) {
+      if (cancelled) {
+        return;
+      }
+
+      window.clearTimeout(pollTimer);
+      pollTimer = window.setTimeout(() => {
+        void hydrateFromServer();
+      }, delayMs);
+    }
+
+    async function hydrateFromServer() {
+      if (cancelled || requestInFlight) {
+        return;
+      }
+
+      requestInFlight = true;
+
+      try {
+        const snapshot = await getAgentControlPlane(authToken);
+        const latestSession = [...snapshot.browserSessions].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+        failureCount = 0;
+
+        if (!latestSession || cancelled) {
+          if (shouldTrackBrowserRun) {
+            scheduleNextPoll(document.hidden ? 8000 : 3000);
+          }
+          return;
+        }
+
+        const shouldContinuePolling = liveBrowserStatuses.has(latestSession.status) || shouldTrackBrowserRun;
+
+        setPanel((current) => {
+          const serverUpdatedAt = Date.parse(latestSession.updatedAt);
+
+          if (current.updatedAt && current.updatedAt >= serverUpdatedAt) {
+            return current;
+          }
+
+          return buildPanelFromBrowserSession(latestSession);
+        });
+        if (shouldContinuePolling) {
+          scheduleNextPoll(document.hidden ? 8000 : 3000);
+        }
+      } catch (_error) {
+        failureCount += 1;
+        const backoffMs = Math.min(3000 * 2 ** (failureCount - 1), 20000);
+        if (shouldTrackBrowserRun) {
+          scheduleNextPoll(backoffMs);
+        }
+      } finally {
+        requestInFlight = false;
+      }
+    }
+
+    void hydrateFromServer();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(pollTimer);
+    };
+  }, [panel.mode, panel.open, panel.run, panel.variant, session?.token]);
 
   const beginExecution = useCallback((input: {
     mode: AgentConsoleMode;
@@ -162,6 +244,29 @@ export function AgentConsoleProvider({ children }: { children: ReactNode }) {
   }), [beginExecution, clear, completeExecution, panel, setPanelOpen, updateExecution]);
 
   return <AgentConsoleContext.Provider value={value}>{children}</AgentConsoleContext.Provider>;
+}
+
+function buildPanelFromBrowserSession(session: BrowserExecutionSession): AgentConsoleState {
+  return {
+    open: true,
+    mode: "browser_fill",
+    title: session.status === "waiting"
+      ? "Browser session waiting"
+      : session.status === "review_ready"
+        ? "Browser session ready for review"
+        : session.status === "submitted"
+          ? "Browser session submitted"
+          : session.status === "blocked"
+            ? "Browser session blocked"
+            : session.status === "resumable"
+              ? "Browser session ready to resume"
+              : "Browser session running",
+    message: session.latestMessage,
+    steps: session.latestSteps,
+    run: null,
+    variant: session.status === "blocked" ? "error" : null,
+    updatedAt: Date.parse(session.updatedAt)
+  };
 }
 
 export function useAgentConsole() {

@@ -2,10 +2,11 @@
   "sessionId": "planner-job_url_aHR0cHM6Ly9kb2NzLmdvb2ds",
   "resumeToken": "job_url_aHR0cHM6Ly9kb2NzLmdvb2ds:2026-05-21T13:14:41.168Z",
   "goal": "Complete the RSVP – Outlier AI Walk-in Screening At Gurgaon Cybercity application at Docs autonomously until a protected or final review checkpoint.",
-  "status": "completed",
-  "summary": "Planner completed the form fill and paused at the review gate.",
-  "currentStep": "stage_2",
-  "currentStageLabel": "Section 2",
+  "status": "needs_review",
+  "summary": "GradLaunch could not find a confident next-step control on this page.",
+  "formMode": "single_stage",
+  "currentStep": "stage_1",
+  "currentStageLabel": "Section 1",
   "currentUrl": "about:blank",
   "retryCount": 0,
   "handoffCount": 0,
@@ -16,9 +17,9 @@
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 3,
-      "lastUpdatedAt": "2026-05-21T13:18:04.143Z",
-      "completedAt": "2026-05-21T13:18:04.143Z"
+      "attempts": 5,
+      "lastUpdatedAt": "2026-05-22T08:15:50.806Z",
+      "completedAt": "2026-05-22T08:15:50.806Z"
     },
     {
       "id": "authenticate_if_needed",
@@ -32,9 +33,9 @@
       "id": "finish_current_section",
       "label": "Finish active section",
       "status": "running",
-      "detail": "Reading Section 2 and planning the next safe action.",
-      "attempts": 7,
-      "lastUpdatedAt": "2026-05-21T13:18:34.742Z",
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 9,
+      "lastUpdatedAt": "2026-05-22T08:15:54.579Z",
       "completedAt": "2026-05-21T13:18:34.240Z"
     },
     {
@@ -66,11 +67,43 @@
       "id": "save_checkpoint",
       "label": "Save checkpoint",
       "status": "completed",
-      "detail": "Saved planner state so the run can continue from the latest checkpoint.",
+      "detail": "Saved checkpoint while waiting for manual stage progress.",
       "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T13:18:37.132Z",
-      "completedAt": "2026-05-21T13:18:37.132Z"
+      "lastUpdatedAt": "2026-05-22T08:15:55.121Z",
+      "completedAt": "2026-05-22T08:15:55.121Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-21T13:18:37.132Z"
+  "lastDecision": {
+    "kind": "navigate_next",
+    "source": "heuristic",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "about:blank",
+    "reason": "Page classified as empty; continuing to the next logical stage.",
+    "fieldLabels": [],
+    "createdAt": "2026-05-22T08:15:55.119Z"
+  },
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "about:blank",
+      "visibleFieldLabels": [],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [],
+      "outcome": "observed",
+      "decision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "about:blank",
+        "reason": "Page classified as empty; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T08:15:55.119Z"
+      },
+      "lastUpdatedAt": "2026-05-22T08:15:55.119Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-22T08:15:55.121Z"
 }

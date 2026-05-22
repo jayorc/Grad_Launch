@@ -1,0 +1,28 @@
+{
+  "id": "job_url_aHR0cHM6Ly93d3cucXVhbnR1",
+  "title": "Back-End Developer",
+  "company": "Quantum Paradigm",
+  "location": "Remote",
+  "workMode": "onsite",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "BCA"
+  ],
+  "skills": [
+    "Node.js",
+    "MongoDB",
+    "PostgreSQL",
+    "Python",
+    "Django",
+    "Java",
+    "AWS",
+    "Docker"
+  ],
+  "description": "Job Overview: We are looking for a Backend Developer to design, develop, and maintain server-side logic, databases, and APIs. The ideal candidate should have expertise in backend programming languages, database management, and cloud services. This position is open for both part-time and full-time professionals. Responsibilities: Develop, test, and maintain backend logic, APIs, and services. Design and manage databases to ensure efficiency and scalability. Optimize application performance and ensure security best practices. Collaborate with frontend developers, AI engineers, and other stakeholders. Implement authentication, authorization, and data protection measures. Monitor and troubleshoot backend issues, ensuring system reliability. Stay updated with the latest backend development trends and technologies. Requirements: Bachelor’s or Master’s degree in Computer Science, Software Engineering, or a related field. Proficiency in Node.js, Python (Django/Flask), Java, Ruby on Rails, or PHP . Strong experience with SQL (MySQL, PostgreSQL) and NoSQL (MongoDB, Firebase) databases. Experience with RESTful APIs, GraphQL, and microservices architecture . Familiarity with cloud platforms like AWS, Google Cloud, or Azure . Strong knowledge of Git, CI/CD pipelines, and containerization (Docker, Kubernetes) . Ability to work independently for part-time roles and collaboratively for full-time positions.",
+  "sourceType": "manual_url",
+  "sourceUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+  "createdAt": "Wed May 20 2026 16:29:23 GMT+0530 (India Standard Time)"
+}

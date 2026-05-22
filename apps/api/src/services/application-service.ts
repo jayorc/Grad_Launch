@@ -11,6 +11,7 @@ import type {
   ResumeRecord,
   StudentProfile
 } from "@gradlaunch/shared";
+import { AgentRepository } from "../repositories/agent-repository";
 import { ApplicationRepository } from "../repositories/application-repository";
 import { JobRepository } from "../repositories/job-repository";
 import { ResumeRepository } from "../repositories/resume-repository";
@@ -28,6 +29,7 @@ export class ApplicationService {
     private readonly students = new StudentRepository(),
     private readonly jobs = new JobRepository(),
     private readonly applications = new ApplicationRepository(),
+    private readonly agentRepository = new AgentRepository(),
     private readonly resumes = new ResumeRepository(),
     private readonly matching = new MatchingService(),
     private readonly aihawk = new AIHawkAdapterService(),
@@ -179,7 +181,10 @@ export class ApplicationService {
       lastUpdatedAt: now,
       createdAt: now
     };
-    const existingRuns = existingApplication ? await this.applications.listRunsByApplication(application.id) : [];
+    const [existingRuns, latestBrowserSession] = await Promise.all([
+      existingApplication ? this.applications.listRunsByApplication(application.id) : Promise.resolve([]),
+      existingApplication ? this.agentRepository.getLatestBrowserExecutionSessionForApplication(application.id) : Promise.resolve(undefined)
+    ]);
     const fields = mergeFilledFields(
       existingRuns[0]?.filledFields ?? [],
       buildFilledFields(student, job, resume, application.generatedArtifacts)
@@ -216,6 +221,10 @@ export class ApplicationService {
     });
 
     const browserReceipt = await this.aihawk.applyWithBrowser({
+      studentId: student.id,
+      applicationId: application.id,
+      runId: preparingRun.id,
+      executionSessionId: latestBrowserSession?.id,
       job,
       fields,
       workspacePath: preparationPackage.directory,
@@ -343,8 +352,13 @@ export class ApplicationService {
       input.reviewedFields,
       latestRun?.filledFields ?? buildFilledFields(student, job, resume, refreshedApplication.generatedArtifacts)
     );
+    const latestBrowserSession = await this.agentRepository.getLatestBrowserExecutionSessionForApplication(application.id);
     const browserReceipt = canAutoSubmit
       ? await this.aihawk.applyWithBrowser({
+          studentId: student.id,
+          applicationId: application.id,
+          runId: latestRun?.id ?? createId("run"),
+          executionSessionId: latestBrowserSession?.id,
           job,
           fields: reviewedFields,
           workspacePath: latestRun?.workspacePath,

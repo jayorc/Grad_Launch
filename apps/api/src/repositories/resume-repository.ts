@@ -24,6 +24,29 @@ export class ResumeRepository {
     const resume = await ResumeModel.findOne({ studentId }).sort({ uploadedAt: -1 }).lean();
     return resume ? mapResume(resume as Record<string, unknown>) : undefined;
   }
+
+  async getById(resumeId: string): Promise<ResumeRecord | undefined> {
+    if (isMemoryMode()) {
+      return db.resumes.find((resume) => resume.id === resumeId);
+    }
+
+    const resume = await ResumeModel.findOne({ id: resumeId }).lean();
+    return resume ? mapResume(resume as Record<string, unknown>) : undefined;
+  }
+
+  async assignToStudent(resumeId: string, studentId: string): Promise<void> {
+    if (isMemoryMode()) {
+      const resume = db.resumes.find((item) => item.id === resumeId);
+
+      if (resume) {
+        resume.studentId = studentId;
+      }
+
+      return;
+    }
+
+    await ResumeModel.updateOne({ id: resumeId }, { $set: { studentId } });
+  }
 }
 
 function mapResume(resume: Record<string, unknown>): ResumeRecord {

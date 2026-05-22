@@ -1,0 +1,36 @@
+{
+  "id": "student_bewagenm",
+  "fullName": "Shiv Kumar",
+  "email": "shivscribe@gmail.com",
+  "degree": "B.Tech in Computer Science",
+  "graduationYear": 2026,
+  "targetRoles": [
+    "Software Engineer"
+  ],
+  "preferredLocations": [
+    "Bengaluru",
+    "Hydrabad",
+    "Gurugram"
+  ],
+  "workModes": [
+    "remote",
+    "hybrid"
+  ],
+  "skills": [
+    "JavaScript",
+    "React",
+    "Node.js",
+    "Express",
+    "MongoDB",
+    "Python",
+    "SQL",
+    "AWS",
+    "Java",
+    "C++",
+    "HTML",
+    "CSS",
+    "REST APIs"
+  ],
+  "automationMode": "full_autopilot",
+  "defaultStrictness": "balanced"
+}

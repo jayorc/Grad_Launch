@@ -2,6 +2,7 @@ import type {
   Application,
   ApplicationRun,
   AgentCapabilities,
+  AgentControlPlaneSnapshot,
   AuthResponse,
   CreateApplicationResult,
   DashboardReport,
@@ -94,6 +95,12 @@ export function getJobs(token: string) {
 
 export function getAgentCapabilities(token: string) {
   return request<AgentCapabilities>("/agent/capabilities", {
+    headers: authHeaders(token)
+  });
+}
+
+export function getAgentControlPlane(token: string) {
+  return request<AgentControlPlaneSnapshot>("/agent/control-plane", {
     headers: authHeaders(token)
   });
 }

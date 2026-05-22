@@ -1,2 +1,3 @@
-2026/05/22-12:06:18.540 6ffee Creating DB /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_www.linkedin.com_0.indexeddb.leveldb since it was missing.
-2026/05/22-12:06:18.542 6ffee Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_www.linkedin.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/05/22-14:13:22.065 94afb Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_www.linkedin.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/05/22-14:13:22.066 94afb Recovering log #3
+2026/05/22-14:13:22.067 94afb Reusing old log /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_www.linkedin.com_0.indexeddb.leveldb/000003.log 

@@ -1,0 +1,701 @@
+{
+  "id": "run_xnxs89gy",
+  "status": "needs_review",
+  "executionMode": "browser_apply",
+  "adapterId": "gradlaunch-browser-agent",
+  "startedAt": "2026-05-22T08:17:53.946Z",
+  "completedAt": "2026-05-22T08:19:02.155Z",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Jay"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar Gupta"
+    },
+    {
+      "label": "Full name",
+      "value": "Jay Kumar Gupta"
+    },
+    {
+      "label": "Email",
+      "value": "jaynrk200211@gmail.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "jaynrk200211@gmail.com"
+    },
+    {
+      "label": "City",
+      "value": "Remote"
+    },
+    {
+      "label": "Location",
+      "value": "Remote"
+    },
+    {
+      "label": "Location (City)",
+      "value": "Remote"
+    },
+    {
+      "label": "Country",
+      "value": "India"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Phone",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Mobile",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer Science"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2020"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Remote"
+    },
+    {
+      "label": "Target role",
+      "value": "Deccan Ai Experts"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the Deccan AI Experts role at Deccanexperts. My background in JavaScript, React, Next.js and my focus on becoming a strong Deccan Ai Experts make this opportunity especially compelling to me. I would be glad to contribute to Deccanexperts's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Remote opportunities."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Next.js, Node.js, Express"
+    },
+    {
+      "label": "Resume context",
+      "value": "jay_kumar_gupta_nit_kkr.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a strong Deccan Ai Experts and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://deccanexperts.ai.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "GradLaunch could not confidently find the next action on this page. Planner action: Page classified as empty; continuing to the next logical stage.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "The run stops before final submission.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "planner",
+      "label": "Planner checkpoint updated",
+      "detail": "GradLaunch could not find a confident next-step control on this page. Form mode: multi_stage. Stages tracked: 8. Last action: navigate_next. Resume token: job_url_aHR0cHM6Ly9kZWNjYW5leHBl:2026-05-22T08:17:53.948Z.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_olpysrdf-deccanexperts-deccan-ai-experts.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "planner": {
+    "sessionId": "planner-job_url_aHR0cHM6Ly9kZWNjYW5leHBl",
+    "resumeToken": "job_url_aHR0cHM6Ly9kZWNjYW5leHBl:2026-05-22T08:17:53.948Z",
+    "goal": "Complete the Deccan AI Experts application at Deccanexperts autonomously until a protected or review checkpoint.",
+    "status": "needs_review",
+    "summary": "GradLaunch could not find a confident next-step control on this page.",
+    "formMode": "multi_stage",
+    "retryCount": 0,
+    "handoffCount": 0,
+    "validationErrors": [],
+    "subgoals": [
+      {
+        "id": "open_job_page",
+        "label": "Open job page",
+        "status": "completed",
+        "detail": "Job page opened successfully in a visible Chrome session.",
+        "attempts": 1,
+        "lastUpdatedAt": "2026-05-22T08:17:55.601Z",
+        "completedAt": "2026-05-22T08:17:55.601Z"
+      },
+      {
+        "id": "authenticate_if_needed",
+        "label": "Handle login if needed",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T08:17:53.948Z"
+      },
+      {
+        "id": "finish_current_section",
+        "label": "Finish active section",
+        "status": "running",
+        "detail": "Reading Section 8 and planning the next safe action.",
+        "attempts": 8,
+        "lastUpdatedAt": "2026-05-22T08:19:01.423Z",
+        "completedAt": "2026-05-22T08:18:53.712Z"
+      },
+      {
+        "id": "recover_from_validation_errors",
+        "label": "Recover from validation errors",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T08:17:53.948Z"
+      },
+      {
+        "id": "retry_alternative_path",
+        "label": "Retry alternative path",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T08:17:53.948Z"
+      },
+      {
+        "id": "reach_submit_gate",
+        "label": "Reach submit/review gate",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T08:17:53.948Z"
+      },
+      {
+        "id": "save_checkpoint",
+        "label": "Save checkpoint",
+        "status": "completed",
+        "detail": "Saved checkpoint while waiting for manual stage progress.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T08:19:02.086Z",
+        "completedAt": "2026-05-22T08:19:02.086Z"
+      }
+    ],
+    "stageHistory": [
+      {
+        "stageIndex": 0,
+        "label": "Section 1",
+        "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "advanced",
+        "lastUpdatedAt": "2026-05-22T08:18:06.396Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 0,
+          "stageLabel": "Section 1",
+          "url": "https://deccanexperts.ai/",
+          "reason": "Page classified as start; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:18:04.622Z"
+        }
+      },
+      {
+        "stageIndex": 1,
+        "label": "Section 2",
+        "url": "https://deccanexperts.ai/",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "advanced",
+        "lastUpdatedAt": "2026-05-22T08:18:34.510Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 1,
+          "stageLabel": "Section 2",
+          "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+          "reason": "Page classified as unknown; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:18:10.490Z"
+        }
+      },
+      {
+        "stageIndex": 2,
+        "label": "Section 3",
+        "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "advanced",
+        "lastUpdatedAt": "2026-05-22T08:18:41.962Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 2,
+          "stageLabel": "Section 3",
+          "url": "https://deccanexperts.ai/",
+          "reason": "Page classified as start; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:18:39.195Z"
+        }
+      },
+      {
+        "stageIndex": 3,
+        "label": "Section 4",
+        "url": "https://deccanexperts.ai/",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "advanced",
+        "lastUpdatedAt": "2026-05-22T08:18:44.520Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 3,
+          "stageLabel": "Section 4",
+          "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+          "reason": "Page classified as empty; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:18:44.483Z"
+        }
+      },
+      {
+        "stageIndex": 4,
+        "label": "Section 5",
+        "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "advanced",
+        "lastUpdatedAt": "2026-05-22T08:18:53.712Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 4,
+          "stageLabel": "Section 5",
+          "url": "https://deccanexperts.ai/",
+          "reason": "Page classified as start; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:18:48.713Z"
+        }
+      },
+      {
+        "stageIndex": 5,
+        "label": "Section 6",
+        "url": "https://authentication.deccanexperts.ai/",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "advanced",
+        "lastUpdatedAt": "2026-05-22T08:18:59.598Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 5,
+          "stageLabel": "Section 6",
+          "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+          "reason": "Page classified as unknown; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:18:59.556Z"
+        }
+      },
+      {
+        "stageIndex": 6,
+        "label": "Section 7",
+        "url": "https://deccanexperts.ai/",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "advanced",
+        "lastUpdatedAt": "2026-05-22T08:19:01.019Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 6,
+          "stageLabel": "Section 7",
+          "url": "https://authentication.deccanexperts.ai/",
+          "reason": "Page classified as empty; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:19:00.958Z"
+        }
+      },
+      {
+        "stageIndex": 7,
+        "label": "Section 8",
+        "url": "https://deccanexperts.ai/",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "observed",
+        "lastUpdatedAt": "2026-05-22T08:19:02.084Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 7,
+          "stageLabel": "Section 8",
+          "url": "https://deccanexperts.ai/",
+          "reason": "Page classified as empty; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:19:02.084Z"
+        }
+      }
+    ],
+    "lastUpdatedAt": "2026-05-22T08:19:02.086Z",
+    "currentUrl": "https://deccanexperts.ai/",
+    "currentStep": "stage_8",
+    "currentStageLabel": "Section 8",
+    "lastDecision": {
+      "kind": "navigate_next",
+      "source": "heuristic",
+      "stageIndex": 7,
+      "stageLabel": "Section 8",
+      "url": "https://deccanexperts.ai/",
+      "reason": "Page classified as empty; continuing to the next logical stage.",
+      "fieldLabels": [],
+      "createdAt": "2026-05-22T08:19:02.084Z"
+    }
+  },
+  "notes": [
+    "GradLaunch could not confidently find the next action on this page.",
+    "Browser fill status: needs_manual_review.",
+    "Filled fields: 0. Skipped fields: 0."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "confirmed",
+    "externalSubmitted": false,
+    "confirmation": "GradLaunch could not confidently find the next action on this page.",
+    "submittedAt": "2026-05-22T08:19:02.155Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "jaynrk200211@gmail.com",
+      "subject": "GradLaunch filled Deccanexperts - Deccan AI Experts",
+      "sentAt": "2026-05-22T08:19:02.155Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "needs_manual_review",
+      "sourceUrl": "https://deccanexperts.ai",
+      "openedAt": "2026-05-22T08:17:53.948Z",
+      "completedAt": "2026-05-22T08:19:02.154Z",
+      "filledLabels": [],
+      "skippedLabels": [],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-stage-1-start.png",
+        "browser-stage-2-start.png",
+        "browser-stage-3-start.png",
+        "browser-stage-4-start.png",
+        "browser-stage-5-start.png",
+        "browser-stage-7-start.png",
+        "browser-stage-8-start.png"
+      ],
+      "message": "GradLaunch could not confidently find the next action on this page.",
+      "planner": {
+        "sessionId": "planner-job_url_aHR0cHM6Ly9kZWNjYW5leHBl",
+        "resumeToken": "job_url_aHR0cHM6Ly9kZWNjYW5leHBl:2026-05-22T08:17:53.948Z",
+        "goal": "Complete the Deccan AI Experts application at Deccanexperts autonomously until a protected or review checkpoint.",
+        "status": "needs_review",
+        "summary": "GradLaunch could not find a confident next-step control on this page.",
+        "formMode": "multi_stage",
+        "retryCount": 0,
+        "handoffCount": 0,
+        "validationErrors": [],
+        "subgoals": [
+          {
+            "id": "open_job_page",
+            "label": "Open job page",
+            "status": "completed",
+            "detail": "Job page opened successfully in a visible Chrome session.",
+            "attempts": 1,
+            "lastUpdatedAt": "2026-05-22T08:17:55.601Z",
+            "completedAt": "2026-05-22T08:17:55.601Z"
+          },
+          {
+            "id": "authenticate_if_needed",
+            "label": "Handle login if needed",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T08:17:53.948Z"
+          },
+          {
+            "id": "finish_current_section",
+            "label": "Finish active section",
+            "status": "running",
+            "detail": "Reading Section 8 and planning the next safe action.",
+            "attempts": 8,
+            "lastUpdatedAt": "2026-05-22T08:19:01.423Z",
+            "completedAt": "2026-05-22T08:18:53.712Z"
+          },
+          {
+            "id": "recover_from_validation_errors",
+            "label": "Recover from validation errors",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T08:17:53.948Z"
+          },
+          {
+            "id": "retry_alternative_path",
+            "label": "Retry alternative path",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T08:17:53.948Z"
+          },
+          {
+            "id": "reach_submit_gate",
+            "label": "Reach submit/review gate",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T08:17:53.948Z"
+          },
+          {
+            "id": "save_checkpoint",
+            "label": "Save checkpoint",
+            "status": "completed",
+            "detail": "Saved checkpoint while waiting for manual stage progress.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T08:19:02.086Z",
+            "completedAt": "2026-05-22T08:19:02.086Z"
+          }
+        ],
+        "stageHistory": [
+          {
+            "stageIndex": 0,
+            "label": "Section 1",
+            "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "advanced",
+            "lastUpdatedAt": "2026-05-22T08:18:06.396Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 0,
+              "stageLabel": "Section 1",
+              "url": "https://deccanexperts.ai/",
+              "reason": "Page classified as start; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T08:18:04.622Z"
+            }
+          },
+          {
+            "stageIndex": 1,
+            "label": "Section 2",
+            "url": "https://deccanexperts.ai/",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "advanced",
+            "lastUpdatedAt": "2026-05-22T08:18:34.510Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 1,
+              "stageLabel": "Section 2",
+              "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+              "reason": "Page classified as unknown; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T08:18:10.490Z"
+            }
+          },
+          {
+            "stageIndex": 2,
+            "label": "Section 3",
+            "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "advanced",
+            "lastUpdatedAt": "2026-05-22T08:18:41.962Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 2,
+              "stageLabel": "Section 3",
+              "url": "https://deccanexperts.ai/",
+              "reason": "Page classified as start; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T08:18:39.195Z"
+            }
+          },
+          {
+            "stageIndex": 3,
+            "label": "Section 4",
+            "url": "https://deccanexperts.ai/",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "advanced",
+            "lastUpdatedAt": "2026-05-22T08:18:44.520Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 3,
+              "stageLabel": "Section 4",
+              "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+              "reason": "Page classified as empty; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T08:18:44.483Z"
+            }
+          },
+          {
+            "stageIndex": 4,
+            "label": "Section 5",
+            "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "advanced",
+            "lastUpdatedAt": "2026-05-22T08:18:53.712Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 4,
+              "stageLabel": "Section 5",
+              "url": "https://deccanexperts.ai/",
+              "reason": "Page classified as start; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T08:18:48.713Z"
+            }
+          },
+          {
+            "stageIndex": 5,
+            "label": "Section 6",
+            "url": "https://authentication.deccanexperts.ai/",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "advanced",
+            "lastUpdatedAt": "2026-05-22T08:18:59.598Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 5,
+              "stageLabel": "Section 6",
+              "url": "https://www.business-standard.com/industry/news/deccan-ai-launches-experts-network-for-india-top-professionals-in-ai-training-125121200119_1.html",
+              "reason": "Page classified as unknown; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T08:18:59.556Z"
+            }
+          },
+          {
+            "stageIndex": 6,
+            "label": "Section 7",
+            "url": "https://deccanexperts.ai/",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "advanced",
+            "lastUpdatedAt": "2026-05-22T08:19:01.019Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 6,
+              "stageLabel": "Section 7",
+              "url": "https://authentication.deccanexperts.ai/",
+              "reason": "Page classified as empty; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T08:19:00.958Z"
+            }
+          },
+          {
+            "stageIndex": 7,
+            "label": "Section 8",
+            "url": "https://deccanexperts.ai/",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "observed",
+            "lastUpdatedAt": "2026-05-22T08:19:02.084Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 7,
+              "stageLabel": "Section 8",
+              "url": "https://deccanexperts.ai/",
+              "reason": "Page classified as empty; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T08:19:02.084Z"
+            }
+          }
+        ],
+        "lastUpdatedAt": "2026-05-22T08:19:02.086Z",
+        "currentUrl": "https://deccanexperts.ai/",
+        "currentStep": "stage_8",
+        "currentStageLabel": "Section 8",
+        "lastDecision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 7,
+          "stageLabel": "Section 8",
+          "url": "https://deccanexperts.ai/",
+          "reason": "Page classified as empty; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T08:19:02.084Z"
+        }
+      }
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-stage-1-start.png",
+    "browser-stage-2-start.png",
+    "browser-stage-3-start.png",
+    "browser-stage-4-start.png",
+    "browser-stage-5-start.png",
+    "browser-stage-7-start.png",
+    "browser-stage-8-start.png"
+  ]
+}

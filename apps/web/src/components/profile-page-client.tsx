@@ -14,11 +14,11 @@ export function ProfilePageClient() {
     <ProtectedPage>
       <PageHeader
         eyebrow="Setup"
-        title="Set up your resume and preferences"
-        description="This keeps everything in one simple profile page. Upload your resume, set preferences, choose your automation level, and let GradLaunch use that everywhere."
+        title="Build your complete profile"
+        description="Store your resume context, personal details, links, compensation, work authorization, structured history, and reusable answers once so GradLaunch can reuse them across many different job forms."
       />
       <div className="grid two-up">
-        <SectionCard title="Personal Profile" description="These answers are the everyday version of the agent's config and resume context.">
+        <SectionCard title="Complete Profile" description="This is the reusable answer bank GradLaunch consults first before asking an LLM or pausing for manual help.">
           <ProfileForm />
         </SectionCard>
         <SectionCard title="Resume and identity" description="Upload a resume and let GradLaunch read useful profile data from it automatically before the background agent starts filling forms.">

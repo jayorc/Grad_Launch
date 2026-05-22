@@ -133,6 +133,83 @@ const agentEventSchema = new Schema(
   { timestamps: true, versionKey: false }
 );
 
+const timelineStepSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    detail: { type: String, required: true },
+    state: { type: String, required: true },
+    source: { type: String, required: true },
+    timestamp: { type: String, required: false }
+  },
+  { _id: false }
+);
+
+const plannerDecisionSchema = new Schema(
+  {
+    kind: { type: String, required: true },
+    source: { type: String, required: true },
+    stageIndex: { type: Number, required: true },
+    stageLabel: { type: String, required: true },
+    url: { type: String, required: true },
+    reason: { type: String, required: true },
+    fieldLabels: { type: [String], default: [] },
+    createdAt: { type: String, required: true }
+  },
+  { _id: false }
+);
+
+const browserStageSignatureSchema = new Schema(
+  {
+    url: { type: String, required: true },
+    title: { type: String, required: true },
+    fingerprint: { type: String, required: true },
+    visibleFieldLabels: { type: [String], default: [] },
+    requiredFieldLabels: { type: [String], default: [] },
+    controlLabels: { type: [String], default: [] },
+    progressText: { type: String, required: false },
+    savedAt: { type: String, required: true }
+  },
+  { _id: false }
+);
+
+const pendingHandoffSchema = new Schema(
+  {
+    kind: { type: String, required: true },
+    title: { type: String, required: true },
+    detail: { type: String, required: true },
+    requestedAt: { type: String, required: true }
+  },
+  { _id: false }
+);
+
+const browserExecutionSessionSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    studentId: { type: String, required: true, index: true },
+    applicationId: { type: String, required: true, index: true },
+    runId: { type: String, required: true, index: true },
+    jobId: { type: String, required: true, index: true },
+    status: { type: String, required: true, index: true },
+    sourceUrl: { type: String, required: true },
+    currentUrl: { type: String, required: false },
+    currentStageIndex: { type: Number, required: false },
+    currentStageLabel: { type: String, required: false },
+    workspacePath: { type: String, required: false },
+    latestMessage: { type: String, required: true },
+    latestSteps: { type: [timelineStepSchema], default: [] },
+    lastDecision: { type: plannerDecisionSchema, required: false },
+    lastStageSignature: { type: browserStageSignatureSchema, required: false },
+    pendingHandoff: { type: pendingHandoffSchema, required: false },
+    browserStatus: { type: String, required: false },
+    filledCount: { type: Number, required: true, default: 0 },
+    manualCount: { type: Number, required: true, default: 0 },
+    updatedAt: { type: String, required: true },
+    createdAt: { type: String, required: true }
+  },
+  { timestamps: true, versionKey: false }
+);
+
 export const AgentGoalModel = mongoose.models.AgentGoal ?? mongoose.model("AgentGoal", agentGoalSchema);
 export const AgentTaskModel = mongoose.models.AgentTask ?? mongoose.model("AgentTask", agentTaskSchema);
 export const AgentTaskRunModel = mongoose.models.AgentTaskRun ?? mongoose.model("AgentTaskRun", agentTaskRunSchema);
@@ -142,3 +219,5 @@ export const PolicyDecisionModel =
 export const StudentMemoryModel =
   mongoose.models.StudentMemory ?? mongoose.model("StudentMemory", studentMemorySchema);
 export const AgentEventModel = mongoose.models.AgentEvent ?? mongoose.model("AgentEvent", agentEventSchema);
+export const BrowserExecutionSessionModel =
+  mongoose.models.BrowserExecutionSession ?? mongoose.model("BrowserExecutionSession", browserExecutionSessionSchema);

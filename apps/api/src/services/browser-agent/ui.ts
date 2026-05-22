@@ -1,6 +1,37 @@
-import type { Page } from "playwright-core";
+import type { BrowserContext, Page } from "playwright-core";
 
 type BotMood = "thinking" | "acting" | "waiting" | "done";
+type BotPosition = { left: number; top: number };
+type BotState = {
+  dragging: boolean;
+  listenersBound: boolean;
+  offsetX: number;
+  offsetY: number;
+  position: BotPosition | null;
+  stopRequested: boolean;
+};
+
+const stopRequestedContexts = new WeakSet<BrowserContext>();
+
+export async function clearUserStopRequest(page: Page) {
+  stopRequestedContexts.delete(page.context());
+
+  await page.evaluate(() => {
+    const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
+      __gradlaunchBotState?: { stopRequested?: boolean };
+    }) | null;
+
+    if (!root) {
+      return;
+    }
+
+    root.removeAttribute("data-gradlaunch-stop-requested");
+
+    if (root.__gradlaunchBotState) {
+      root.__gradlaunchBotState.stopRequested = false;
+    }
+  }).catch(() => undefined);
+}
 
 export async function updateLiveBot(
   page: Page,
@@ -11,25 +42,25 @@ export async function updateLiveBot(
     step?: string;
   }
 ) {
+  await page.exposeFunction("__gradlaunchRequestStop", () => {
+    stopRequestedContexts.add(page.context());
+    return true;
+  }).catch(() => undefined);
+
   await page.evaluate(({ title, message, mood, step }) => {
     const rootId = "gradlaunch-live-bot";
     const existing = document.getElementById(rootId);
     const root = existing ?? document.createElement("div");
     const botRoot = root as HTMLElement & {
-      __gradlaunchBotState?: {
-        dragging: boolean;
-        listenersBound: boolean;
-        offsetX: number;
-        offsetY: number;
-        position: { left: number; top: number } | null;
-      };
+      __gradlaunchBotState?: BotState;
     };
-    const state = botRoot.__gradlaunchBotState ?? {
+    const state: BotState = botRoot.__gradlaunchBotState ?? {
       dragging: false,
       listenersBound: false,
       offsetX: 0,
       offsetY: 0,
-      position: null
+      position: null,
+      stopRequested: false
     };
     botRoot.__gradlaunchBotState = state;
 
@@ -46,25 +77,28 @@ export async function updateLiveBot(
         all: initial;
         position: fixed;
         right: 18px;
-        bottom: 18px;
+        top: 18px;
         z-index: 2147483647;
-        width: 154px;
+        width: min(196px, calc(100vw - 24px));
+        max-width: calc(100vw - 24px);
         user-select: none;
         pointer-events: auto;
         font-family: "Avenir Next", "Segoe UI", Arial, sans-serif;
+        touch-action: none;
       }
       #${rootId} * { box-sizing: border-box; }
       #${rootId} .gl-bot-shell {
         position: relative;
-        width: 154px;
-        min-height: 164px;
+        width: min(196px, calc(100vw - 24px));
+        min-height: 228px;
       }
       #${rootId} .gl-cloud {
         position: absolute;
         left: 4px;
         right: 4px;
         top: 0;
-        padding: 10px 12px;
+        min-height: 132px;
+        padding: 12px 14px 28px;
         border-radius: 22px;
         background: rgba(255, 255, 255, 0.96);
         border: 1px solid rgba(23, 37, 84, 0.14);
@@ -100,19 +134,42 @@ export async function updateLiveBot(
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
+        padding-right: 56px;
       }
       #${rootId} .gl-message {
         margin: 0;
         font-size: 12px;
-        line-height: 1.35;
+        line-height: 1.45;
         font-weight: 700;
+        padding-right: 8px;
+        overflow-wrap: anywhere;
+      }
+      #${rootId} .gl-stop {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        border: 0;
+        border-radius: 999px;
+        background: #e11d48;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1;
+        padding: 7px 9px;
+        cursor: pointer;
+        box-shadow: 0 8px 16px rgba(225, 29, 72, 0.25);
+      }
+      #${rootId} .gl-stop:disabled {
+        opacity: 0.82;
+        cursor: default;
       }
       #${rootId} .gl-body {
         position: absolute;
-        right: 28px;
-        bottom: 0;
-        width: 78px;
-        height: 88px;
+        left: 50%;
+        top: 146px;
+        transform: translateX(-50%);
+        width: 86px;
+        height: 92px;
         cursor: grab;
       }
       #${rootId} .gl-body:active {
@@ -201,15 +258,40 @@ export async function updateLiveBot(
       }
       #${rootId} .gl-drag {
         position: absolute;
-        left: 14px;
+        left: 8px;
+        right: 8px;
         top: 82px;
         font-size: 10px;
         font-weight: 800;
         color: #48627f;
+        text-align: center;
       }
       @keyframes gl-bot-blink {
         0%, 100% { transform: scale(1); opacity: 1; }
         50% { transform: scale(0.55); opacity: 0.65; }
+      }
+      @media (max-width: 720px) {
+        #${rootId} {
+          right: 12px;
+          top: 12px;
+          width: min(176px, calc(100vw - 20px));
+        }
+        #${rootId} .gl-bot-shell {
+          width: min(176px, calc(100vw - 20px));
+          min-height: 210px;
+        }
+        #${rootId} .gl-cloud {
+          min-height: 122px;
+          padding: 10px 12px 24px;
+        }
+        #${rootId} .gl-message {
+          font-size: 11px;
+        }
+        #${rootId} .gl-body {
+          top: 134px;
+          width: 80px;
+          height: 88px;
+        }
       }
     `;
 
@@ -230,6 +312,21 @@ export async function updateLiveBot(
     text.className = "gl-message";
     text.textContent = message;
     cloud.appendChild(text);
+
+    const stop = document.createElement("button");
+    stop.className = "gl-stop";
+    stop.textContent = "Quit";
+    stop.type = "button";
+    stop.onclick = () => {
+      state.stopRequested = true;
+      root.setAttribute("data-gradlaunch-stop-requested", "true");
+      stop.textContent = "Stopping";
+      stop.disabled = true;
+      void (window as typeof window & {
+        __gradlaunchRequestStop?: () => Promise<boolean>;
+      }).__gradlaunchRequestStop?.();
+    };
+    cloud.appendChild(stop);
 
     const body = document.createElement("div");
     body.className = `gl-body gl-${mood}`;
@@ -264,29 +361,39 @@ export async function updateLiveBot(
     applySavedPosition(root, state);
     attachDrag(root, body, state);
 
-    function applySavedPosition(panel: HTMLElement, botState: typeof state) {
+    function clampPosition(panel: HTMLElement, position: BotPosition) {
+      return {
+        left: Math.min(Math.max(8, position.left), Math.max(8, window.innerWidth - panel.offsetWidth - 8)),
+        top: Math.min(Math.max(8, position.top), Math.max(8, window.innerHeight - panel.offsetHeight - 8))
+      };
+    }
+
+    function applySavedPosition(panel: HTMLElement, botState: BotState) {
       if (!botState.position) {
         panel.style.left = "";
         panel.style.top = "";
         panel.style.right = "18px";
-        panel.style.bottom = "18px";
+        panel.style.bottom = "auto";
         return;
       }
 
+      const clamped = clampPosition(panel, botState.position);
+      botState.position = clamped;
       panel.style.right = "auto";
       panel.style.bottom = "auto";
-      panel.style.left = `${botState.position.left}px`;
-      panel.style.top = `${botState.position.top}px`;
+      panel.style.left = `${clamped.left}px`;
+      panel.style.top = `${clamped.top}px`;
     }
 
-    function attachDrag(panel: HTMLElement, handle: HTMLElement, botState: typeof state) {
-      handle.onmousedown = (event) => {
+    function attachDrag(panel: HTMLElement, handle: HTMLElement, botState: BotState) {
+      handle.onpointerdown = (event) => {
         botState.dragging = true;
         const rect = panel.getBoundingClientRect();
         botState.offsetX = event.clientX - rect.left;
         botState.offsetY = event.clientY - rect.top;
         panel.style.right = "auto";
         panel.style.bottom = "auto";
+        handle.setPointerCapture?.(event.pointerId);
         event.preventDefault();
       };
 
@@ -296,21 +403,43 @@ export async function updateLiveBot(
 
       botState.listenersBound = true;
 
-      document.addEventListener("mousemove", (event) => {
+      document.addEventListener("pointermove", (event) => {
         if (!botState.dragging) {
           return;
         }
 
-        const left = Math.min(Math.max(8, event.clientX - botState.offsetX), window.innerWidth - panel.offsetWidth - 8);
-        const top = Math.min(Math.max(8, event.clientY - botState.offsetY), window.innerHeight - panel.offsetHeight - 8);
-        botState.position = { left, top };
-        panel.style.left = `${left}px`;
-        panel.style.top = `${top}px`;
+        const next = clampPosition(panel, {
+          left: event.clientX - botState.offsetX,
+          top: event.clientY - botState.offsetY
+        });
+        botState.position = next;
+        panel.style.left = `${next.left}px`;
+        panel.style.top = `${next.top}px`;
       });
 
-      document.addEventListener("mouseup", () => {
+      document.addEventListener("pointerup", () => {
         botState.dragging = false;
+      });
+
+      window.addEventListener("resize", () => {
+        if (botState.position) {
+          applySavedPosition(panel, botState);
+        }
       });
     }
   }, input).catch(() => undefined);
+}
+
+export async function didUserRequestStop(page: Page) {
+  if (stopRequestedContexts.has(page.context())) {
+    return true;
+  }
+
+  return page.evaluate(() => {
+    const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
+      __gradlaunchBotState?: { stopRequested?: boolean };
+    }) | null;
+
+    return root?.dataset.gradlaunchStopRequested === "true" || root?.__gradlaunchBotState?.stopRequested === true;
+  }).catch(() => false);
 }

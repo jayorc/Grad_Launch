@@ -182,6 +182,10 @@ export class AIHawkAdapterService {
   }
 
   async applyWithBrowser(input: {
+    studentId?: string;
+    applicationId?: string;
+    runId?: string;
+    executionSessionId?: string;
     job: Job;
     fields: FilledField[];
     workspacePath?: string;

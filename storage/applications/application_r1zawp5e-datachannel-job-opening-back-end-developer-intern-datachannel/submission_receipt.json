@@ -1,0 +1,147 @@
+{
+  "intent": "browser_fill",
+  "outcome": "confirmed",
+  "externalSubmitted": false,
+  "confirmation": "GradLaunch could not confidently find the next action on this page.",
+  "submittedAt": "2026-05-22T11:46:06.046Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "shivscribe@gmail.com",
+    "subject": "GradLaunch filled Datachannel - Job Opening - Back End Developer (Intern) | DataChannel",
+    "sentAt": "2026-05-22T11:46:06.046Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "needs_manual_review",
+    "sourceUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+    "openedAt": "2026-05-22T11:45:43.263Z",
+    "completedAt": "2026-05-22T11:46:06.046Z",
+    "filledLabels": [
+      "Resume upload",
+      "Name",
+      "Email"
+    ],
+    "skippedLabels": [],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-stage-1-start.png"
+    ],
+    "message": "GradLaunch could not confidently find the next action on this page.",
+    "planner": {
+      "sessionId": "planner-job_url_aHR0cHM6Ly93d3cuZGF0YWNo",
+      "resumeToken": "job_url_aHR0cHM6Ly93d3cuZGF0YWNo:2026-05-22T11:45:43.263Z",
+      "goal": "Complete the Job Opening - Back End Developer (Intern) | DataChannel application at Datachannel autonomously until a protected or review checkpoint.",
+      "status": "needs_review",
+      "summary": "GradLaunch could not find a confident next-step control on this page.",
+      "formMode": "single_stage",
+      "retryCount": 0,
+      "handoffCount": 0,
+      "validationErrors": [],
+      "subgoals": [
+        {
+          "id": "open_job_page",
+          "label": "Open job page",
+          "status": "completed",
+          "detail": "Job page opened successfully in a visible Chrome session.",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-22T11:45:44.418Z",
+          "completedAt": "2026-05-22T11:45:44.418Z"
+        },
+        {
+          "id": "authenticate_if_needed",
+          "label": "Handle login if needed",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T11:45:43.263Z"
+        },
+        {
+          "id": "finish_current_section",
+          "label": "Finish active section",
+          "status": "running",
+          "detail": "Reading Section 1 and planning the next safe action.",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-22T11:45:48.484Z"
+        },
+        {
+          "id": "recover_from_validation_errors",
+          "label": "Recover from validation errors",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T11:45:43.263Z"
+        },
+        {
+          "id": "retry_alternative_path",
+          "label": "Retry alternative path",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T11:45:43.263Z"
+        },
+        {
+          "id": "reach_submit_gate",
+          "label": "Reach submit/review gate",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T11:45:43.263Z"
+        },
+        {
+          "id": "save_checkpoint",
+          "label": "Save checkpoint",
+          "status": "completed",
+          "detail": "Saved checkpoint while waiting for manual stage progress.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T11:45:53.407Z",
+          "completedAt": "2026-05-22T11:45:53.407Z"
+        }
+      ],
+      "stageHistory": [
+        {
+          "stageIndex": 0,
+          "label": "Section 1",
+          "url": "https://www.datachannel.co/career/back-end-developer-intern",
+          "visibleFieldLabels": [
+            "Name",
+            "Email",
+            "Attach Resume (PDF)"
+          ],
+          "requiredFieldLabels": [
+            "Name",
+            "Email",
+            "Attach Resume (PDF)"
+          ],
+          "filledFieldLabels": [],
+          "outcome": "observed",
+          "lastUpdatedAt": "2026-05-22T11:45:53.389Z",
+          "decision": {
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
+            "url": "https://www.datachannel.co/career/back-end-developer-intern",
+            "reason": "Page classified as consent; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T11:45:53.389Z"
+          }
+        }
+      ],
+      "lastUpdatedAt": "2026-05-22T11:46:05.981Z",
+      "currentUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+      "currentStep": "stage_1",
+      "currentStageLabel": "Section 1",
+      "lastDecision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://www.datachannel.co/career/back-end-developer-intern",
+        "reason": "Page classified as consent; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T11:45:53.389Z"
+      }
+    }
+  }
+}

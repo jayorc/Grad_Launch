@@ -24,6 +24,10 @@ import { nowIso } from "../lib/time";
 import { BrowserAgentEngine } from "./browser-agent/engine";
 
 type BrowserApplyInput = {
+  studentId?: string;
+  applicationId?: string;
+  runId?: string;
+  executionSessionId?: string;
   job: Job;
   fields: FilledField[];
   workspacePath?: string;

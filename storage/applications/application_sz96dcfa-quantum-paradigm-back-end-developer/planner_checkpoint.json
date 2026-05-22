@@ -1,0 +1,161 @@
+{
+  "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
+  "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-22T09:16:05.517Z",
+  "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or review checkpoint.",
+  "status": "needs_review",
+  "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+  "formMode": "multi_stage",
+  "currentStep": "prepare_application",
+  "currentStageLabel": "Section 1",
+  "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+  "retryCount": 0,
+  "handoffCount": 0,
+  "validationErrors": [],
+  "subgoals": [
+    {
+      "id": "open_job_page",
+      "label": "Open job page",
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 15,
+      "lastUpdatedAt": "2026-05-22T11:30:44.881Z",
+      "completedAt": "2026-05-22T11:30:44.881Z"
+    },
+    {
+      "id": "authenticate_if_needed",
+      "label": "Handle login if needed",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T09:16:05.517Z"
+    },
+    {
+      "id": "finish_current_section",
+      "label": "Finish active section",
+      "status": "running",
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 17,
+      "lastUpdatedAt": "2026-05-22T11:28:52.464Z"
+    },
+    {
+      "id": "recover_from_validation_errors",
+      "label": "Recover from validation errors",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T09:16:05.517Z"
+    },
+    {
+      "id": "retry_alternative_path",
+      "label": "Retry alternative path",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T09:16:05.517Z"
+    },
+    {
+      "id": "reach_submit_gate",
+      "label": "Reach submit/review gate",
+      "status": "completed",
+      "detail": "Reached the review/submit checkpoint safely.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T11:28:58.910Z",
+      "completedAt": "2026-05-22T11:28:58.910Z"
+    },
+    {
+      "id": "save_checkpoint",
+      "label": "Save checkpoint",
+      "status": "completed",
+      "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T11:30:47.295Z",
+      "completedAt": "2026-05-22T11:30:47.295Z"
+    }
+  ],
+  "lastDecision": {
+    "kind": "fill_fields",
+    "source": "llm",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+    "reason": "Highly motivated Backend Developer with expertise in JavaScript, React, Next.js, Node.js, and strong experience in database management and cloud services.",
+    "fieldLabels": [
+      "Full Name",
+      "Email",
+      "Phone",
+      "Cover Letter",
+      "By using this form you agree with the storage and handling of your data by this website."
+    ],
+    "createdAt": "2026-05-22T11:28:58.238Z"
+  },
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+      "visibleFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "requiredFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "filledFieldLabels": [
+        "Resume upload",
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "outcome": "review",
+      "decision": {
+        "kind": "fill_fields",
+        "source": "llm",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+        "reason": "Highly motivated Backend Developer with expertise in JavaScript, React, Next.js, Node.js, and strong experience in database management and cloud services.",
+        "fieldLabels": [
+          "Full Name",
+          "Email",
+          "Phone",
+          "Cover Letter",
+          "By using this form you agree with the storage and handling of your data by this website."
+        ],
+        "createdAt": "2026-05-22T11:28:58.238Z"
+      },
+      "lastUpdatedAt": "2026-05-22T11:28:58.910Z"
+    },
+    {
+      "stageIndex": 1,
+      "label": "Section 2",
+      "url": "about:blank",
+      "visibleFieldLabels": [],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [],
+      "outcome": "observed",
+      "decision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 1,
+        "stageLabel": "Section 2",
+        "url": "about:blank",
+        "reason": "Page classified as empty; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T11:28:37.357Z"
+      },
+      "lastUpdatedAt": "2026-05-22T11:28:37.357Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-22T11:30:47.295Z"
+}

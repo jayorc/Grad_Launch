@@ -1,10 +1,10 @@
 {
-  "id": "run_1wygh8f3",
+  "id": "run_u07enykb",
   "status": "needs_review",
   "executionMode": "browser_apply",
   "adapterId": "gradlaunch-browser-agent",
-  "startedAt": "2026-05-22T06:36:37.910Z",
-  "completedAt": "2026-05-22T06:36:45.054Z",
+  "startedAt": "2026-05-22T08:42:36.411Z",
+  "completedAt": "2026-05-22T08:42:45.273Z",
   "filledFields": [
     {
       "label": "First name",
@@ -162,7 +162,7 @@
     "currentStep": "stage_1",
     "currentStageLabel": "Section 1",
     "currentUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
-    "retryCount": 1,
+    "retryCount": 3,
     "handoffCount": 0,
     "validationErrors": [],
     "subgoals": [
@@ -171,9 +171,9 @@
         "label": "Open job page",
         "status": "completed",
         "detail": "Job page opened successfully in a visible Chrome session.",
-        "attempts": 1,
-        "lastUpdatedAt": "2026-05-22T06:36:40.101Z",
-        "completedAt": "2026-05-22T06:36:40.101Z"
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-22T08:42:37.893Z",
+        "completedAt": "2026-05-22T08:42:37.893Z"
       },
       {
         "id": "authenticate_if_needed",
@@ -188,16 +188,16 @@
         "label": "Finish active section",
         "status": "running",
         "detail": "Reading Section 1 and planning the next safe action.",
-        "attempts": 2,
-        "lastUpdatedAt": "2026-05-22T06:36:44.739Z"
+        "attempts": 4,
+        "lastUpdatedAt": "2026-05-22T08:42:41.730Z"
       },
       {
         "id": "recover_from_validation_errors",
         "label": "Recover from validation errors",
         "status": "retrying",
         "detail": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
-        "attempts": 1,
-        "lastUpdatedAt": "2026-05-22T06:36:45.054Z"
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-22T08:42:45.198Z"
       },
       {
         "id": "retry_alternative_path",
@@ -232,7 +232,7 @@
       "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
       "reason": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
       "fieldLabels": [],
-      "createdAt": "2026-05-22T06:36:45.054Z"
+      "createdAt": "2026-05-22T08:42:45.198Z"
     },
     "stageHistory": [
       {
@@ -243,7 +243,6 @@
         "requiredFieldLabels": [],
         "filledFieldLabels": [],
         "outcome": "observed",
-        "lastUpdatedAt": "2026-05-22T06:36:45.054Z",
         "decision": {
           "kind": "recover_validation",
           "source": "system",
@@ -252,11 +251,12 @@
           "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
           "reason": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
           "fieldLabels": [],
-          "createdAt": "2026-05-22T06:36:45.054Z"
-        }
+          "createdAt": "2026-05-22T08:42:45.198Z"
+        },
+        "lastUpdatedAt": "2026-05-22T08:42:45.198Z"
       }
     ],
-    "lastUpdatedAt": "2026-05-22T06:36:45.054Z"
+    "lastUpdatedAt": "2026-05-22T08:42:45.198Z"
   },
   "notes": [
     "GradLaunch found validation blockers after filling: Software Engineer Contractor page is loaded.",
@@ -268,20 +268,20 @@
     "outcome": "confirmed",
     "externalSubmitted": false,
     "confirmation": "GradLaunch found validation blockers after filling: Software Engineer Contractor page is loaded.",
-    "submittedAt": "2026-05-22T06:36:45.054Z",
+    "submittedAt": "2026-05-22T08:42:45.273Z",
     "email": {
       "status": "skipped",
       "provider": "outbox",
       "to": "jaynrk200211@gmail.com",
       "subject": "GradLaunch filled Blue Umbrella India Pvt Ltd - Software Engineer Contractor",
-      "sentAt": "2026-05-22T06:36:45.054Z",
+      "sentAt": "2026-05-22T08:42:45.273Z",
       "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
     },
     "browser": {
       "status": "needs_manual_review",
       "sourceUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
-      "openedAt": "2026-05-22T06:36:38.042Z",
-      "completedAt": "2026-05-22T06:36:45.054Z",
+      "openedAt": "2026-05-22T08:42:36.662Z",
+      "completedAt": "2026-05-22T08:42:45.273Z",
       "filledLabels": [],
       "skippedLabels": [],
       "screenshots": [
@@ -299,7 +299,7 @@
         "currentStep": "stage_1",
         "currentStageLabel": "Section 1",
         "currentUrl": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
-        "retryCount": 1,
+        "retryCount": 3,
         "handoffCount": 0,
         "validationErrors": [],
         "subgoals": [
@@ -308,9 +308,9 @@
             "label": "Open job page",
             "status": "completed",
             "detail": "Job page opened successfully in a visible Chrome session.",
-            "attempts": 1,
-            "lastUpdatedAt": "2026-05-22T06:36:40.101Z",
-            "completedAt": "2026-05-22T06:36:40.101Z"
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-22T08:42:37.893Z",
+            "completedAt": "2026-05-22T08:42:37.893Z"
           },
           {
             "id": "authenticate_if_needed",
@@ -325,16 +325,16 @@
             "label": "Finish active section",
             "status": "running",
             "detail": "Reading Section 1 and planning the next safe action.",
-            "attempts": 2,
-            "lastUpdatedAt": "2026-05-22T06:36:44.739Z"
+            "attempts": 4,
+            "lastUpdatedAt": "2026-05-22T08:42:41.730Z"
           },
           {
             "id": "recover_from_validation_errors",
             "label": "Recover from validation errors",
             "status": "retrying",
             "detail": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
-            "attempts": 1,
-            "lastUpdatedAt": "2026-05-22T06:36:45.054Z"
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-22T08:42:45.198Z"
           },
           {
             "id": "retry_alternative_path",
@@ -369,7 +369,7 @@
           "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
           "reason": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
           "fieldLabels": [],
-          "createdAt": "2026-05-22T06:36:45.054Z"
+          "createdAt": "2026-05-22T08:42:45.198Z"
         },
         "stageHistory": [
           {
@@ -380,7 +380,6 @@
             "requiredFieldLabels": [],
             "filledFieldLabels": [],
             "outcome": "observed",
-            "lastUpdatedAt": "2026-05-22T06:36:45.054Z",
             "decision": {
               "kind": "recover_validation",
               "source": "system",
@@ -389,11 +388,12 @@
               "url": "https://amlrightsource.wd1.myworkdayjobs.com/amlrightsource/job/Noida-India/Software-Engineer-Contractor_R-102639",
               "reason": "Validation blockers appeared: Software Engineer Contractor page is loaded.",
               "fieldLabels": [],
-              "createdAt": "2026-05-22T06:36:45.054Z"
-            }
+              "createdAt": "2026-05-22T08:42:45.198Z"
+            },
+            "lastUpdatedAt": "2026-05-22T08:42:45.198Z"
           }
         ],
-        "lastUpdatedAt": "2026-05-22T06:36:45.054Z"
+        "lastUpdatedAt": "2026-05-22T08:42:45.198Z"
       }
     }
   },

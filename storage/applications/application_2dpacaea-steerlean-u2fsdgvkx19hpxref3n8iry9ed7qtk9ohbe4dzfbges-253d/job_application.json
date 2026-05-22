@@ -1,0 +1,296 @@
+{
+  "applicationId": "application_2dpacaea",
+  "studentId": "student_tcgn9yq4",
+  "jobId": "job_uflqj9v8",
+  "status": "ready_for_review",
+  "sourceLabel": "Pasted URL",
+  "matchScore": 62,
+  "generatedArtifacts": {
+    "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d role at Steerlean.",
+    "coverLetterExcerpt": "I am excited to apply for the U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d role at Steerlean. My background in JavaScript, React, Next.js and my focus on becoming a strong Software Engineer make this opportunity especially compelling to me. I would be glad to contribute to Steerlean's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in remote collaboration. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with banglore opportunities.",
+    "shortAnswers": [
+      {
+        "question": "Why are you interested in this role?",
+        "answer": "This role aligns with my goal of becoming a strong Software Engineer and uses skills I have already practiced through projects and coursework."
+      },
+      {
+        "question": "What makes you a match?",
+        "answer": "My background in JavaScript, React, Next.js, Node.js closely matches the technical expectations in the job description."
+      }
+    ]
+  },
+  "uploadedDocuments": [
+    "jay_kumar_gupta_nit_kkr.pdf",
+    "tailored_resume_summary.txt",
+    "cover_letter_excerpt.txt",
+    "short_answers.json"
+  ],
+  "run": {
+    "id": "run_hqbkn3r0",
+    "status": "needs_review",
+    "executionMode": "browser_apply",
+    "filledFields": [
+      {
+        "label": "First name",
+        "value": "Jay"
+      },
+      {
+        "label": "Last name",
+        "value": "Kumar Gupta"
+      },
+      {
+        "label": "Full name",
+        "value": "Jay Kumar Gupta"
+      },
+      {
+        "label": "Email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "Confirm your email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "City",
+        "value": "banglore"
+      },
+      {
+        "label": "Location",
+        "value": "banglore"
+      },
+      {
+        "label": "Location (City)",
+        "value": "banglore"
+      },
+      {
+        "label": "Country",
+        "value": "India"
+      },
+      {
+        "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Phone",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Mobile",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Degree",
+        "value": "B.Tech in Computer Science"
+      },
+      {
+        "label": "Graduation year",
+        "value": "2020"
+      },
+      {
+        "label": "Preferred location",
+        "value": "banglore"
+      },
+      {
+        "label": "Target role",
+        "value": "Software Engineer"
+      },
+      {
+        "label": "Work authorization",
+        "value": "Yes"
+      },
+      {
+        "label": "Legally authorized to work",
+        "value": "Yes"
+      },
+      {
+        "label": "Visa sponsorship required",
+        "value": "No"
+      },
+      {
+        "label": "Visa required",
+        "value": "No"
+      },
+      {
+        "label": "Current CTC",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Current salary",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Message to the Hiring Team",
+        "value": "I am excited to apply for the U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d role at Steerlean. My background in JavaScript, React, Next.js and my focus on becoming a strong Software Engineer make this opportunity especially compelling to me. I would be glad to contribute to Steerlean's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in remote collaboration. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with banglore opportunities."
+      },
+      {
+        "label": "Primary skills",
+        "value": "JavaScript, React, Next.js, Node.js, Express"
+      },
+      {
+        "label": "Resume context",
+        "value": "jay_kumar_gupta_nit_kkr.pdf"
+      },
+      {
+        "label": "Why are you interested in this role?",
+        "value": "This role aligns with my goal of becoming a strong Software Engineer and uses skills I have practiced through projects and coursework."
+      },
+      {
+        "label": "What makes you a match?",
+        "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+      }
+    ],
+    "submission": {
+      "intent": "browser_fill",
+      "outcome": "confirmed",
+      "externalSubmitted": false,
+      "confirmation": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+      "submittedAt": "2026-05-22T08:40:02.960Z",
+      "email": {
+        "status": "skipped",
+        "provider": "outbox",
+        "to": "jaynrk200211@gmail.com",
+        "subject": "GradLaunch filled Steerlean - U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d",
+        "sentAt": "2026-05-22T08:40:02.960Z",
+        "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+      },
+      "browser": {
+        "status": "needs_manual_review",
+        "sourceUrl": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+        "openedAt": "2026-05-22T08:39:58.607Z",
+        "completedAt": "2026-05-22T08:40:02.960Z",
+        "filledLabels": [],
+        "skippedLabels": [],
+        "screenshots": [
+          "browser-opened.png"
+        ],
+        "message": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+        "planner": {
+          "sessionId": "planner-job_uflqj9v8",
+          "resumeToken": "job_uflqj9v8:2026-05-22T08:22:18.422Z",
+          "goal": "Complete the U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d application at Steerlean autonomously until a protected or review checkpoint.",
+          "status": "needs_review",
+          "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+          "formMode": "single_stage",
+          "currentStep": "prepare_application",
+          "currentStageLabel": "Section 1",
+          "currentUrl": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+          "retryCount": 0,
+          "handoffCount": 0,
+          "validationErrors": [],
+          "subgoals": [
+            {
+              "id": "open_job_page",
+              "label": "Open job page",
+              "status": "completed",
+              "detail": "Job page opened successfully in a visible Chrome session.",
+              "attempts": 4,
+              "lastUpdatedAt": "2026-05-22T08:39:59.429Z",
+              "completedAt": "2026-05-22T08:39:59.429Z"
+            },
+            {
+              "id": "authenticate_if_needed",
+              "label": "Handle login if needed",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-22T08:22:18.422Z"
+            },
+            {
+              "id": "finish_current_section",
+              "label": "Finish active section",
+              "status": "running",
+              "detail": "Reading Section 1 and planning the next safe action.",
+              "attempts": 3,
+              "lastUpdatedAt": "2026-05-22T08:39:35.888Z"
+            },
+            {
+              "id": "recover_from_validation_errors",
+              "label": "Recover from validation errors",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-22T08:22:18.422Z"
+            },
+            {
+              "id": "retry_alternative_path",
+              "label": "Retry alternative path",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-22T08:22:18.422Z"
+            },
+            {
+              "id": "reach_submit_gate",
+              "label": "Reach submit/review gate",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-22T08:22:18.422Z"
+            },
+            {
+              "id": "save_checkpoint",
+              "label": "Save checkpoint",
+              "status": "completed",
+              "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-22T08:40:02.871Z",
+              "completedAt": "2026-05-22T08:40:02.871Z"
+            }
+          ],
+          "lastDecision": {
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
+            "url": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+            "reason": "Page classified as account_gate; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T08:39:40.832Z"
+          },
+          "stageHistory": [
+            {
+              "stageIndex": 0,
+              "label": "Section 1",
+              "url": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+              "visibleFieldLabels": [
+                "First name",
+                "Middle name",
+                "Last name",
+                "daniel@gmail.com",
+                "074104 10123",
+                "Current Organization",
+                "Current designation",
+                "Start typing to choose location",
+                "Start typing to choose city",
+                "Current Annual Salary",
+                "Expected Annual Salary"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "observed",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 0,
+                "stageLabel": "Section 1",
+                "url": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+                "reason": "Page classified as account_gate; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-22T08:39:40.832Z"
+              },
+              "lastUpdatedAt": "2026-05-22T08:39:40.832Z"
+            }
+          ],
+          "lastUpdatedAt": "2026-05-22T08:40:02.871Z"
+        }
+      }
+    },
+    "notes": [
+      "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+      "Browser fill status: needs_manual_review.",
+      "Filled fields: 0. Skipped fields: 0."
+    ]
+  },
+  "createdAt": "2026-05-22T08:22:18.420Z",
+  "updatedAt": "2026-05-22T08:40:02.960Z"
+}

@@ -30,9 +30,11 @@ import {
   clickNextStageControl,
   clickSoftGate,
   detectProtectedCheckpoint,
+  getStageSignature,
   discoverVisibleFields,
   getActivePage,
   getPageFingerprint,
+  matchesSavedStageSignature,
   getVisibleRequiredEmptyLabels,
   getVisibleValidationMessages,
   hasFileUpload,
@@ -40,12 +42,15 @@ import {
   observeBrowserPage
 } from "./observe";
 import type { BrowserApplyInput, BrowserAvailability, HandoffRequest } from "./types";
-import { updateLiveBot } from "./ui";
+import { BrowserExecutionSessionService } from "./session";
+import { clearUserStopRequest, didUserRequestStop, updateLiveBot } from "./ui";
 import { pathExists, writeBrowserDebug } from "./util";
 
 const defaultChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 export class BrowserAgentEngine {
+  private readonly executionSessions = new BrowserExecutionSessionService();
+
   async getAvailability(): Promise<BrowserAvailability> {
     const cdpUrl = await resolveManagedChromeCdpUrl();
 
@@ -114,6 +119,8 @@ export class BrowserAgentEngine {
     let context: BrowserContext | undefined;
     let keepContextOpen = false;
     let attachedToExistingBrowser = false;
+    let executionSessionId = input.executionSessionId;
+    const resumeUrl = sanitizeBrowserResumeUrl(input.planner?.currentUrl);
 
     try {
       ({ browser, context, keepContextOpen, attachedToExistingBrowser } = await launchContext(availability.chromePath));
@@ -121,7 +128,22 @@ export class BrowserAgentEngine {
       console.log(
         `[GradLaunch][Browser] Mode=${attachedToExistingBrowser ? "attached_cdp" : keepContextOpen ? "persistent_profile" : "ephemeral"} headless=${process.env.BROWSER_HEADLESS === "true"}`
       );
-      const page = await context.newPage();
+      const page = await openOrResumePage(context, input.job.sourceUrl, resumeUrl);
+      await clearUserStopRequest(page);
+      if (input.studentId && input.applicationId && input.runId) {
+        const session = await this.executionSessions.createOrReuse({
+          sessionId: executionSessionId,
+          studentId: input.studentId,
+          applicationId: input.applicationId,
+          runId: input.runId,
+          jobId: input.job.id,
+          sourceUrl: input.job.sourceUrl,
+          workspacePath,
+          planner,
+          latestMessage: "Opening the job page and reading the first stage."
+        });
+        executionSessionId = session.id;
+      }
       await updateLiveBot(page, {
         title: "GradLaunch Bot",
         step: "Starting",
@@ -131,7 +153,7 @@ export class BrowserAgentEngine {
       page.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
       markPlannerTask(planner, "open_job_page", "running", "Opening the target application URL in a new Chrome tab.");
       setPlannerStatus(planner, "running", "Opening the job page in a new Chrome tab.");
-      await page.goto(input.job.sourceUrl, {
+      await page.goto(resumeUrl ?? input.job.sourceUrl, {
         waitUntil: "domcontentloaded",
         timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000)
       });
@@ -140,6 +162,18 @@ export class BrowserAgentEngine {
       planner.currentUrl = activePage.url();
       planner.currentStep = "prepare_application";
       planner.lastUpdatedAt = nowIso();
+      await updateExecutionSession(this.executionSessions, executionSessionId, {
+        status: "running",
+        latestMessage: "The job page is open and the agent is scanning the current stage.",
+        planner,
+        currentUrl: activePage.url(),
+        currentStageIndex: 0,
+        currentStageLabel: "Opening",
+        workspacePath,
+        lastStageSignature: await getStageSignature(activePage),
+        filledCount: 0,
+        manualCount: 0
+      });
       await saveScreenshot(activePage, workspacePath, screenshots, "browser-opened.png");
       await updateLiveBot(activePage, {
         step: "Page Opened",
@@ -151,6 +185,22 @@ export class BrowserAgentEngine {
       const initialCheckpoint = await detectProtectedCheckpoint(activePage);
 
       if (initialCheckpoint.blocked) {
+        await updateExecutionSession(this.executionSessions, executionSessionId, {
+          status: "waiting",
+          latestMessage: initialCheckpoint.reason ?? "The browser session is waiting for manual verification.",
+          planner,
+          currentUrl: activePage.url(),
+          currentStageIndex: 0,
+          currentStageLabel: "Protected checkpoint",
+          workspacePath,
+          lastStageSignature: await getStageSignature(activePage),
+          pendingHandoff: {
+            kind: mapCheckpointToHandoff(initialCheckpoint.kind) ?? "review",
+            title: "Manual handoff required",
+            detail: initialCheckpoint.reason ?? "A protected checkpoint must be cleared in the browser.",
+            requestedAt: nowIso()
+          }
+        });
         const handoff = await waitForHumanIntervention({
           context,
           page: activePage,
@@ -164,6 +214,22 @@ export class BrowserAgentEngine {
         activePage = handoff.activePage;
 
         if (!handoff.resolved) {
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "waiting",
+            latestMessage: "The browser session is waiting for login or verification to be completed.",
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: 0,
+            currentStageLabel: "Protected checkpoint",
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            pendingHandoff: {
+              kind: mapCheckpointToHandoff(initialCheckpoint.kind) ?? "review",
+              title: "Manual handoff required",
+              detail: initialCheckpoint.reason ?? "Login or verification is still required in the portal.",
+              requestedAt: nowIso()
+            }
+          });
           return {
             status: "handoff_required",
             sourceUrl: input.job.sourceUrl,
@@ -190,8 +256,41 @@ export class BrowserAgentEngine {
       let sameScreenAttempts = 0;
 
       for (let stageIndex = 0; stageIndex < maxStages; stageIndex += 1) {
+        if (!hasOpenPage(context)) {
+          return await handleGracefulStop({
+            reason: "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+            input,
+            openedAt,
+            screenshots,
+            planner,
+            workspacePath,
+            executionSessions: this.executionSessions,
+            executionSessionId,
+            activePage: undefined,
+            filledLabels,
+            skippedLabels,
+            stageIndex
+          });
+        }
+
         stageCount = stageIndex + 1;
         activePage = await getActivePage(context, activePage);
+        if (await didUserRequestStop(activePage)) {
+          return await handleGracefulStop({
+            reason: "GradLaunch stopped because you clicked Quit in the live bot.",
+            input,
+            openedAt,
+            screenshots,
+            planner,
+            workspacePath,
+            executionSessions: this.executionSessions,
+            executionSessionId,
+            activePage,
+            filledLabels,
+            skippedLabels,
+            stageIndex
+          });
+        }
         plannerEnterStage(planner, activePage, stageIndex);
         await updateLiveBot(activePage, {
           step: `Stage ${stageIndex + 1}`,
@@ -204,6 +303,24 @@ export class BrowserAgentEngine {
         const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
 
         if (protectedCheckpoint.blocked) {
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "waiting",
+            latestMessage: protectedCheckpoint.reason ?? `The browser session is waiting on Stage ${stageIndex + 1}.`,
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length,
+            pendingHandoff: {
+              kind: mapCheckpointToHandoff(protectedCheckpoint.kind) ?? "review",
+              title: "Manual handoff required",
+              detail: protectedCheckpoint.reason ?? "A protected checkpoint must be cleared in the browser.",
+              requestedAt: nowIso()
+            }
+          });
           const handoff = await waitForHumanIntervention({
             context,
             page: activePage,
@@ -235,6 +352,7 @@ export class BrowserAgentEngine {
 
         const visibleFields = await discoverVisibleFields(activePage);
         const observation = await observeBrowserPage(activePage, visibleFields);
+        const stageSignature = await getStageSignature(activePage, observation);
         const stagePlan = buildStageExecutionPlan({
           observation,
           resumeAvailable: Boolean(input.resume?.storagePath),
@@ -272,11 +390,35 @@ export class BrowserAgentEngine {
           mood: stagePlan.action === "ask_user" ? "waiting" : "thinking",
           message: stagePlan.reason
         });
+        await updateExecutionSession(this.executionSessions, executionSessionId, {
+          status: stagePlan.action === "ask_user" ? "waiting" : "running",
+          latestMessage: stagePlan.reason,
+          planner,
+          currentUrl: activePage.url(),
+          currentStageIndex: stageIndex,
+          currentStageLabel: `Stage ${stageIndex + 1}`,
+          workspacePath,
+          lastStageSignature: stageSignature,
+          filledCount: filledLabels.length,
+          manualCount: skippedLabels.length
+        });
 
         if (sameScreenAttempts > loopThreshold) {
           const message = `The agent saw the same screen repeatedly after ${sameScreenAttempts + 1} attempts and paused to avoid looping.`;
           bumpPlannerRetries(planner, "retry_alternative_path", message, activePage, stageIndex);
           setPlannerStatus(planner, "needs_review", message);
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "resumable",
+            latestMessage: message,
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: stageSignature,
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length
+          });
           return {
             status: "needs_manual_review",
             sourceUrl: input.job.sourceUrl,
@@ -291,6 +433,22 @@ export class BrowserAgentEngine {
         }
 
         if (!resumeUploaded && input.resume?.storagePath && await pathExists(input.resume.storagePath) && await hasFileUpload(activePage)) {
+          if (await didUserRequestStop(activePage)) {
+            return await handleGracefulStop({
+              reason: "GradLaunch stopped because you clicked Quit in the live bot.",
+              input,
+              openedAt,
+              screenshots,
+              planner,
+              workspacePath,
+              executionSessions: this.executionSessions,
+              executionSessionId,
+              activePage,
+              filledLabels,
+              skippedLabels,
+              stageIndex
+            });
+          }
           await updateLiveBot(activePage, {
             step: `Stage ${stageIndex + 1}`,
             mood: "acting",
@@ -322,6 +480,7 @@ export class BrowserAgentEngine {
             baseFields: input.fields,
             student: input.student,
             memory: input.memory,
+            resumeText: input.resume?.extractedText,
             workspacePath
           });
           recordPlannerDecision({
@@ -340,6 +499,23 @@ export class BrowserAgentEngine {
           });
 
           for (const field of answerPlan.answers) {
+            if (await didUserRequestStop(activePage)) {
+              return await handleGracefulStop({
+                reason: "GradLaunch stopped because you clicked Quit in the live bot.",
+                input,
+                openedAt,
+                screenshots,
+                planner,
+                workspacePath,
+                executionSessions: this.executionSessions,
+                executionSessionId,
+                activePage,
+                filledLabels,
+                skippedLabels,
+                stageIndex
+              });
+            }
+
             const filled = await fillFormField(activePage, field);
             const key = field.label.toLowerCase().trim();
 
@@ -360,6 +536,17 @@ export class BrowserAgentEngine {
         const submitVisible = await hasFinalSubmitControl(activePage);
         let outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
         let validationMessages = await getVisibleValidationMessages(activePage);
+        const uploadStillPending = Boolean(
+          input.resume?.storagePath
+          && await pathExists(input.resume.storagePath)
+          && await hasFileUpload(activePage)
+          && !resumeUploaded
+        );
+
+        if (uploadStillPending && !outstandingRequired.some((label) => label.toLowerCase().includes("resume upload"))) {
+          outstandingRequired = [...outstandingRequired, "Resume upload"];
+        }
+
         let evaluation = evaluateStageReadiness({
           visibleFields,
           outstandingRequired,
@@ -412,6 +599,22 @@ export class BrowserAgentEngine {
             });
 
             for (const field of reflection.answers) {
+              if (await didUserRequestStop(activePage)) {
+                return await handleGracefulStop({
+                  reason: "GradLaunch stopped because you clicked Quit in the live bot.",
+                  input,
+                  openedAt,
+                  screenshots,
+                  planner,
+                  workspacePath,
+                  executionSessions: this.executionSessions,
+                  executionSessionId,
+                  activePage,
+                  filledLabels,
+                  skippedLabels,
+                  stageIndex
+                });
+              }
               await fillFormField(activePage, field);
             }
 
@@ -431,6 +634,24 @@ export class BrowserAgentEngine {
 
         if (evaluation.status === "needs_user") {
           recordPlannerValidation(planner, evaluation.missingRequiredLabels);
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "waiting",
+            latestMessage: `The browser session needs manual answers on Stage ${stageIndex + 1}.`,
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length,
+            pendingHandoff: {
+              kind: "missing_data",
+              title: "Manual answers required",
+              detail: `Required answers are still missing: ${evaluation.missingRequiredLabels.join(", ")}.`,
+              requestedAt: nowIso()
+            }
+          });
           const handoff = await waitForHumanIntervention({
             context,
             page: activePage,
@@ -445,6 +666,24 @@ export class BrowserAgentEngine {
           activePage = handoff.activePage;
 
           if (!handoff.resolved) {
+            await updateExecutionSession(this.executionSessions, executionSessionId, {
+              status: "waiting",
+              latestMessage: `The browser session is waiting for manual answers on Stage ${stageIndex + 1}.`,
+              planner,
+              currentUrl: activePage.url(),
+              currentStageIndex: stageIndex,
+              currentStageLabel: `Stage ${stageIndex + 1}`,
+              workspacePath,
+              lastStageSignature: await getStageSignature(activePage),
+              filledCount: filledLabels.length,
+              manualCount: skippedLabels.length,
+              pendingHandoff: {
+                kind: "missing_data",
+                title: "Manual answers required",
+                detail: `Required answers are still missing: ${evaluation.missingRequiredLabels.join(", ")}.`,
+                requestedAt: nowIso()
+              }
+            });
             return {
               status: "handoff_required",
               sourceUrl: input.job.sourceUrl,
@@ -468,6 +707,18 @@ export class BrowserAgentEngine {
             message: `I hit a validation blocker and need a manual review: ${evaluation.validationMessages.join(", ")}.`
           });
           bumpPlannerRetries(planner, "recover_from_validation_errors", `Validation blockers appeared: ${evaluation.validationMessages.join(", ")}.`, activePage, stageIndex);
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "resumable",
+            latestMessage: `Validation blockers stopped the agent on Stage ${stageIndex + 1}.`,
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length
+          });
           return {
             status: "needs_manual_review",
             sourceUrl: input.job.sourceUrl,
@@ -482,6 +733,23 @@ export class BrowserAgentEngine {
         }
 
         if (evaluation.status === "ready_to_submit" || evaluation.status === "ready_for_review") {
+          if (await didUserRequestStop(activePage)) {
+            return await handleGracefulStop({
+              reason: "GradLaunch stopped because you clicked Quit in the live bot.",
+              input,
+              openedAt,
+              screenshots,
+              planner,
+              workspacePath,
+              executionSessions: this.executionSessions,
+              executionSessionId,
+              activePage,
+              filledLabels,
+              skippedLabels,
+              stageIndex
+            });
+          }
+
           if (input.submit && process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true") {
             await updateLiveBot(activePage, {
               step: `Stage ${stageIndex + 1}`,
@@ -526,6 +794,20 @@ export class BrowserAgentEngine {
               outcome: "submitted",
               filledFieldLabels: filledLabels
             });
+            await updateExecutionSession(this.executionSessions, executionSessionId, {
+              status: "submitted",
+              latestMessage: "The browser agent submitted the application successfully.",
+              planner,
+              currentUrl: activePage.url(),
+              currentStageIndex: stageIndex,
+              currentStageLabel: `Stage ${stageIndex + 1}`,
+              workspacePath,
+              lastStageSignature: await getStageSignature(activePage),
+              browserStatus: "submitted",
+              filledCount: filledLabels.length,
+              manualCount: skippedLabels.length,
+              pendingHandoff: undefined
+            });
             return {
               status: "submitted",
               sourceUrl: input.job.sourceUrl,
@@ -557,6 +839,35 @@ export class BrowserAgentEngine {
           keepContextOpen = shouldKeepBrowserOpenForReview();
           await maybeKeepBrowserOpen(context);
           await saveScreenshot(activePage, workspacePath, screenshots, "browser-filled.png");
+          const manualAdvance = await waitForManualProgress({
+            context,
+            page: activePage,
+            stageIndex,
+            planner,
+            workspacePath,
+            baselineSignature: await getStageSignature(activePage),
+            prompt: "This stage looks ready. If you move ahead manually, I will detect it and continue filling."
+          });
+
+          if (manualAdvance.resumed) {
+            activePage = manualAdvance.activePage;
+            continue;
+          }
+
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "review_ready",
+            latestMessage: "The form is filled and ready for review in the open browser.",
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            browserStatus: "filled",
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length,
+            pendingHandoff: undefined
+          });
           return {
             status: "filled",
             sourceUrl: input.job.sourceUrl,
@@ -583,15 +894,58 @@ export class BrowserAgentEngine {
           mood: "acting",
           message: "This stage looks complete. Moving to the next step."
         });
+        if (await didUserRequestStop(activePage)) {
+          return await handleGracefulStop({
+            reason: "GradLaunch stopped because you clicked Quit in the live bot.",
+            input,
+            openedAt,
+            screenshots,
+            planner,
+            workspacePath,
+            executionSessions: this.executionSessions,
+            executionSessionId,
+            activePage,
+            filledLabels,
+            skippedLabels,
+            stageIndex
+          });
+        }
         const navigation = await clickNextStageControl(context, activePage, { allowApplyStart: true });
 
         if (!navigation.clicked) {
+          const manualAdvance = await waitForManualProgress({
+            context,
+            page: activePage,
+            stageIndex,
+            planner,
+            workspacePath,
+            baselineSignature: await getStageSignature(activePage),
+            prompt: "I could not move this stage automatically. If you advance the portal manually, I will detect it and continue."
+          });
+
+          if (manualAdvance.resumed) {
+            activePage = manualAdvance.activePage;
+            continue;
+          }
+
           await updateLiveBot(activePage, {
             step: `Stage ${stageIndex + 1}`,
             mood: "waiting",
             message: "I could not find a safe next action here, so I am pausing for review."
           });
           setPlannerStatus(planner, "needs_review", "GradLaunch could not find a confident next-step control on this page.");
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "resumable",
+            latestMessage: "The agent could not confirm a safe next-step control on this page.",
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length
+          });
           return {
             status: "needs_manual_review",
             sourceUrl: input.job.sourceUrl,
@@ -614,6 +968,18 @@ export class BrowserAgentEngine {
         step: "Paused",
         mood: "waiting",
         message: "I reached the stage limit for this application and paused for review."
+      });
+      await updateExecutionSession(this.executionSessions, executionSessionId, {
+        status: "resumable",
+        latestMessage: "The agent reached the configured stage limit and paused for review.",
+        planner,
+        currentUrl: (activePage ?? page).url(),
+        currentStageIndex: stageCount - 1,
+        currentStageLabel: `Stage ${stageCount}`,
+        workspacePath,
+        lastStageSignature: await getStageSignature(activePage ?? page),
+        filledCount: filledLabels.length,
+        manualCount: skippedLabels.length
       });
       return {
         status: "needs_manual_review",
@@ -640,6 +1006,15 @@ export class BrowserAgentEngine {
       }
       markPlannerTask(planner, "finish_current_section", "blocked", message);
       setPlannerStatus(planner, "blocked", message);
+      await updateExecutionSession(this.executionSessions, executionSessionId, {
+        status: "blocked",
+        latestMessage: message,
+        planner,
+        currentUrl: context?.pages().find((candidate) => !candidate.isClosed())?.url(),
+        workspacePath,
+        filledCount: 0,
+        manualCount: input.fields.length
+      });
       return blockedReceipt(input, openedAt, screenshots, planner, message);
     } finally {
       if (context && !keepContextOpen && !attachedToExistingBrowser) {
@@ -651,6 +1026,189 @@ export class BrowserAgentEngine {
       }
     }
   }
+}
+
+async function openOrResumePage(context: BrowserContext, sourceUrl: string, resumeUrl: string | undefined) {
+  const candidateUrls = [resumeUrl, sourceUrl].filter((value): value is string => Boolean(value));
+
+  for (const candidate of context.pages().filter((page) => !page.isClosed()).reverse()) {
+    if (candidateUrls.some((url) => candidate.url() === url || (url && candidate.url().startsWith(url)))) {
+      return candidate;
+    }
+  }
+
+  return context.newPage();
+}
+
+function sanitizeBrowserResumeUrl(value: string | undefined) {
+  if (!value || value === "about:blank" || value.startsWith("chrome://newtab")) {
+    return undefined;
+  }
+
+  return value;
+}
+
+async function updateExecutionSession(
+  sessions: BrowserExecutionSessionService,
+  sessionId: string | undefined,
+  input: Parameters<BrowserExecutionSessionService["update"]>[0]
+) {
+  if (!sessionId) {
+    return;
+  }
+
+  await sessions.update({
+    ...input,
+    sessionId
+  }).catch(() => undefined);
+}
+
+function hasOpenPage(context: BrowserContext) {
+  return context.pages().some((page) => !page.isClosed());
+}
+
+async function handleGracefulStop(input: {
+  reason: string;
+  input: BrowserApplyInput;
+  openedAt: string;
+  screenshots: string[];
+  planner: ReturnType<typeof createPlannerCheckpoint>;
+  workspacePath: string;
+  executionSessions: BrowserExecutionSessionService;
+  executionSessionId?: string;
+  activePage?: Page;
+  filledLabels: string[];
+  skippedLabels: string[];
+  stageIndex: number;
+}): Promise<BrowserApplyReceipt> {
+  const page = input.activePage && !input.activePage.isClosed() ? input.activePage : undefined;
+
+  if (page) {
+    await updateLiveBot(page, {
+      step: "Paused",
+      mood: "waiting",
+      message: input.reason
+    });
+    await saveScreenshot(page, input.workspacePath, input.screenshots, "browser-paused.png");
+    recordPlannerDecision({
+      planner: input.planner,
+      page,
+      stageIndex: input.stageIndex,
+      kind: "stop",
+      source: "system",
+      reason: input.reason
+    });
+  }
+
+  markPlannerTask(input.planner, "save_checkpoint", "completed", "Saved the latest resumable checkpoint before pausing the browser run.");
+  setPlannerStatus(input.planner, "needs_review", input.reason);
+
+  await updateExecutionSession(input.executionSessions, input.executionSessionId, {
+    status: "resumable",
+    latestMessage: input.reason,
+    planner: input.planner,
+    currentUrl: page?.url() ?? input.planner.currentUrl ?? input.input.job.sourceUrl,
+    currentStageIndex: input.stageIndex,
+    currentStageLabel: input.planner.currentStageLabel ?? `Stage ${input.stageIndex + 1}`,
+    workspacePath: input.workspacePath,
+    lastStageSignature: page ? await getStageSignature(page).catch(() => undefined) : undefined,
+    filledCount: input.filledLabels.length,
+    manualCount: input.skippedLabels.length
+  });
+
+  return {
+    status: "needs_manual_review",
+    sourceUrl: input.input.job.sourceUrl,
+    openedAt: input.openedAt,
+    completedAt: nowIso(),
+    filledLabels: input.filledLabels,
+    skippedLabels: input.skippedLabels,
+    screenshots: input.screenshots,
+    message: input.reason,
+    planner: input.planner
+  };
+}
+
+async function waitForManualProgress(input: {
+  context: BrowserContext;
+  page: Page;
+  stageIndex: number;
+  planner: ReturnType<typeof createPlannerCheckpoint>;
+  workspacePath: string;
+  baselineSignature: Awaited<ReturnType<typeof getStageSignature>>;
+  prompt: string;
+}) {
+  const timeoutMs = Number(process.env.BROWSER_MANUAL_RESUME_TIMEOUT_MS ?? 45000);
+  const pollMs = Number(process.env.BROWSER_MANUAL_RESUME_POLL_MS ?? 900);
+  const startedAt = Date.now();
+  let activePage = input.page;
+
+  await updateLiveBot(activePage, {
+    step: `Stage ${input.stageIndex + 1}`,
+    mood: "waiting",
+    message: input.prompt
+  });
+  markPlannerTask(input.planner, "save_checkpoint", "completed", "Saved checkpoint while waiting for manual stage progress.");
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!hasOpenPage(input.context)) {
+      return {
+        resumed: false,
+        activePage
+      };
+    }
+
+    await activePage.waitForTimeout(pollMs).catch(() => undefined);
+    activePage = await getActivePage(input.context, activePage);
+    if (await didUserRequestStop(activePage)) {
+      return {
+        resumed: false,
+        activePage
+      };
+    }
+
+    const stillSameStage = await matchesSavedStageSignature(activePage, input.baselineSignature).catch(() => true);
+
+    if (stillSameStage) {
+      continue;
+    }
+
+    const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
+
+    if (protectedCheckpoint.blocked) {
+      continue;
+    }
+
+    const nextSignature = await getStageSignature(activePage);
+    recordPlannerStageOutcome({
+      planner: input.planner,
+      page: activePage,
+      stageIndex: input.stageIndex,
+      outcome: "advanced",
+      filledFieldLabels: []
+    });
+    await writeBrowserDebug(input.workspacePath, "manual-stage-progress-detected", {
+      stageIndex: input.stageIndex,
+      from: input.baselineSignature,
+      to: nextSignature,
+      url: activePage.url()
+    });
+    await updateLiveBot(activePage, {
+      step: `Stage ${input.stageIndex + 1}`,
+      mood: "thinking",
+      message: "I detected manual progress. Re-scanning this new stage now."
+    });
+
+    return {
+      resumed: true,
+      activePage
+    };
+  }
+
+  return {
+    resumed: false,
+    activePage
+  };
 }
 
 async function launchContext(chromePath: string | undefined) {
@@ -749,7 +1307,8 @@ async function handleDialogSafely(dialog: Dialog, page: Page, workspacePath: str
 
   try {
     if (dialog.type() === "beforeunload") {
-      await dialog.dismiss();
+      // Let the browser/tab close proceed when a site asks for beforeunload confirmation.
+      await dialog.accept();
     } else {
       await dialog.accept();
     }
@@ -779,8 +1338,21 @@ async function waitForHumanIntervention(input: HandoffRequest) {
   notePlannerHandoff(input.planner, input.reason, activePage, input.stageIndex, input.handoffKind ?? "review");
 
   while (Date.now() - startedAt < timeoutMs) {
+    if (!hasOpenPage(input.context)) {
+      return {
+        resolved: false,
+        activePage
+      };
+    }
+
     await activePage.waitForTimeout(pollMs).catch(() => undefined);
     activePage = await getActivePage(input.context, activePage);
+    if (await didUserRequestStop(activePage)) {
+      return {
+        resolved: false,
+        activePage
+      };
+    }
     const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
 
     if (protectedCheckpoint.blocked) {

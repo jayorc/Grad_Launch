@@ -2,8 +2,10 @@ import type { BrowserContext, Page } from "playwright-core";
 import type {
   AtsAdapterHint,
   BrowserAgentObservation,
+  NavigationCandidate,
   BrowserFieldGroup,
   BrowserPageState,
+  TransitionWaitResult,
   ObservedControl,
   ProtectedCheckpointDetection,
   VisibleField
@@ -13,10 +15,32 @@ import { dedupeLabels, normalizeKey, safeHostname } from "./util";
 export async function getActivePage(context: BrowserContext, fallbackPage: Page) {
   await fallbackPage.waitForTimeout(400).catch(() => undefined);
   const pages = context.pages().filter((page) => !page.isClosed());
-  const page = pages.includes(fallbackPage) ? fallbackPage : pages.at(-1) ?? fallbackPage;
+  const meaningfulPages = pages.filter((page) => !isBlankBrowserPage(page.url()));
+  const fallbackIsUsable = pages.includes(fallbackPage) && !isBlankBrowserPage(fallbackPage.url());
+  const fallbackOrigin = safePageOrigin(fallbackPage.url());
+  const originMatch = meaningfulPages.find((page) => safePageOrigin(page.url()) === fallbackOrigin);
+  const page = fallbackIsUsable
+    ? fallbackPage
+    : originMatch
+      ?? meaningfulPages.at(-1)
+      ?? (pages.includes(fallbackPage) ? fallbackPage : undefined)
+      ?? pages.at(-1)
+      ?? fallbackPage;
   page.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
   await page.bringToFront().catch(() => undefined);
   return page;
+}
+
+function isBlankBrowserPage(url: string) {
+  return !url || url === "about:blank" || url.startsWith("chrome://newtab");
+}
+
+function safePageOrigin(url: string) {
+  try {
+    return new URL(url).origin;
+  } catch (_error) {
+    return "";
+  }
 }
 
 export async function clickSoftGate(page: Page) {
@@ -350,6 +374,63 @@ export async function getPageFingerprint(page: Page) {
   }).catch(() => page.url());
 }
 
+export async function getProgressSnapshot(page: Page) {
+  return page.evaluate(() => {
+    const selectors = [
+      "[aria-current='step']",
+      "[data-testid*='step']",
+      "[class*='step'][class*='active']",
+      "[class*='progress'] [class*='active']",
+      "[role='progressbar']",
+      "ol li[aria-current='step']",
+      "nav li[aria-current='page']"
+    ];
+
+    for (const selector of selectors) {
+      const elements = Array.from(document.querySelectorAll(selector));
+
+      for (const element of elements) {
+        const htmlElement = element as HTMLElement;
+        const rect = htmlElement.getBoundingClientRect();
+        const text = element.textContent?.replace(/\s+/g, " ").trim();
+
+        if (text && rect.width > 0 && rect.height > 0) {
+          return text.slice(0, 180);
+        }
+      }
+    }
+
+    return undefined;
+  }).catch(() => undefined);
+}
+
+export async function getStageSignature(page: Page, observation?: BrowserAgentObservation) {
+  const nextObservation = observation ?? await observeBrowserPage(page, await discoverVisibleFields(page));
+  const fingerprint = await getPageFingerprint(page);
+  const progressText = await getProgressSnapshot(page);
+
+  return {
+    url: page.url(),
+    title: nextObservation.title,
+    fingerprint,
+    visibleFieldLabels: nextObservation.visibleFields.map((field) => field.label).slice(0, 25),
+    requiredFieldLabels: nextObservation.visibleFields.filter((field) => field.required).map((field) => field.label).slice(0, 20),
+    controlLabels: nextObservation.controls.map((control) => control.text || control.label).filter(Boolean).slice(0, 20),
+    progressText,
+    savedAt: new Date().toISOString()
+  };
+}
+
+export async function matchesSavedStageSignature(page: Page, signature: { fingerprint: string; url: string; progressText?: string }) {
+  const [fingerprint, progressText] = await Promise.all([
+    getPageFingerprint(page),
+    getProgressSnapshot(page)
+  ]);
+
+  return fingerprint === signature.fingerprint
+    || (page.url() === signature.url && progressText === signature.progressText);
+}
+
 export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCheckpointDetection> {
   return page.evaluate(() => {
     function normalize(value: string) {
@@ -648,9 +729,34 @@ export async function getVisibleValidationMessages(page: Page) {
 export async function hasFileUpload(page: Page) {
   return page.evaluate(() => {
     const controls = getSearchRoots().flatMap((root) => Array.from(root.querySelectorAll("input[type='file']"))) as HTMLInputElement[];
-    return controls.some((control) => {
-      const rect = control.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0 && !control.disabled;
+    if (controls.some((control) => !control.disabled)) {
+      return true;
+    }
+
+    const uploadSelectors = [
+      "button",
+      "[role='button']",
+      "label",
+      "a",
+      "div",
+      "span"
+    ];
+
+    return uploadSelectors.some((selector) => {
+      return Array.from(document.querySelectorAll(selector)).some((element) => {
+        if (!(element instanceof HTMLElement)) {
+          return false;
+        }
+
+        const rect = element.getBoundingClientRect();
+
+        if (rect.width <= 0 || rect.height <= 0) {
+          return false;
+        }
+
+        const text = `${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`.toLowerCase().replace(/\s+/g, " ").trim();
+        return /\b(upload resume|attach resume|drag and drop your resume|browse file|choose file|select file)\b/.test(text);
+      });
     });
 
     function getSearchRoots() {
@@ -715,6 +821,110 @@ export async function hasFinalSubmitControl(page: Page) {
   }).catch(() => false);
 }
 
+export async function detectNavigationCandidates(
+  page: Page,
+  observation: BrowserAgentObservation,
+  options: { allowApplyStart: boolean }
+): Promise<NavigationCandidate[]> {
+  const adapterId = observation.adapter?.id;
+
+  return observation.controls
+    .filter((control) => !control.disabled)
+    .map((control) => {
+      const text = normalizeKey(`${control.text} ${control.label}`);
+      let score = 0;
+
+      if (/\b(next|continue|save and continue|save continue|proceed)\b/.test(text)) {
+        score += 90;
+      }
+
+      if (/\b(review|review application|continue to review)\b/.test(text)) {
+        score += 76;
+      }
+
+      if (options.allowApplyStart && /\b(apply|apply now|apply for this job|apply for this position|start application|i m interested|im interested)\b/.test(text)) {
+        score += 70;
+      }
+
+      if (adapterId === "smartrecruiters" && /\b(next|continue|review)\b/.test(text)) {
+        score += 18;
+      }
+
+      if (adapterId === "workday" && /\b(next|continue|review and submit)\b/.test(text)) {
+        score += 18;
+      }
+
+      if (isFinalSubmitText(text) || (!options.allowApplyStart && isApplyStartText(text)) || /\b(cancel|back|previous|close|add)\b/.test(text)) {
+        score -= 120;
+      }
+
+      if (!["button", "link"].includes(control.role) && !["button", "a", "input"].includes(control.tagName)) {
+        score -= 10;
+      }
+
+      return {
+        id: control.id,
+        label: control.text || control.label,
+        role: control.role || control.tagName,
+        score,
+        strategy: "dom_control" as const
+      };
+    })
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 8);
+}
+
+export async function waitForStageTransition(
+  context: BrowserContext,
+  page: Page,
+  signatureBefore: Awaited<ReturnType<typeof getStageSignature>>
+): Promise<TransitionWaitResult> {
+  const timeoutMs = Number(process.env.BROWSER_STAGE_TRANSITION_TIMEOUT_MS ?? 5000);
+  const pollMs = Number(process.env.BROWSER_STAGE_TRANSITION_POLL_MS ?? 250);
+  const startedAt = Date.now();
+  let activePage = await getActivePage(context, page);
+
+  while (Date.now() - startedAt < timeoutMs) {
+    await activePage.waitForLoadState("domcontentloaded", { timeout: pollMs }).catch(() => undefined);
+    await activePage.waitForTimeout(pollMs).catch(() => undefined);
+    activePage = await getActivePage(context, activePage);
+
+    const visibleFields = await discoverVisibleFields(activePage);
+    const observation = await observeBrowserPage(activePage, visibleFields);
+    const signatureAfter = await getStageSignature(activePage, observation);
+
+    if (signatureAfter.fingerprint !== signatureBefore.fingerprint || signatureAfter.progressText !== signatureBefore.progressText || signatureAfter.url !== signatureBefore.url) {
+      const outcome = observation.pageState === "submit"
+        ? "submit_ready"
+        : observation.pageState === "review"
+          ? "review_ready"
+          : "advanced";
+
+      return {
+        changed: true,
+        activePage,
+        reason: `Detected a stage transition to ${observation.pageState}.`,
+        signatureBefore,
+        signatureAfter,
+        outcome
+      };
+    }
+  }
+
+  const signatureAfter = await getStageSignature(activePage);
+  const observation = await observeBrowserPage(activePage, await discoverVisibleFields(activePage));
+
+  return {
+    changed: false,
+    activePage,
+    reason: `No stage transition was confirmed after the click. Current page state: ${observation.pageState}.`,
+    signatureBefore,
+    signatureAfter,
+    outcome: "same_stage"
+  };
+}
+
 export async function clickFinalSubmit(page: Page) {
   const labels = ["Submit application", "Submit Application", "Submit", "Apply"];
 
@@ -744,52 +954,24 @@ export async function clickFinalSubmit(page: Page) {
 }
 
 export async function clickNextStageControl(context: BrowserContext, page: Page, options: { allowApplyStart: boolean }) {
-  const labels = [
-    "Continue",
-    "Next",
-    "Save and continue",
-    "Save & continue",
-    "Continue to review",
-    "Review application",
-    "Review",
-    "Proceed",
-    "Start application",
-    "Start",
-    ...(options.allowApplyStart ? ["Apply", "Apply now", "Apply for this job", "Apply for this position"] : []),
-    "I'm interested",
-    "I’m interested"
-  ];
+  const observation = await observeBrowserPage(page, await discoverVisibleFields(page));
+  const signatureBefore = await getStageSignature(page, observation);
+  const candidates = await detectNavigationCandidates(page, observation, options);
 
-  for (const label of labels) {
-    const locators = [
-      page.getByRole("button", { name: label, exact: false }),
-      page.getByRole("link", { name: label, exact: false })
-    ];
+  for (const candidate of candidates) {
+    const clicked = await clickObservedControl(context, page, candidate.id);
 
-    for (const locator of locators) {
-      const count = await locator.count().catch(() => 0);
+    if (!clicked) {
+      continue;
+    }
 
-      for (let index = 0; index < Math.min(count, 4); index += 1) {
-        const candidate = locator.nth(index);
+    const transition = await waitForStageTransition(context, clicked, signatureBefore);
 
-        try {
-          const text = await candidate.innerText({ timeout: 700 }).catch(() => label);
-
-          if (isFinalSubmitText(text) || (!options.allowApplyStart && isApplyStartText(text))) {
-            continue;
-          }
-
-          await candidate.scrollIntoViewIfNeeded({ timeout: 1000 });
-          const nextPagePromise = context.waitForEvent("page", { timeout: 2500 }).catch(() => undefined);
-          await candidate.click({ timeout: 1500 });
-          return {
-            clicked: true,
-            page: (await nextPagePromise) ?? page
-          };
-        } catch (_error) {
-          // Continue to the next candidate.
-        }
-      }
+    if (transition.changed) {
+      return {
+        clicked: true,
+        page: transition.activePage
+      };
     }
   }
 
@@ -797,6 +979,29 @@ export async function clickNextStageControl(context: BrowserContext, page: Page,
     clicked: false,
     page
   };
+}
+
+async function clickObservedControl(context: BrowserContext, page: Page, controlId: string) {
+  for (const frame of page.frames()) {
+    const nextPagePromise = context.waitForEvent("page", { timeout: 1500 }).catch(() => undefined);
+    const clicked = await frame.evaluate((targetId) => {
+      const control = document.querySelector(`[data-gradlaunch-control-id="${CSS.escape(targetId)}"]`);
+
+      if (!(control instanceof HTMLElement)) {
+        return false;
+      }
+
+      control.scrollIntoView({ block: "center", inline: "center" });
+      control.click();
+      return true;
+    }, controlId).catch(() => false);
+
+    if (clicked) {
+      return (await nextPagePromise) ?? page;
+    }
+  }
+
+  return undefined;
 }
 
 function resolveAtsAdapter(url: string): AtsAdapterHint | undefined {
@@ -881,6 +1086,7 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
   ].join(" "));
   const hasVisibleFields = input.visibleFields.length > 0;
   const hasPasswordField = input.visibleFields.some((field) => field.inputType === "password" || /\bpassword\b/i.test(field.label));
+  const visibleFieldText = normalizeKey(input.visibleFields.map((field) => `${field.label} ${field.context}`).join(" "));
   const hasResumeUploadField = input.visibleFields.some((field) => field.inputType === "file")
     || input.controls.some((control) => /upload resume|upload cv|attach resume|choose file|select resume|autofill with resume/.test(normalizeKey(`${control.text} ${control.label}`)));
   const hasConsentLanguage = /\b(privacy|terms|consent|agree|acknowledge|declaration|data processing|equal opportunity|eeo|voluntary self identification)\b/.test(text);
@@ -890,8 +1096,13 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
   const hasQuestionnaireHints = input.groupedFields.length > 0
     || input.visibleFields.some((field) => field.options.length > 0 || field.inputType === "radio" || field.inputType === "checkbox")
     || /\b(questionnaire|screening question|additional question|work authorization|salary expectation|notice period)\b/.test(text);
+  const hasCredentialField = input.visibleFields.some((field) => /\b(email|username|user name|login|password|otp|verification code)\b/i.test(field.label));
+  const hasApplicationIdentityField = /\b(name|full name|first name|last name|resume|cv|phone|mobile|linkedin|portfolio|website|location|city)\b/.test(visibleFieldText);
+  const loginLanguage = /\b(sign in|log in|login|continue with email|forgot password|create account|account password)\b/.test(text);
+  const looksLikeLogin = hasPasswordField
+    || (loginLanguage && hasCredentialField && !hasApplicationIdentityField && !hasResumeUploadField && !hasApplyStart);
 
-  if (hasPasswordField || /\b(sign in|log in|login|password)\b/.test(text)) {
+  if (looksLikeLogin) {
     return "login";
   }
 

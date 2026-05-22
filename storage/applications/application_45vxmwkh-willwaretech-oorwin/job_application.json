@@ -2,7 +2,7 @@
   "applicationId": "application_45vxmwkh",
   "studentId": "student_tcgn9yq4",
   "jobId": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
-  "status": "autofilled",
+  "status": "ready_for_review",
   "sourceLabel": "Pasted URL",
   "matchScore": 8,
   "generatedArtifacts": {
@@ -26,8 +26,8 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_hrzdkqlo",
-    "status": "completed",
+    "id": "run_fc1a6xmp",
+    "status": "needs_review",
     "executionMode": "browser_apply",
     "filledFields": [
       {
@@ -143,21 +143,21 @@
       "intent": "browser_fill",
       "outcome": "confirmed",
       "externalSubmitted": false,
-      "confirmation": "The form is filled across 1 stage and is ready for review or direct submit.",
-      "submittedAt": "2026-05-22T06:39:56.197Z",
+      "confirmation": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+      "submittedAt": "2026-05-22T08:40:36.053Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "jaynrk200211@gmail.com",
         "subject": "GradLaunch filled Willwaretech - Oorwin",
-        "sentAt": "2026-05-22T06:39:56.197Z",
+        "sentAt": "2026-05-22T08:40:36.053Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
-        "status": "filled",
+        "status": "needs_manual_review",
         "sourceUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-        "openedAt": "2026-05-22T06:39:46.467Z",
-        "completedAt": "2026-05-22T06:39:56.197Z",
+        "openedAt": "2026-05-22T08:40:08.257Z",
+        "completedAt": "2026-05-22T08:40:36.053Z",
         "filledLabels": [
           "Resume upload",
           "Last Name",
@@ -166,25 +166,30 @@
           "mat-input-3",
           "Years of Experience",
           "City",
-          "Current CTC"
+          "Current CTC",
+          "Search for Job Title, Location...",
+          "Location"
         ],
-        "skippedLabels": [],
+        "skippedLabels": [
+          "add_docs"
+        ],
         "screenshots": [
           "browser-opened.png",
           "browser-stage-1-start.png",
-          "browser-filled.png"
+          "browser-filled.png",
+          "browser-stage-2-start.png"
         ],
-        "message": "The form is filled across 1 stage and is ready for review or direct submit.",
+        "message": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
         "planner": {
           "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
           "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-21T10:00:04.549Z",
           "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or final review checkpoint.",
-          "status": "completed",
-          "summary": "Planner completed the form fill and paused at the review gate.",
-          "formMode": "single_stage",
-          "currentStep": "stage_1",
-          "currentStageLabel": "Section 1",
-          "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+          "status": "needs_review",
+          "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+          "formMode": "multi_stage",
+          "currentStep": "stage_3",
+          "currentStageLabel": "Section 3",
+          "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
           "retryCount": 0,
           "handoffCount": 0,
           "validationErrors": [
@@ -199,9 +204,9 @@
               "label": "Open job page",
               "status": "completed",
               "detail": "Job page opened successfully in a visible Chrome session.",
-              "attempts": 10,
-              "lastUpdatedAt": "2026-05-22T06:39:47.408Z",
-              "completedAt": "2026-05-22T06:39:47.408Z"
+              "attempts": 12,
+              "lastUpdatedAt": "2026-05-22T08:40:09.333Z",
+              "completedAt": "2026-05-22T08:40:09.333Z"
             },
             {
               "id": "authenticate_if_needed",
@@ -214,10 +219,11 @@
             {
               "id": "finish_current_section",
               "label": "Finish active section",
-              "status": "running",
-              "detail": "Reading Section 1 and planning the next safe action.",
-              "attempts": 28,
-              "lastUpdatedAt": "2026-05-22T06:39:51.334Z"
+              "status": "completed",
+              "detail": "Completed Section 2 and advanced to the next stage.",
+              "attempts": 31,
+              "lastUpdatedAt": "2026-05-22T08:40:35.941Z",
+              "completedAt": "2026-05-22T08:40:35.941Z"
             },
             {
               "id": "recover_from_validation_errors",
@@ -241,42 +247,34 @@
               "status": "completed",
               "detail": "Reached the review/submit checkpoint safely.",
               "attempts": 2,
-              "lastUpdatedAt": "2026-05-22T06:39:55.818Z",
-              "completedAt": "2026-05-22T06:39:55.818Z"
+              "lastUpdatedAt": "2026-05-22T08:40:19.576Z",
+              "completedAt": "2026-05-22T08:40:19.576Z"
             },
             {
               "id": "save_checkpoint",
               "label": "Save checkpoint",
               "status": "completed",
-              "detail": "Saved planner state so the run can continue from the latest checkpoint.",
+              "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
               "attempts": 0,
-              "lastUpdatedAt": "2026-05-22T06:39:55.818Z",
-              "completedAt": "2026-05-22T06:39:55.818Z"
+              "lastUpdatedAt": "2026-05-22T08:40:35.941Z",
+              "completedAt": "2026-05-22T08:40:35.941Z"
             }
           ],
           "lastDecision": {
-            "kind": "fill_fields",
-            "source": "llm",
-            "stageIndex": 0,
-            "stageLabel": "Section 1",
-            "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-            "reason": "Jay Kumar Gupta is excited to apply for the Oorwin role at Willwaretech, leveraging his skills in JavaScript, React, and Next.js to contribute to the team with a practical approach.",
-            "fieldLabels": [
-              "Last Name",
-              "First Name",
-              "Email",
-              "mat-input-3",
-              "Years of Experience",
-              "City",
-              "Current CTC"
-            ],
-            "createdAt": "2026-05-22T06:39:55.736Z"
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 1,
+            "stageLabel": "Section 2",
+            "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
+            "reason": "Page classified as account_gate; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T08:40:30.913Z"
           },
           "stageHistory": [
             {
               "stageIndex": 0,
               "label": "Section 1",
-              "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+              "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
               "visibleFieldLabels": [
                 "document_file",
                 "Last Name",
@@ -299,14 +297,14 @@
                 "mat-input-3",
                 "Years of Experience"
               ],
-              "outcome": "review",
+              "outcome": "advanced",
               "decision": {
                 "kind": "fill_fields",
                 "source": "llm",
                 "stageIndex": 0,
                 "stageLabel": "Section 1",
                 "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-                "reason": "Jay Kumar Gupta is excited to apply for the Oorwin role at Willwaretech, leveraging his skills in JavaScript, React, and Next.js to contribute to the team with a practical approach.",
+                "reason": "Jay Kumar Gupta is excited to apply for the Oorwin role at Willwaretech, leveraging his skills in JavaScript, React, Next.js, and experience in building reliable backend systems.",
                 "fieldLabels": [
                   "Last Name",
                   "First Name",
@@ -314,23 +312,47 @@
                   "mat-input-3",
                   "Years of Experience",
                   "City",
-                  "Current CTC"
+                  "Current CTC",
+                  "add_docs"
                 ],
-                "createdAt": "2026-05-22T06:39:55.736Z"
+                "createdAt": "2026-05-22T08:40:18.362Z"
               },
-              "lastUpdatedAt": "2026-05-22T06:39:55.818Z"
+              "lastUpdatedAt": "2026-05-22T08:40:26.332Z"
+            },
+            {
+              "stageIndex": 1,
+              "label": "Section 2",
+              "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
+              "visibleFieldLabels": [
+                "Search for Job Title, Location...",
+                "Location"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-22T08:40:35.941Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 1,
+                "stageLabel": "Section 2",
+                "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
+                "reason": "Page classified as account_gate; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-22T08:40:30.913Z"
+              }
             }
           ],
-          "lastUpdatedAt": "2026-05-22T06:39:55.818Z"
+          "lastUpdatedAt": "2026-05-22T08:40:35.941Z"
         }
       }
     },
     "notes": [
-      "The form is filled across 1 stage and is ready for review or direct submit.",
-      "Browser fill status: filled.",
-      "Filled fields: 8. Skipped fields: 0."
+      "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+      "Browser fill status: needs_manual_review.",
+      "Filled fields: 10. Skipped fields: 1."
     ]
   },
   "createdAt": "2026-05-20T10:53:28.958Z",
-  "updatedAt": "2026-05-22T06:39:56.197Z"
+  "updatedAt": "2026-05-22T08:40:36.053Z"
 }

@@ -4,11 +4,13 @@ import { createId } from "../lib/id";
 import { nowIso } from "../lib/time";
 import { AuthRepository } from "../repositories/auth-repository";
 import { StudentRepository } from "../repositories/student-repository";
+import { ResumeService } from "./resume-service";
 
 export class AuthService {
   constructor(
     private readonly auth = new AuthRepository(),
-    private readonly students = new StudentRepository()
+    private readonly students = new StudentRepository(),
+    private readonly resumes = new ResumeService()
   ) {}
 
   async login(input: LoginInput): Promise<AuthResponse> {
@@ -49,10 +51,45 @@ export class AuthService {
       visaRequired: false,
       automationMode: "full_autopilot",
       defaultStrictness: "balanced",
-      bio: ""
+      bio: "",
+      completeProfile: {
+        workAuthorizationCountries: [],
+        preferredEmploymentTypes: [],
+        certifications: [],
+        languages: [],
+        achievements: [],
+        educationHistory: [],
+        employmentHistory: [],
+        projectHistory: [],
+        screeningAnswers: [],
+        customFacts: [],
+        eeo: {}
+      },
+      resumeId: input.resumeId
     };
 
+    if (input.completeProfile) {
+      student.completeProfile = {
+        ...student.completeProfile,
+        ...input.completeProfile,
+        workAuthorizationCountries: input.completeProfile.workAuthorizationCountries ?? [],
+        preferredEmploymentTypes: input.completeProfile.preferredEmploymentTypes ?? [],
+        certifications: input.completeProfile.certifications ?? [],
+        languages: input.completeProfile.languages ?? [],
+        achievements: input.completeProfile.achievements ?? [],
+        educationHistory: input.completeProfile.educationHistory ?? [],
+        employmentHistory: input.completeProfile.employmentHistory ?? [],
+        projectHistory: input.completeProfile.projectHistory ?? [],
+        screeningAnswers: input.completeProfile.screeningAnswers ?? [],
+        customFacts: input.completeProfile.customFacts ?? [],
+        eeo: input.completeProfile.eeo ?? {}
+      };
+    }
+
     await this.students.create(student);
+    if (input.resumeId) {
+      await this.resumes.assignExistingResumeToStudent(input.resumeId, student.id).catch(() => undefined);
+    }
     await this.auth.createAccount({
       id: createId("account"),
       studentId: student.id,

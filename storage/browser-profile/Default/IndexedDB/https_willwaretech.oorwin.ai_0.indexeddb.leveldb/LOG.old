@@ -1,13 +1,5 @@
-2026/05/22-11:38:52.970 676a1 Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_willwaretech.oorwin.ai_0.indexeddb.leveldb/MANIFEST-000001
-2026/05/22-11:38:52.971 676a1 Recovering log #38
-2026/05/22-11:38:52.974 676a1 Reusing old log /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_willwaretech.oorwin.ai_0.indexeddb.leveldb/000038.log 
-2026/05/22-11:38:52.983 676af Level-0 table #43: started
-2026/05/22-11:38:52.984 676af Level-0 table #43: 4525 bytes OK
-2026/05/22-11:38:52.985 676af Delete type=0 #38
-2026/05/22-11:38:52.985 676af Manual compaction at level-0 from '\x00\x10\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x11\x00\x00\x00' @ 0 : 0; will stop at '\x00\x10\x00\x00\x05' @ 694 : 1
-2026/05/22-11:38:52.985 676af Compacting 1@0 + 1@1 files
-2026/05/22-11:38:52.986 676af Generated table #44@0: 29 keys, 1667 bytes
-2026/05/22-11:38:52.986 676af Compacted 1@0 + 1@1 files => 1667 bytes
-2026/05/22-11:38:52.987 676af compacted to: files[ 0 1 1 0 0 0 0 ]
-2026/05/22-11:38:52.987 676af Delete type=2 #43
-2026/05/22-11:38:52.987 676af Manual compaction at level-0 from '\x00\x10\x00\x00\x05' @ 694 : 1 .. '\x00\x11\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/05/22-17:01:17.215 b5143 Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_willwaretech.oorwin.ai_0.indexeddb.leveldb/MANIFEST-000001
+2026/05/22-17:01:17.216 b5143 Recovering log #66
+2026/05/22-17:01:17.216 b5143 Reusing old log /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_willwaretech.oorwin.ai_0.indexeddb.leveldb/000066.log 
+2026/05/22-17:01:17.216 b5143 Delete type=2 #64
+2026/05/22-17:01:17.229 b515a Manual compaction at level-0 from '\x00\x1a\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x1b\x00\x00\x00' @ 0 : 0; will stop at (end)

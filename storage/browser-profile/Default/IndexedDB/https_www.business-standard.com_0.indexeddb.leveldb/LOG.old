@@ -1,0 +1,3 @@
+2026/05/22-13:48:14.356 8edff Creating DB /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_www.business-standard.com_0.indexeddb.leveldb since it was missing.
+2026/05/22-13:48:14.364 8edff Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/IndexedDB/https_www.business-standard.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/05/22-13:48:14.386 8ee00 Manual compaction at level-0 from '\x00\x01\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x02\x00\x00\x00' @ 0 : 0; will stop at (end)

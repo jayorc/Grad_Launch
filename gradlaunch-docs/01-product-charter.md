@@ -46,7 +46,7 @@ GradLaunch will not:
 - impersonate a student in interviews
 - take real hiring assessments on the student's behalf
 - bypass captchas, OTP, identity checks, or platform protections
-- promise reliable automation on every job site on the internet
+
 
 ## Product Principles
 

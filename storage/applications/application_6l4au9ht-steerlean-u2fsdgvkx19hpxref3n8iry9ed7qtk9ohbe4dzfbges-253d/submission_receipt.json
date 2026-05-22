@@ -1,0 +1,158 @@
+{
+  "intent": "browser_fill",
+  "outcome": "confirmed",
+  "externalSubmitted": false,
+  "confirmation": "GradLaunch could not confidently find the next action on this page.",
+  "submittedAt": "2026-05-22T08:20:00.074Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "jaynrk200211@gmail.com",
+    "subject": "GradLaunch filled Steerlean - U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d",
+    "sentAt": "2026-05-22T08:20:00.074Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "needs_manual_review",
+    "sourceUrl": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+    "openedAt": "2026-05-22T08:19:36.816Z",
+    "completedAt": "2026-05-22T08:20:00.074Z",
+    "filledLabels": [
+      "First name",
+      "Last name",
+      "daniel@gmail.com",
+      "074104 10123",
+      "Current Organization",
+      "Current designation",
+      "Start typing to choose location",
+      "Start typing to choose city",
+      "Current Annual Salary",
+      "Expected Annual Salary"
+    ],
+    "skippedLabels": [],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-stage-1-start.png"
+    ],
+    "message": "GradLaunch could not confidently find the next action on this page.",
+    "planner": {
+      "sessionId": "planner-job_p7xij9qq",
+      "resumeToken": "job_p7xij9qq:2026-05-22T08:19:36.816Z",
+      "goal": "Complete the U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d application at Steerlean autonomously until a protected or review checkpoint.",
+      "status": "needs_review",
+      "summary": "GradLaunch could not find a confident next-step control on this page.",
+      "formMode": "single_stage",
+      "retryCount": 0,
+      "handoffCount": 0,
+      "validationErrors": [],
+      "subgoals": [
+        {
+          "id": "open_job_page",
+          "label": "Open job page",
+          "status": "completed",
+          "detail": "Job page opened successfully in a visible Chrome session.",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-22T08:19:39.094Z",
+          "completedAt": "2026-05-22T08:19:39.094Z"
+        },
+        {
+          "id": "authenticate_if_needed",
+          "label": "Handle login if needed",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T08:19:36.816Z"
+        },
+        {
+          "id": "finish_current_section",
+          "label": "Finish active section",
+          "status": "running",
+          "detail": "Reading Section 1 and planning the next safe action.",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-22T08:19:42.888Z"
+        },
+        {
+          "id": "recover_from_validation_errors",
+          "label": "Recover from validation errors",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T08:19:36.816Z"
+        },
+        {
+          "id": "retry_alternative_path",
+          "label": "Retry alternative path",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T08:19:36.816Z"
+        },
+        {
+          "id": "reach_submit_gate",
+          "label": "Reach submit/review gate",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T08:19:36.816Z"
+        },
+        {
+          "id": "save_checkpoint",
+          "label": "Save checkpoint",
+          "status": "completed",
+          "detail": "Saved checkpoint while waiting for manual stage progress.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T08:19:48.099Z",
+          "completedAt": "2026-05-22T08:19:48.099Z"
+        }
+      ],
+      "stageHistory": [
+        {
+          "stageIndex": 0,
+          "label": "Section 1",
+          "url": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+          "visibleFieldLabels": [
+            "First name",
+            "Middle name",
+            "Last name",
+            "daniel@gmail.com",
+            "074104 10123",
+            "Current Organization",
+            "Current designation",
+            "Start typing to choose location",
+            "Start typing to choose city",
+            "Current Annual Salary",
+            "Expected Annual Salary"
+          ],
+          "requiredFieldLabels": [],
+          "filledFieldLabels": [],
+          "outcome": "observed",
+          "lastUpdatedAt": "2026-05-22T08:19:48.087Z",
+          "decision": {
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
+            "url": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+            "reason": "Page classified as account_gate; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T08:19:48.087Z"
+          }
+        }
+      ],
+      "lastUpdatedAt": "2026-05-22T08:20:00.008Z",
+      "currentUrl": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+      "currentStep": "stage_1",
+      "currentStageLabel": "Section 1",
+      "lastDecision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://steerlean.talentrecruit.com/career-page/apply/U2FsdGVkX19hpxref3N8iRY9eD7QTK9Ohbe4dzFbgEs%253d?share=linkedin",
+        "reason": "Page classified as account_gate; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T08:19:48.087Z"
+      }
+    }
+  }
+}

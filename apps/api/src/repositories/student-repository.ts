@@ -111,6 +111,107 @@ function mapStudent(student: Record<string, unknown>): StudentProfile {
     defaultStrictness: String(student.defaultStrictness) as StudentProfile["defaultStrictness"],
     bio: typeof student.bio === "string" ? student.bio : "",
     avatarUrl: typeof student.avatarUrl === "string" ? student.avatarUrl : undefined,
-    resumeId: typeof student.resumeId === "string" ? student.resumeId : undefined
+    resumeId: typeof student.resumeId === "string" ? student.resumeId : undefined,
+    completeProfile: isRecord(student.completeProfile)
+      ? {
+          headline: asOptionalString(student.completeProfile.headline),
+          phone: asOptionalString(student.completeProfile.phone),
+          alternateEmail: asOptionalString(student.completeProfile.alternateEmail),
+          linkedInUrl: asOptionalString(student.completeProfile.linkedInUrl),
+          githubUrl: asOptionalString(student.completeProfile.githubUrl),
+          portfolioUrl: asOptionalString(student.completeProfile.portfolioUrl),
+          websiteUrl: asOptionalString(student.completeProfile.websiteUrl),
+          leetcodeUrl: asOptionalString(student.completeProfile.leetcodeUrl),
+          kaggleUrl: asOptionalString(student.completeProfile.kaggleUrl),
+          addressLine1: asOptionalString(student.completeProfile.addressLine1),
+          addressLine2: asOptionalString(student.completeProfile.addressLine2),
+          city: asOptionalString(student.completeProfile.city),
+          state: asOptionalString(student.completeProfile.state),
+          country: asOptionalString(student.completeProfile.country),
+          postalCode: asOptionalString(student.completeProfile.postalCode),
+          nationality: asOptionalString(student.completeProfile.nationality),
+          pronouns: asOptionalString(student.completeProfile.pronouns),
+          gender: asOptionalString(student.completeProfile.gender),
+          dateOfBirth: asOptionalString(student.completeProfile.dateOfBirth),
+          currentCompany: asOptionalString(student.completeProfile.currentCompany),
+          currentTitle: asOptionalString(student.completeProfile.currentTitle),
+          totalExperienceYears: asOptionalNumber(student.completeProfile.totalExperienceYears),
+          noticePeriodDays: asOptionalNumber(student.completeProfile.noticePeriodDays),
+          currentSalaryLpa: asOptionalNumber(student.completeProfile.currentSalaryLpa),
+          sponsorshipRequired: asOptionalBoolean(student.completeProfile.sponsorshipRequired),
+          openToRelocate: asOptionalBoolean(student.completeProfile.openToRelocate),
+          willingToTravel: asOptionalBoolean(student.completeProfile.willingToTravel),
+          workAuthorizationCountries: asStringArray(student.completeProfile.workAuthorizationCountries),
+          preferredEmploymentTypes: asStringArray(student.completeProfile.preferredEmploymentTypes),
+          certifications: asStringArray(student.completeProfile.certifications),
+          languages: asStringArray(student.completeProfile.languages),
+          achievements: asStringArray(student.completeProfile.achievements),
+          educationHistory: asRecordArray(student.completeProfile.educationHistory).map((entry) => ({
+            school: String(entry.school ?? ""),
+            degree: String(entry.degree ?? ""),
+            fieldOfStudy: asOptionalString(entry.fieldOfStudy),
+            startYear: asOptionalNumber(entry.startYear),
+            endYear: asOptionalNumber(entry.endYear),
+            grade: asOptionalString(entry.grade),
+            city: asOptionalString(entry.city),
+            country: asOptionalString(entry.country)
+          })),
+          employmentHistory: asRecordArray(student.completeProfile.employmentHistory).map((entry) => ({
+            company: String(entry.company ?? ""),
+            title: String(entry.title ?? ""),
+            startDate: asOptionalString(entry.startDate),
+            endDate: asOptionalString(entry.endDate),
+            current: asOptionalBoolean(entry.current),
+            location: asOptionalString(entry.location),
+            summary: asOptionalString(entry.summary)
+          })),
+          projectHistory: asRecordArray(student.completeProfile.projectHistory).map((entry) => ({
+            name: String(entry.name ?? ""),
+            role: asOptionalString(entry.role),
+            techStack: asOptionalString(entry.techStack),
+            summary: asOptionalString(entry.summary),
+            url: asOptionalString(entry.url)
+          })),
+          screeningAnswers: asRecordArray(student.completeProfile.screeningAnswers).map((entry) => ({
+            question: String(entry.question ?? ""),
+            answer: String(entry.answer ?? "")
+          })),
+          customFacts: asRecordArray(student.completeProfile.customFacts).map((entry) => ({
+            label: String(entry.label ?? ""),
+            value: String(entry.value ?? "")
+          })),
+          eeo: isRecord(student.completeProfile.eeo)
+            ? {
+                ethnicity: asOptionalString(student.completeProfile.eeo.ethnicity),
+                veteranStatus: asOptionalString(student.completeProfile.eeo.veteranStatus),
+                disabilityStatus: asOptionalString(student.completeProfile.eeo.disabilityStatus)
+              }
+            : {}
+        }
+      : undefined
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function asOptionalString(value: unknown) {
+  return typeof value === "string" ? value : undefined;
+}
+
+function asOptionalNumber(value: unknown) {
+  return typeof value === "number" ? value : undefined;
+}
+
+function asOptionalBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function asStringArray(value: unknown) {
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+function asRecordArray(value: unknown) {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
 }

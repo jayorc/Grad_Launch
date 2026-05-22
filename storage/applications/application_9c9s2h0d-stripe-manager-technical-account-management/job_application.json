@@ -1,0 +1,428 @@
+{
+  "applicationId": "application_9c9s2h0d",
+  "studentId": "student_tcgn9yq4",
+  "jobId": "job_greenhouse_c3RyaXBlLTc2NjQ2Njc",
+  "status": "ready_for_review",
+  "sourceLabel": "Greenhouse",
+  "matchScore": 38,
+  "generatedArtifacts": {
+    "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the Manager, Technical Account Management role at Stripe.",
+    "coverLetterExcerpt": "I am excited to apply for the Manager, Technical Account Management role at Stripe. My background in JavaScript, React, Next.js and my focus on becoming a strong Manager, Technical Account Management make this opportunity especially compelling to me. I would be glad to contribute to Stripe's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Sydney opportunities.",
+    "shortAnswers": [
+      {
+        "question": "Why are you interested in this role?",
+        "answer": "This role aligns with my goal of becoming a strong Manager, Technical Account Management and uses skills I have already practiced through projects and coursework."
+      },
+      {
+        "question": "What makes you a match?",
+        "answer": "My background in JavaScript, React, Next.js, Node.js closely matches the technical expectations in the job description."
+      }
+    ]
+  },
+  "uploadedDocuments": [
+    "jay_kumar_gupta_nit_kkr.pdf",
+    "tailored_resume_summary.txt",
+    "cover_letter_excerpt.txt",
+    "short_answers.json"
+  ],
+  "run": {
+    "id": "run_gryrum3k",
+    "status": "needs_review",
+    "executionMode": "browser_apply",
+    "filledFields": [
+      {
+        "label": "First name",
+        "value": "Jay"
+      },
+      {
+        "label": "Last name",
+        "value": "Kumar Gupta"
+      },
+      {
+        "label": "Full name",
+        "value": "Jay Kumar Gupta"
+      },
+      {
+        "label": "Email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "Confirm your email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "City",
+        "value": "Sydney"
+      },
+      {
+        "label": "Location",
+        "value": "Sydney"
+      },
+      {
+        "label": "Location (City)",
+        "value": "Sydney"
+      },
+      {
+        "label": "Country",
+        "value": "India"
+      },
+      {
+        "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Phone",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Mobile",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Degree",
+        "value": "B.Tech in Computer Science"
+      },
+      {
+        "label": "Graduation year",
+        "value": "2020"
+      },
+      {
+        "label": "Preferred location",
+        "value": "Sydney"
+      },
+      {
+        "label": "Target role",
+        "value": "Manager, Technical Account Management"
+      },
+      {
+        "label": "Work authorization",
+        "value": "Yes"
+      },
+      {
+        "label": "Legally authorized to work",
+        "value": "Yes"
+      },
+      {
+        "label": "Visa sponsorship required",
+        "value": "No"
+      },
+      {
+        "label": "Visa required",
+        "value": "No"
+      },
+      {
+        "label": "Current CTC",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Current salary",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Message to the Hiring Team",
+        "value": "I am excited to apply for the Manager, Technical Account Management role at Stripe. My background in JavaScript, React, Next.js and my focus on becoming a strong Manager, Technical Account Management make this opportunity especially compelling to me. I would be glad to contribute to Stripe's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Sydney opportunities."
+      },
+      {
+        "label": "Primary skills",
+        "value": "JavaScript, React, Next.js, Node.js, Express"
+      },
+      {
+        "label": "Resume context",
+        "value": "jay_kumar_gupta_nit_kkr.pdf"
+      },
+      {
+        "label": "Why are you interested in this role?",
+        "value": "This role aligns with my goal of becoming a strong Manager, Technical Account Management and uses skills I have practiced through projects and coursework."
+      },
+      {
+        "label": "What makes you a match?",
+        "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+      }
+    ],
+    "submission": {
+      "intent": "browser_fill",
+      "outcome": "confirmed",
+      "externalSubmitted": false,
+      "confirmation": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+      "submittedAt": "2026-05-22T08:13:15.642Z",
+      "email": {
+        "status": "skipped",
+        "provider": "outbox",
+        "to": "jaynrk200211@gmail.com",
+        "subject": "GradLaunch filled Stripe - Manager, Technical Account Management",
+        "sentAt": "2026-05-22T08:13:15.642Z",
+        "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+      },
+      "browser": {
+        "status": "needs_manual_review",
+        "sourceUrl": "https://stripe.com/jobs/search?gh_jid=7664667",
+        "openedAt": "2026-05-22T08:12:31.913Z",
+        "completedAt": "2026-05-22T08:13:15.642Z",
+        "filledLabels": [
+          "First Name",
+          "Last Name",
+          "Email",
+          "Country",
+          "Phone",
+          "Location (City)",
+          "Who is your current or previous employer?",
+          "What is your current or previous job title?",
+          "Australia",
+          "Are you authorized to work in the location(s) you selected in your previous response?",
+          "Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in your previous response?",
+          "If this role offers the option to work from a remote location, do you plan to work remotely?",
+          "What is the most recent school you attended?",
+          "What is the most recent degree you obtained?",
+          "Do you opt-in to receive WhatsApp messages from Stripe Recruiting?"
+        ],
+        "skippedLabels": [
+          "Attach"
+        ],
+        "screenshots": [
+          "browser-opened.png",
+          "browser-stage-1-start.png",
+          "browser-stage-2-start.png",
+          "browser-handoff-needed.png"
+        ],
+        "message": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+        "planner": {
+          "sessionId": "planner-job_greenhouse_c3RyaXBlLTc2NjQ2Njc",
+          "resumeToken": "job_greenhouse_c3RyaXBlLTc2NjQ2Njc:2026-05-22T08:12:31.913Z",
+          "goal": "Complete the Manager, Technical Account Management application at Stripe autonomously until a protected or review checkpoint.",
+          "status": "needs_review",
+          "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+          "formMode": "multi_stage",
+          "retryCount": 0,
+          "handoffCount": 1,
+          "validationErrors": [
+            "Country",
+            "Location (City)",
+            "Please select the country where you currently reside.",
+            "Are you authorized to work in the location(s) you selected in your previous response?",
+            "Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in you",
+            "If this role offers the option to work from a remote location, do you plan to work remotely?",
+            "Have you ever been employed by Stripe or a Stripe affiliate?",
+            "Do you opt-in to receive WhatsApp messages from Stripe Recruiting?"
+          ],
+          "subgoals": [
+            {
+              "id": "open_job_page",
+              "label": "Open job page",
+              "status": "completed",
+              "detail": "Job page opened successfully in a visible Chrome session.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-22T08:12:35.200Z",
+              "completedAt": "2026-05-22T08:12:35.200Z"
+            },
+            {
+              "id": "authenticate_if_needed",
+              "label": "Handle login if needed",
+              "status": "running",
+              "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+              "attempts": 2,
+              "lastUpdatedAt": "2026-05-22T08:13:15.554Z"
+            },
+            {
+              "id": "finish_current_section",
+              "label": "Finish active section",
+              "status": "running",
+              "detail": "Reading Section 2 and planning the next safe action.",
+              "attempts": 2,
+              "lastUpdatedAt": "2026-05-22T08:12:45.937Z",
+              "completedAt": "2026-05-22T08:12:45.527Z"
+            },
+            {
+              "id": "recover_from_validation_errors",
+              "label": "Recover from validation errors",
+              "status": "blocked",
+              "detail": "Validation or required-answer blockers were found: Country, Location (City), Please select the country where you currently reside., Are you authorized to work in the location(s) you selected in your previous response?, Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in you, If this role offers the option to work from a remote location, do you plan to work remotely?, Have you ever been employed by Stripe or a Stripe affiliate?, Do you opt-in to receive WhatsApp messages from Stripe Recruiting?.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-22T08:12:54.660Z"
+            },
+            {
+              "id": "retry_alternative_path",
+              "label": "Retry alternative path",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-22T08:12:31.913Z"
+            },
+            {
+              "id": "reach_submit_gate",
+              "label": "Reach submit/review gate",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-22T08:12:31.913Z"
+            },
+            {
+              "id": "save_checkpoint",
+              "label": "Save checkpoint",
+              "status": "completed",
+              "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-22T08:13:15.554Z",
+              "completedAt": "2026-05-22T08:13:15.554Z"
+            }
+          ],
+          "stageHistory": [
+            {
+              "stageIndex": 0,
+              "label": "Section 1",
+              "url": "https://stripe.com/jobs/listing/manager-technical-account-management/7664667/apply",
+              "visibleFieldLabels": [],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-22T08:12:45.527Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 0,
+                "stageLabel": "Section 1",
+                "url": "https://stripe.com/jobs/listing/manager-technical-account-management/7664667",
+                "reason": "Page classified as start; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-22T08:12:42.525Z"
+              }
+            },
+            {
+              "stageIndex": 1,
+              "label": "Section 2",
+              "url": "https://stripe.com/jobs/listing/manager-technical-account-management/7664667/apply",
+              "visibleFieldLabels": [
+                "First Name",
+                "Last Name",
+                "Email",
+                "Country",
+                "Phone",
+                "Location (City)",
+                "Attach",
+                "Who is your current or previous employer?",
+                "What is your current or previous job title?",
+                "Please select the country where you currently reside.",
+                "Australia",
+                "Belgium",
+                "Brazil",
+                "Canada",
+                "France",
+                "Germany",
+                "India",
+                "Indonesia",
+                "Ireland",
+                "Israel",
+                "Italy",
+                "Japan",
+                "Luxembourg",
+                "Malaysia",
+                "Mexico",
+                "New Zealand",
+                "Poland",
+                "Portugal",
+                "Romania",
+                "Singapore",
+                "South Korea",
+                "Spain",
+                "Sweden",
+                "Switzerland",
+                "Thailand",
+                "The Netherlands",
+                "UAE",
+                "UK",
+                "US",
+                "Are you authorized to work in the location(s) you selected in your previous response?",
+                "Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in your previous response?",
+                "If this role offers the option to work from a remote location, do you plan to work remotely?",
+                "Have you ever been employed by Stripe or a Stripe affiliate?",
+                "What is the most recent school you attended?",
+                "What is the most recent degree you obtained?",
+                "Do you opt-in to receive WhatsApp messages from Stripe Recruiting?"
+              ],
+              "requiredFieldLabels": [
+                "First Name",
+                "Last Name",
+                "Email",
+                "Country",
+                "Phone",
+                "Location (City)",
+                "Who is your current or previous employer?",
+                "What is your current or previous job title?",
+                "Please select the country where you currently reside.",
+                "Australia",
+                "Belgium",
+                "Brazil",
+                "Canada",
+                "France",
+                "Germany",
+                "India",
+                "Indonesia",
+                "Ireland",
+                "Israel",
+                "Italy",
+                "Japan",
+                "Luxembourg",
+                "Malaysia",
+                "Mexico",
+                "New Zealand",
+                "Poland",
+                "Portugal",
+                "Romania",
+                "Singapore",
+                "South Korea",
+                "Spain",
+                "Sweden",
+                "Switzerland",
+                "Thailand",
+                "The Netherlands",
+                "UAE",
+                "UK",
+                "US",
+                "Are you authorized to work in the location(s) you selected in your previous response?",
+                "Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in your previous response?",
+                "If this role offers the option to work from a remote location, do you plan to work remotely?",
+                "Have you ever been employed by Stripe or a Stripe affiliate?",
+                "What is the most recent school you attended?",
+                "What is the most recent degree you obtained?",
+                "Do you opt-in to receive WhatsApp messages from Stripe Recruiting?"
+              ],
+              "filledFieldLabels": [],
+              "outcome": "handoff",
+              "lastUpdatedAt": "2026-05-22T08:12:54.977Z",
+              "decision": {
+                "kind": "wait_for_user_input",
+                "source": "system",
+                "stageIndex": 1,
+                "stageLabel": "Section 2",
+                "url": "https://stripe.com/jobs/listing/manager-technical-account-management/7664667/apply",
+                "reason": "GradLaunch needs your help with required answers on this screen: Country, Location (City), Please select the country where you currently reside., Are you authorized to work in the location(s) you selected in your previous response?, Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in you, If this role offers the option to work from a remote location, do you plan to work remotely?, Have you ever been employed by Stripe or a Stripe affiliate?, Do you opt-in to receive WhatsApp messages from Stripe Recruiting?.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-22T08:12:54.977Z"
+              }
+            }
+          ],
+          "lastUpdatedAt": "2026-05-22T08:13:15.554Z",
+          "currentUrl": "https://stripe.com/jobs/listing/manager-technical-account-management/7664667/apply",
+          "currentStep": "stage_2",
+          "currentStageLabel": "Section 2",
+          "lastDecision": {
+            "kind": "wait_for_user_input",
+            "source": "system",
+            "stageIndex": 1,
+            "stageLabel": "Section 2",
+            "url": "https://stripe.com/jobs/listing/manager-technical-account-management/7664667/apply",
+            "reason": "GradLaunch needs your help with required answers on this screen: Country, Location (City), Please select the country where you currently reside., Are you authorized to work in the location(s) you selected in your previous response?, Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in you, If this role offers the option to work from a remote location, do you plan to work remotely?, Have you ever been employed by Stripe or a Stripe affiliate?, Do you opt-in to receive WhatsApp messages from Stripe Recruiting?.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T08:12:54.977Z"
+          }
+        }
+      }
+    },
+    "notes": [
+      "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+      "Browser fill status: needs_manual_review.",
+      "Filled fields: 15. Skipped fields: 1."
+    ]
+  },
+  "createdAt": "2026-05-22T08:12:31.912Z",
+  "updatedAt": "2026-05-22T08:13:15.642Z"
+}

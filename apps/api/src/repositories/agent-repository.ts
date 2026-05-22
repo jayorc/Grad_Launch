@@ -7,6 +7,7 @@ import type {
   AgentTask,
   AgentTaskRun,
   AgentTaskStatus,
+  BrowserExecutionSession,
   PolicyDecision,
   StudentMemory
 } from "@gradlaunch/shared";
@@ -17,6 +18,7 @@ import {
   AgentHandoffModel,
   AgentTaskModel,
   AgentTaskRunModel,
+  BrowserExecutionSessionModel,
   PolicyDecisionModel,
   StudentMemoryModel
 } from "../models/agent-models";
@@ -35,6 +37,99 @@ type ListTaskOptions = {
 };
 
 export class AgentRepository {
+  async createBrowserExecutionSession(session: BrowserExecutionSession): Promise<BrowserExecutionSession> {
+    if (isMemoryMode()) {
+      db.browserExecutionSessions.push(session);
+      return session;
+    }
+
+    await BrowserExecutionSessionModel.create(session);
+    return session;
+  }
+
+  async upsertBrowserExecutionSession(session: BrowserExecutionSession): Promise<BrowserExecutionSession> {
+    if (isMemoryMode()) {
+      const index = db.browserExecutionSessions.findIndex((item) => item.id === session.id);
+
+      if (index === -1) {
+        db.browserExecutionSessions.push(session);
+      } else {
+        db.browserExecutionSessions[index] = session;
+      }
+
+      return session;
+    }
+
+    await BrowserExecutionSessionModel.findOneAndUpdate(
+      { id: session.id },
+      { $set: session },
+      { upsert: true, new: true }
+    );
+
+    return session;
+  }
+
+  async updateBrowserExecutionSession(sessionId: string, patch: Partial<BrowserExecutionSession>): Promise<BrowserExecutionSession> {
+    if (isMemoryMode()) {
+      const index = db.browserExecutionSessions.findIndex((session) => session.id === sessionId);
+
+      if (index === -1) {
+        throw new Error("Browser execution session not found.");
+      }
+
+      db.browserExecutionSessions[index] = {
+        ...db.browserExecutionSessions[index],
+        ...patch
+      };
+
+      return db.browserExecutionSessions[index];
+    }
+
+    const session = await BrowserExecutionSessionModel.findOneAndUpdate(
+      { id: sessionId },
+      { $set: patch },
+      { new: true }
+    ).lean();
+
+    if (!session) {
+      throw new Error("Browser execution session not found.");
+    }
+
+    return mapBrowserExecutionSession(session as Record<string, unknown>);
+  }
+
+  async getBrowserExecutionSessionById(sessionId: string): Promise<BrowserExecutionSession | undefined> {
+    if (isMemoryMode()) {
+      return db.browserExecutionSessions.find((session) => session.id === sessionId);
+    }
+
+    const session = await BrowserExecutionSessionModel.findOne({ id: sessionId }).lean();
+    return session ? mapBrowserExecutionSession(session as Record<string, unknown>) : undefined;
+  }
+
+  async getLatestBrowserExecutionSessionForApplication(applicationId: string): Promise<BrowserExecutionSession | undefined> {
+    if (isMemoryMode()) {
+      return [...db.browserExecutionSessions]
+        .filter((session) => session.applicationId === applicationId)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+    }
+
+    const session = await BrowserExecutionSessionModel.findOne({ applicationId }).sort({ updatedAt: -1 }).lean();
+    return session ? mapBrowserExecutionSession(session as Record<string, unknown>) : undefined;
+  }
+
+  async listBrowserExecutionSessionsByStudent(studentId: string, limit = 10): Promise<BrowserExecutionSession[]> {
+    if (isMemoryMode()) {
+      return [...db.browserExecutionSessions]
+        .filter((session) => session.studentId === studentId)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .slice(0, limit);
+    }
+
+    const sessions = await BrowserExecutionSessionModel.find({ studentId }).sort({ updatedAt: -1 }).limit(limit).lean();
+    return sessions.map((session) => mapBrowserExecutionSession(session as Record<string, unknown>));
+  }
+
   async createGoal(goal: AgentGoal): Promise<AgentGoal> {
     if (isMemoryMode()) {
       db.agentGoals.push(goal);
@@ -397,11 +492,12 @@ export class AgentRepository {
   }
 
   async getControlPlaneSnapshot(studentId: string): Promise<AgentControlPlaneSnapshot> {
-    const [goals, tasks, handoffs, recentEvents, memory] = await Promise.all([
+    const [goals, tasks, handoffs, recentEvents, browserSessions, memory] = await Promise.all([
       this.listGoalsByStudent(studentId, 10),
       this.listTasks({ studentId, limit: 20 }),
       this.listOpenHandoffsByStudent(studentId, 10),
       this.listEventsByStudent(studentId, 20),
+      this.listBrowserExecutionSessionsByStudent(studentId, 10),
       this.getStudentMemory(studentId)
     ]);
 
@@ -410,6 +506,7 @@ export class AgentRepository {
       tasks,
       handoffs,
       recentEvents,
+      browserSessions,
       memory
     };
   }
@@ -539,6 +636,73 @@ function mapEvent(event: Record<string, unknown>): AgentEvent {
     applicationId: typeof event.applicationId === "string" ? event.applicationId : undefined,
     metadata: isRecord(event.metadata) ? event.metadata : undefined,
     createdAt: String(event.createdAt)
+  };
+}
+
+function mapBrowserExecutionSession(session: Record<string, unknown>): BrowserExecutionSession {
+  return {
+    id: String(session.id),
+    studentId: String(session.studentId),
+    applicationId: String(session.applicationId),
+    runId: String(session.runId),
+    jobId: String(session.jobId),
+    status: String(session.status) as BrowserExecutionSession["status"],
+    sourceUrl: String(session.sourceUrl ?? ""),
+    currentUrl: typeof session.currentUrl === "string" ? session.currentUrl : undefined,
+    currentStageIndex: typeof session.currentStageIndex === "number" ? session.currentStageIndex : undefined,
+    currentStageLabel: typeof session.currentStageLabel === "string" ? session.currentStageLabel : undefined,
+    workspacePath: typeof session.workspacePath === "string" ? session.workspacePath : undefined,
+    latestMessage: String(session.latestMessage ?? ""),
+    latestSteps: Array.isArray(session.latestSteps)
+      ? session.latestSteps.map((step) => {
+          const next = step as Record<string, unknown>;
+          return {
+            id: String(next.id ?? ""),
+            label: String(next.label ?? ""),
+            detail: String(next.detail ?? ""),
+            state: String(next.state ?? "queued") as BrowserExecutionSession["latestSteps"][number]["state"],
+            source: String(next.source ?? "gradlaunch") as BrowserExecutionSession["latestSteps"][number]["source"],
+            timestamp: typeof next.timestamp === "string" ? next.timestamp : undefined
+          };
+        })
+      : [],
+    lastDecision: isRecord(session.lastDecision)
+      ? {
+          kind: String(session.lastDecision.kind ?? "scan_page") as NonNullable<BrowserExecutionSession["lastDecision"]>["kind"],
+          source: String(session.lastDecision.source ?? "system") as NonNullable<BrowserExecutionSession["lastDecision"]>["source"],
+          stageIndex: Number(session.lastDecision.stageIndex ?? 0),
+          stageLabel: String(session.lastDecision.stageLabel ?? ""),
+          url: String(session.lastDecision.url ?? ""),
+          reason: String(session.lastDecision.reason ?? ""),
+          fieldLabels: Array.isArray(session.lastDecision.fieldLabels) ? session.lastDecision.fieldLabels.map(String) : [],
+          createdAt: String(session.lastDecision.createdAt ?? "")
+        }
+      : undefined,
+    lastStageSignature: isRecord(session.lastStageSignature)
+      ? {
+          url: String(session.lastStageSignature.url ?? ""),
+          title: String(session.lastStageSignature.title ?? ""),
+          fingerprint: String(session.lastStageSignature.fingerprint ?? ""),
+          visibleFieldLabels: Array.isArray(session.lastStageSignature.visibleFieldLabels) ? session.lastStageSignature.visibleFieldLabels.map(String) : [],
+          requiredFieldLabels: Array.isArray(session.lastStageSignature.requiredFieldLabels) ? session.lastStageSignature.requiredFieldLabels.map(String) : [],
+          controlLabels: Array.isArray(session.lastStageSignature.controlLabels) ? session.lastStageSignature.controlLabels.map(String) : [],
+          progressText: typeof session.lastStageSignature.progressText === "string" ? session.lastStageSignature.progressText : undefined,
+          savedAt: String(session.lastStageSignature.savedAt ?? "")
+        }
+      : undefined,
+    pendingHandoff: isRecord(session.pendingHandoff)
+      ? {
+          kind: String(session.pendingHandoff.kind ?? "review") as NonNullable<BrowserExecutionSession["pendingHandoff"]>["kind"],
+          title: String(session.pendingHandoff.title ?? ""),
+          detail: String(session.pendingHandoff.detail ?? ""),
+          requestedAt: String(session.pendingHandoff.requestedAt ?? "")
+        }
+      : undefined,
+    browserStatus: typeof session.browserStatus === "string" ? session.browserStatus as BrowserExecutionSession["browserStatus"] : undefined,
+    filledCount: Number(session.filledCount ?? 0),
+    manualCount: Number(session.manualCount ?? 0),
+    updatedAt: String(session.updatedAt ?? ""),
+    createdAt: String(session.createdAt ?? "")
   };
 }
 

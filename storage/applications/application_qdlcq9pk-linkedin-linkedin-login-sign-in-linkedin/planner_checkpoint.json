@@ -4,46 +4,49 @@
   "goal": "Complete the LinkedIn Login, Sign In | LinkedIn application at Linkedin autonomously until a protected or final review checkpoint.",
   "status": "needs_review",
   "summary": "GradLaunch could not find a confident next-step control on this page.",
-  "formMode": "single_stage",
-  "currentStep": "stage_1",
-  "currentStageLabel": "Section 1",
-  "currentUrl": "https://www.linkedin.com/authwall?trk=bf&trkInfo=AQETgWvIuJRoQgAAAZ5OZh8AdSiJ98YqibdV5bHB9rxf-09CWiagCu72RExgzXwm_ZnjHdMCZWWXhEUKSJMu5kvNMo4Pj4cg6O6dSp4Sl1YNV1ROfjAwi2csexX3OwQSCPhaAdc=&original_referer=&sessionRedirect=https%3A%2F%2Fwww.linkedin.com%2Fjobs%2Fsearch-results%2F%3FcurrentJobId%3D4404713630%26eBP%3DNOT_ELIGIBLE_FOR_CHARGING%26refId%3DbmuVzLv3wARa91TgPATRSg%253D%253D%26trackingId%3D736Wudo4Kq6JfyQQFZtQ%252Fg%253D%253D%26keywords%3Dpart-time%2520or%2520contract%2520or%2520temporary%2520Back%2520End%2520Developer%2520or%2520Web%2520Developer%252C%2520hybrid%26origin%3DPREFERENCES_LANDING%26geoId%3D102713980%252C105556991%252C106187582%252C114806696",
+  "formMode": "multi_stage",
+  "currentStep": "stage_2",
+  "currentStageLabel": "Section 2",
+  "currentUrl": "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Faccounts.google.com%2Fgsi%2Fselect%3Fclient_id%3D990339570472-k6nqn1tpmitg8pui82bfaun3jrpmiuhs.apps.googleusercontent.com%26auto_select%3Dtrue%26ux_mode%3Dpopup%26ui_mode%3Dcard%26context%3Dsignin%26as%3DMxICnBrHYHuevDvZDnJWEg%26channel_id%3Da22ba8a2bab6dc078abdbaa3ae94de79101a1d43ebf05ff19f8cb043bde68f40%26origin%3Dhttps%3A%2F%2Fwww.linkedin.com&dsh=S-2011777178%3A1779439398152764&faa=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin&ifkv=AWa2Pas5N2PIGZaELlWhyU_bcmFTzp6XQpC7-gAv2682qQnCGYWj1oao8RM4-T_yKWPU7dtHTwtm-w",
   "retryCount": 0,
-  "handoffCount": 2,
-  "validationErrors": [],
+  "handoffCount": 3,
+  "validationErrors": [
+    "Email",
+    "Password (6+ characters)"
+  ],
   "subgoals": [
     {
       "id": "open_job_page",
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 2,
-      "lastUpdatedAt": "2026-05-22T06:36:16.933Z",
-      "completedAt": "2026-05-22T06:36:16.933Z"
+      "attempts": 3,
+      "lastUpdatedAt": "2026-05-22T08:42:56.569Z",
+      "completedAt": "2026-05-22T08:42:56.569Z"
     },
     {
       "id": "authenticate_if_needed",
       "label": "Handle login if needed",
       "status": "running",
       "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
-      "attempts": 4,
-      "lastUpdatedAt": "2026-05-21T10:35:21.213Z"
+      "attempts": 6,
+      "lastUpdatedAt": "2026-05-22T08:43:24.909Z"
     },
     {
       "id": "finish_current_section",
       "label": "Finish active section",
       "status": "running",
-      "detail": "Reading Section 1 and planning the next safe action.",
-      "attempts": 5,
-      "lastUpdatedAt": "2026-05-22T06:36:21.616Z"
+      "detail": "Reading Section 2 and planning the next safe action.",
+      "attempts": 7,
+      "lastUpdatedAt": "2026-05-22T08:43:25.321Z"
     },
     {
       "id": "recover_from_validation_errors",
       "label": "Recover from validation errors",
-      "status": "pending",
-      "detail": "Waiting to start.",
-      "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:34:59.134Z"
+      "status": "blocked",
+      "detail": "Validation or required-answer blockers were found: Email, Password (6+ characters).",
+      "attempts": 1,
+      "lastUpdatedAt": "2026-05-22T08:43:02.654Z"
     },
     {
       "id": "retry_alternative_path",
@@ -65,43 +68,69 @@
       "id": "save_checkpoint",
       "label": "Save checkpoint",
       "status": "completed",
-      "detail": "Saved checkpoint before handing the browser to the student.",
+      "detail": "Saved checkpoint while waiting for manual stage progress.",
       "attempts": 0,
-      "lastUpdatedAt": "2026-05-21T10:35:19.445Z",
-      "completedAt": "2026-05-21T10:35:19.445Z"
+      "lastUpdatedAt": "2026-05-22T08:43:28.326Z",
+      "completedAt": "2026-05-22T08:43:28.326Z"
     }
   ],
   "lastDecision": {
     "kind": "navigate_next",
     "source": "heuristic",
-    "stageIndex": 0,
-    "stageLabel": "Section 1",
-    "url": "https://www.linkedin.com/authwall?trk=bf&trkInfo=AQETgWvIuJRoQgAAAZ5OZh8AdSiJ98YqibdV5bHB9rxf-09CWiagCu72RExgzXwm_ZnjHdMCZWWXhEUKSJMu5kvNMo4Pj4cg6O6dSp4Sl1YNV1ROfjAwi2csexX3OwQSCPhaAdc=&original_referer=&sessionRedirect=https%3A%2F%2Fwww.linkedin.com%2Fjobs%2Fsearch-results%2F%3FcurrentJobId%3D4404713630%26eBP%3DNOT_ELIGIBLE_FOR_CHARGING%26refId%3DbmuVzLv3wARa91TgPATRSg%253D%253D%26trackingId%3D736Wudo4Kq6JfyQQFZtQ%252Fg%253D%253D%26keywords%3Dpart-time%2520or%2520contract%2520or%2520temporary%2520Back%2520End%2520Developer%2520or%2520Web%2520Developer%252C%2520hybrid%26origin%3DPREFERENCES_LANDING%26geoId%3D102713980%252C105556991%252C106187582%252C114806696",
+    "stageIndex": 1,
+    "stageLabel": "Section 2",
+    "url": "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Faccounts.google.com%2Fgsi%2Fselect%3Fclient_id%3D990339570472-k6nqn1tpmitg8pui82bfaun3jrpmiuhs.apps.googleusercontent.com%26auto_select%3Dtrue%26ux_mode%3Dpopup%26ui_mode%3Dcard%26context%3Dsignin%26as%3DMxICnBrHYHuevDvZDnJWEg%26channel_id%3Da22ba8a2bab6dc078abdbaa3ae94de79101a1d43ebf05ff19f8cb043bde68f40%26origin%3Dhttps%3A%2F%2Fwww.linkedin.com&dsh=S-2011777178%3A1779439398152764&faa=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin&ifkv=AWa2Pas5N2PIGZaELlWhyU_bcmFTzp6XQpC7-gAv2682qQnCGYWj1oao8RM4-T_yKWPU7dtHTwtm-w",
     "reason": "Page classified as empty; continuing to the next logical stage.",
     "fieldLabels": [],
-    "createdAt": "2026-05-22T06:36:22.573Z"
+    "createdAt": "2026-05-22T08:43:28.324Z"
   },
   "stageHistory": [
     {
       "stageIndex": 0,
       "label": "Section 1",
       "url": "https://www.linkedin.com/authwall?trk=bf&trkInfo=AQETgWvIuJRoQgAAAZ5OZh8AdSiJ98YqibdV5bHB9rxf-09CWiagCu72RExgzXwm_ZnjHdMCZWWXhEUKSJMu5kvNMo4Pj4cg6O6dSp4Sl1YNV1ROfjAwi2csexX3OwQSCPhaAdc=&original_referer=&sessionRedirect=https%3A%2F%2Fwww.linkedin.com%2Fjobs%2Fsearch-results%2F%3FcurrentJobId%3D4404713630%26eBP%3DNOT_ELIGIBLE_FOR_CHARGING%26refId%3DbmuVzLv3wARa91TgPATRSg%253D%253D%26trackingId%3D736Wudo4Kq6JfyQQFZtQ%252Fg%253D%253D%26keywords%3Dpart-time%2520or%2520contract%2520or%2520temporary%2520Back%2520End%2520Developer%2520or%2520Web%2520Developer%252C%2520hybrid%26origin%3DPREFERENCES_LANDING%26geoId%3D102713980%252C105556991%252C106187582%252C114806696",
+      "visibleFieldLabels": [
+        "Email",
+        "Password (6+ characters)"
+      ],
+      "requiredFieldLabels": [
+        "Email",
+        "Password (6+ characters)"
+      ],
+      "filledFieldLabels": [],
+      "outcome": "handoff",
+      "decision": {
+        "kind": "wait_for_user_input",
+        "source": "system",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://www.linkedin.com/authwall?trk=bf&trkInfo=AQETgWvIuJRoQgAAAZ5OZh8AdSiJ98YqibdV5bHB9rxf-09CWiagCu72RExgzXwm_ZnjHdMCZWWXhEUKSJMu5kvNMo4Pj4cg6O6dSp4Sl1YNV1ROfjAwi2csexX3OwQSCPhaAdc=&original_referer=&sessionRedirect=https%3A%2F%2Fwww.linkedin.com%2Fjobs%2Fsearch-results%2F%3FcurrentJobId%3D4404713630%26eBP%3DNOT_ELIGIBLE_FOR_CHARGING%26refId%3DbmuVzLv3wARa91TgPATRSg%253D%253D%26trackingId%3D736Wudo4Kq6JfyQQFZtQ%252Fg%253D%253D%26keywords%3Dpart-time%2520or%2520contract%2520or%2520temporary%2520Back%2520End%2520Developer%2520or%2520Web%2520Developer%252C%2520hybrid%26origin%3DPREFERENCES_LANDING%26geoId%3D102713980%252C105556991%252C106187582%252C114806696",
+        "reason": "GradLaunch needs your help with required answers on this screen: Email, Password (6+ characters).",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T08:43:02.851Z"
+      },
+      "lastUpdatedAt": "2026-05-22T08:43:02.851Z"
+    },
+    {
+      "stageIndex": 1,
+      "label": "Section 2",
+      "url": "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Faccounts.google.com%2Fgsi%2Fselect%3Fclient_id%3D990339570472-k6nqn1tpmitg8pui82bfaun3jrpmiuhs.apps.googleusercontent.com%26auto_select%3Dtrue%26ux_mode%3Dpopup%26ui_mode%3Dcard%26context%3Dsignin%26as%3DMxICnBrHYHuevDvZDnJWEg%26channel_id%3Da22ba8a2bab6dc078abdbaa3ae94de79101a1d43ebf05ff19f8cb043bde68f40%26origin%3Dhttps%3A%2F%2Fwww.linkedin.com&dsh=S-2011777178%3A1779439398152764&faa=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin&ifkv=AWa2Pas5N2PIGZaELlWhyU_bcmFTzp6XQpC7-gAv2682qQnCGYWj1oao8RM4-T_yKWPU7dtHTwtm-w",
       "visibleFieldLabels": [],
       "requiredFieldLabels": [],
       "filledFieldLabels": [],
       "outcome": "observed",
-      "lastUpdatedAt": "2026-05-22T06:36:22.573Z",
+      "lastUpdatedAt": "2026-05-22T08:43:28.324Z",
       "decision": {
         "kind": "navigate_next",
         "source": "heuristic",
-        "stageIndex": 0,
-        "stageLabel": "Section 1",
-        "url": "https://www.linkedin.com/authwall?trk=bf&trkInfo=AQETgWvIuJRoQgAAAZ5OZh8AdSiJ98YqibdV5bHB9rxf-09CWiagCu72RExgzXwm_ZnjHdMCZWWXhEUKSJMu5kvNMo4Pj4cg6O6dSp4Sl1YNV1ROfjAwi2csexX3OwQSCPhaAdc=&original_referer=&sessionRedirect=https%3A%2F%2Fwww.linkedin.com%2Fjobs%2Fsearch-results%2F%3FcurrentJobId%3D4404713630%26eBP%3DNOT_ELIGIBLE_FOR_CHARGING%26refId%3DbmuVzLv3wARa91TgPATRSg%253D%253D%26trackingId%3D736Wudo4Kq6JfyQQFZtQ%252Fg%253D%253D%26keywords%3Dpart-time%2520or%2520contract%2520or%2520temporary%2520Back%2520End%2520Developer%2520or%2520Web%2520Developer%252C%2520hybrid%26origin%3DPREFERENCES_LANDING%26geoId%3D102713980%252C105556991%252C106187582%252C114806696",
+        "stageIndex": 1,
+        "stageLabel": "Section 2",
+        "url": "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Faccounts.google.com%2Fgsi%2Fselect%3Fclient_id%3D990339570472-k6nqn1tpmitg8pui82bfaun3jrpmiuhs.apps.googleusercontent.com%26auto_select%3Dtrue%26ux_mode%3Dpopup%26ui_mode%3Dcard%26context%3Dsignin%26as%3DMxICnBrHYHuevDvZDnJWEg%26channel_id%3Da22ba8a2bab6dc078abdbaa3ae94de79101a1d43ebf05ff19f8cb043bde68f40%26origin%3Dhttps%3A%2F%2Fwww.linkedin.com&dsh=S-2011777178%3A1779439398152764&faa=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin&ifkv=AWa2Pas5N2PIGZaELlWhyU_bcmFTzp6XQpC7-gAv2682qQnCGYWj1oao8RM4-T_yKWPU7dtHTwtm-w",
         "reason": "Page classified as empty; continuing to the next logical stage.",
         "fieldLabels": [],
-        "createdAt": "2026-05-22T06:36:22.573Z"
+        "createdAt": "2026-05-22T08:43:28.324Z"
       }
     }
   ],
-  "lastUpdatedAt": "2026-05-22T06:36:22.577Z"
+  "lastUpdatedAt": "2026-05-22T08:43:28.326Z"
 }

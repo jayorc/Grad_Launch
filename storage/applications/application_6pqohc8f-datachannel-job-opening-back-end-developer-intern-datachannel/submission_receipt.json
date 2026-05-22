@@ -1,0 +1,152 @@
+{
+  "intent": "browser_fill",
+  "outcome": "confirmed",
+  "externalSubmitted": false,
+  "confirmation": "GradLaunch could not confidently find the next action on this page.",
+  "submittedAt": "2026-05-22T09:33:47.432Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "jaynrk@gmail.com",
+    "subject": "GradLaunch filled Datachannel - Job Opening - Back End Developer (Intern) | DataChannel",
+    "sentAt": "2026-05-22T09:33:47.432Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "needs_manual_review",
+    "sourceUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+    "openedAt": "2026-05-22T09:33:24.083Z",
+    "completedAt": "2026-05-22T09:33:47.432Z",
+    "filledLabels": [
+      "Resume upload",
+      "Name",
+      "Email"
+    ],
+    "skippedLabels": [
+      "Attach Resume (PDF)"
+    ],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-stage-1-start.png"
+    ],
+    "message": "GradLaunch could not confidently find the next action on this page.",
+    "planner": {
+      "sessionId": "planner-job_url_aHR0cHM6Ly93d3cuZGF0YWNo",
+      "resumeToken": "job_url_aHR0cHM6Ly93d3cuZGF0YWNo:2026-05-22T09:20:16.830Z",
+      "goal": "Complete the Job Opening - Back End Developer (Intern) | DataChannel application at Datachannel autonomously until a protected or review checkpoint.",
+      "status": "needs_review",
+      "summary": "GradLaunch could not find a confident next-step control on this page.",
+      "formMode": "single_stage",
+      "currentStep": "stage_1",
+      "currentStageLabel": "Section 1",
+      "currentUrl": "https://www.datachannel.co/career/back-end-developer-intern",
+      "retryCount": 0,
+      "handoffCount": 1,
+      "validationErrors": [
+        "Name",
+        "Email"
+      ],
+      "subgoals": [
+        {
+          "id": "open_job_page",
+          "label": "Open job page",
+          "status": "completed",
+          "detail": "Job page opened successfully in a visible Chrome session.",
+          "attempts": 3,
+          "lastUpdatedAt": "2026-05-22T09:33:25.264Z",
+          "completedAt": "2026-05-22T09:33:25.264Z"
+        },
+        {
+          "id": "authenticate_if_needed",
+          "label": "Handle login if needed",
+          "status": "running",
+          "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+          "attempts": 2,
+          "lastUpdatedAt": "2026-05-22T09:21:01.715Z"
+        },
+        {
+          "id": "finish_current_section",
+          "label": "Finish active section",
+          "status": "running",
+          "detail": "Reading Section 1 and planning the next safe action.",
+          "attempts": 3,
+          "lastUpdatedAt": "2026-05-22T09:33:29.533Z"
+        },
+        {
+          "id": "recover_from_validation_errors",
+          "label": "Recover from validation errors",
+          "status": "blocked",
+          "detail": "Validation or required-answer blockers were found: Name, Email.",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-22T09:20:26.003Z"
+        },
+        {
+          "id": "retry_alternative_path",
+          "label": "Retry alternative path",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T09:20:16.830Z"
+        },
+        {
+          "id": "reach_submit_gate",
+          "label": "Reach submit/review gate",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T09:20:16.830Z"
+        },
+        {
+          "id": "save_checkpoint",
+          "label": "Save checkpoint",
+          "status": "completed",
+          "detail": "Saved checkpoint while waiting for manual stage progress.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-22T09:33:34.427Z",
+          "completedAt": "2026-05-22T09:33:34.427Z"
+        }
+      ],
+      "lastDecision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://www.datachannel.co/career/back-end-developer-intern",
+        "reason": "Page classified as consent; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T09:33:34.407Z"
+      },
+      "stageHistory": [
+        {
+          "stageIndex": 0,
+          "label": "Section 1",
+          "url": "https://www.datachannel.co/career/back-end-developer-intern",
+          "visibleFieldLabels": [
+            "Name",
+            "Email",
+            "Attach Resume (PDF)"
+          ],
+          "requiredFieldLabels": [
+            "Name",
+            "Email",
+            "Attach Resume (PDF)"
+          ],
+          "filledFieldLabels": [],
+          "outcome": "advanced",
+          "decision": {
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
+            "url": "https://www.datachannel.co/career/back-end-developer-intern",
+            "reason": "Page classified as consent; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T09:33:34.407Z"
+          },
+          "lastUpdatedAt": "2026-05-22T09:33:34.407Z"
+        }
+      ],
+      "lastUpdatedAt": "2026-05-22T09:33:47.352Z"
+    }
+  }
+}

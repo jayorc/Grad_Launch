@@ -1,0 +1,23 @@
+{
+  "id": "job_url_aHR0cHM6Ly9kZWNjYW5leHBl",
+  "title": "Deccan AI Experts",
+  "company": "Deccanexperts",
+  "location": "Remote",
+  "workMode": "onsite",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "BCA"
+  ],
+  "skills": [
+    "JavaScript",
+    "APIs",
+    "Communication"
+  ],
+  "description": "Live opening parsed from deccanexperts.ai.",
+  "sourceType": "manual_url",
+  "sourceUrl": "https://deccanexperts.ai",
+  "createdAt": "Fri May 22 2026 13:47:47 GMT+0530 (India Standard Time)"
+}

@@ -1,0 +1,685 @@
+{
+  "id": "run_wrth7vp1",
+  "status": "needs_review",
+  "executionMode": "browser_apply",
+  "adapterId": "gradlaunch-browser-agent",
+  "startedAt": "2026-05-22T11:39:56.078Z",
+  "completedAt": "2026-05-22T11:41:15.436Z",
+  "blockedReason": "GradLaunch paused because this screen still needs manual answers: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Shiv"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar"
+    },
+    {
+      "label": "Full name",
+      "value": "Shiv Kumar"
+    },
+    {
+      "label": "Email",
+      "value": "shivscribe@gmail.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "shivscribe@gmail.com"
+    },
+    {
+      "label": "City",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Location (City)",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Country",
+      "value": "India"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-8685837036"
+    },
+    {
+      "label": "Phone",
+      "value": "+91-8685837036"
+    },
+    {
+      "label": "Mobile",
+      "value": "+91-8685837036"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer Science"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2026"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Bengaluru"
+    },
+    {
+      "label": "Target role",
+      "value": "Software Engineer"
+    },
+    {
+      "label": "LinkedIn",
+      "value": "https://linkedin.com/in/shiv-chauhan-6b94a7138/"
+    },
+    {
+      "label": "Website",
+      "value": "https://github.com/ChauhanShiv17"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the Software Engineer, AI Solutions(Contarct-12 Months) role at Jobs. My background in JavaScript, React, Node.js and my focus on becoming a strong Software Engineer make this opportunity especially compelling to me. I would be glad to contribute to Jobs's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Bengaluru opportunities."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Node.js, Express, MongoDB"
+    },
+    {
+      "label": "Resume context",
+      "value": "Shiv_Resume0.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a strong Software Engineer and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Node.js, Express closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://jobs.ea.com/en_US/careers/JobDetail/Software-Engineer-AI-Solutions-Contract-12-Months/213675?source=LinkedIn.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "GradLaunch paused because this screen still needs manual answers: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent. Planner action: GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+      "state": "attention",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Waiting for manual handoff",
+      "detail": "GradLaunch paused because this screen still needs manual answers: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+      "state": "attention",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "planner",
+      "label": "Planner checkpoint updated",
+      "detail": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent. Form mode: multi_stage. Stages tracked: 3. Last action: wait_for_user_input. Resume token: job_url_aHR0cHM6Ly9qb2JzLmVhLmNv:2026-05-22T11:39:56.080Z.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_wfn7o3fo-jobs-software-engineer-ai-solutions-contarct-12-months.",
+      "state": "attention",
+      "source": "gradlaunch"
+    }
+  ],
+  "planner": {
+    "sessionId": "planner-job_url_aHR0cHM6Ly9qb2JzLmVhLmNv",
+    "resumeToken": "job_url_aHR0cHM6Ly9qb2JzLmVhLmNv:2026-05-22T11:39:56.080Z",
+    "goal": "Complete the Software Engineer, AI Solutions(Contarct-12 Months) application at Jobs autonomously until a protected or review checkpoint.",
+    "status": "handoff_required",
+    "summary": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+    "formMode": "multi_stage",
+    "retryCount": 0,
+    "handoffCount": 2,
+    "validationErrors": [
+      "Username",
+      "Password",
+      "Preferred First Name",
+      "Address 1",
+      "City",
+      "Postal Code",
+      "How did you hear about this opportunity?",
+      "Are you willing to relocate?",
+      "Have you ever worked at EA in any capacity (employee, intern, contractor)?",
+      "How many years of relevant experience do you have related to this role (excluding internships)?",
+      "Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive",
+      "Password confirmation",
+      "I certify I am 18 years of age or older",
+      "Consent",
+      "Do Not Consent"
+    ],
+    "subgoals": [
+      {
+        "id": "open_job_page",
+        "label": "Open job page",
+        "status": "completed",
+        "detail": "Job page opened successfully in a visible Chrome session.",
+        "attempts": 1,
+        "lastUpdatedAt": "2026-05-22T11:40:01.515Z",
+        "completedAt": "2026-05-22T11:40:01.515Z"
+      },
+      {
+        "id": "authenticate_if_needed",
+        "label": "Handle login if needed",
+        "status": "needs_user",
+        "detail": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-22T11:40:44.671Z"
+      },
+      {
+        "id": "finish_current_section",
+        "label": "Finish active section",
+        "status": "running",
+        "detail": "Reading Section 3 and planning the next safe action.",
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-22T11:40:40.922Z",
+        "completedAt": "2026-05-22T11:40:12.729Z"
+      },
+      {
+        "id": "recover_from_validation_errors",
+        "label": "Recover from validation errors",
+        "status": "blocked",
+        "detail": "Validation or required-answer blockers were found: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+        "attempts": 2,
+        "lastUpdatedAt": "2026-05-22T11:40:44.404Z"
+      },
+      {
+        "id": "retry_alternative_path",
+        "label": "Retry alternative path",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T11:39:56.080Z"
+      },
+      {
+        "id": "reach_submit_gate",
+        "label": "Reach submit/review gate",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T11:39:56.080Z"
+      },
+      {
+        "id": "save_checkpoint",
+        "label": "Save checkpoint",
+        "status": "completed",
+        "detail": "Saved checkpoint before handing control to the student.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T11:40:44.671Z",
+        "completedAt": "2026-05-22T11:40:44.671Z"
+      }
+    ],
+    "stageHistory": [
+      {
+        "stageIndex": 0,
+        "label": "Section 1",
+        "url": "https://jobs.ea.com/en_US/careers/ApplicationMethods?jobId=213675&source=LinkedIn",
+        "visibleFieldLabels": [],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [],
+        "outcome": "advanced",
+        "lastUpdatedAt": "2026-05-22T11:40:12.729Z",
+        "decision": {
+          "kind": "navigate_next",
+          "source": "heuristic",
+          "stageIndex": 0,
+          "stageLabel": "Section 1",
+          "url": "https://jobs.ea.com/en_US/careers/JobDetail/Software-Engineer-AI-Solutions-Contract-12-Months/213675?source=LinkedIn",
+          "reason": "Page classified as start; continuing to the next logical stage.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T11:40:09.735Z"
+        }
+      },
+      {
+        "stageIndex": 1,
+        "label": "Section 2",
+        "url": "https://jobs.ea.com/en_US/careers/ApplicationMethods?jobId=213675&source=LinkedIn",
+        "visibleFieldLabels": [
+          "Username",
+          "Password"
+        ],
+        "requiredFieldLabels": [
+          "Username",
+          "Password"
+        ],
+        "filledFieldLabels": [],
+        "outcome": "handoff",
+        "lastUpdatedAt": "2026-05-22T11:40:16.847Z",
+        "decision": {
+          "kind": "wait_for_user_input",
+          "source": "system",
+          "stageIndex": 1,
+          "stageLabel": "Section 2",
+          "url": "https://jobs.ea.com/en_US/careers/ApplicationMethods?jobId=213675&source=LinkedIn",
+          "reason": "GradLaunch needs your help with required answers on this screen: Username, Password.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T11:40:16.847Z"
+        }
+      },
+      {
+        "stageIndex": 2,
+        "label": "Section 3",
+        "url": "https://jobs.ea.com/en_US/careers/Register?jobId=213675&source=LinkedIn",
+        "visibleFieldLabels": [
+          "Legal First name",
+          "Preferred First Name",
+          "Legal Last Name",
+          "Email",
+          "Address 1",
+          "Address 2",
+          "Country Select an option",
+          "State/ Province Select an option",
+          "City",
+          "Postal Code",
+          "Mobile Country Code Select an option",
+          "Mobile Phone Number",
+          "Secondary Country CodeSelect an option",
+          "Secondary Phone Number",
+          "How did you hear about this opportunity?",
+          "Are you willing to relocate?",
+          "Most Recent Company",
+          "Most Recent Position Title",
+          "Have you ever worked at EA in any capacity (employee, intern, contractor)?",
+          "How many years of relevant experience do you have related to this role (excluding internships)?",
+          "Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/university or Military Service?",
+          "Company",
+          "Position title",
+          "Is current position?",
+          "Start date",
+          "End date",
+          "Type of Degree",
+          "Major/ Subject of study",
+          "College/ UniversitySelect an option",
+          "Graduation Date",
+          "Language",
+          "Written level",
+          "Spoken level",
+          "Skills",
+          "Cover Letter",
+          "Portfolio",
+          "Website/Portfolio Link",
+          "Website/Portfolio Link Password",
+          "Password",
+          "Password confirmation",
+          "I certify I am 18 years of age or older",
+          "Consent",
+          "Do Not Consent",
+          "I want EA recruiters to contact me in relation to other relevant job opportunities, including related events. I understand that I can withdraw my consent at any"
+        ],
+        "requiredFieldLabels": [
+          "Legal First name",
+          "Preferred First Name",
+          "Legal Last Name",
+          "Email",
+          "Address 1",
+          "Country Select an option",
+          "State/ Province Select an option",
+          "City",
+          "Postal Code",
+          "Mobile Country Code Select an option",
+          "Mobile Phone Number",
+          "How did you hear about this opportunity?",
+          "Are you willing to relocate?",
+          "Have you ever worked at EA in any capacity (employee, intern, contractor)?",
+          "How many years of relevant experience do you have related to this role (excluding internships)?",
+          "Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/university or Military Service?",
+          "Password",
+          "Password confirmation",
+          "I certify I am 18 years of age or older",
+          "Consent",
+          "Do Not Consent"
+        ],
+        "filledFieldLabels": [],
+        "outcome": "handoff",
+        "lastUpdatedAt": "2026-05-22T11:40:44.671Z",
+        "decision": {
+          "kind": "wait_for_user_input",
+          "source": "system",
+          "stageIndex": 2,
+          "stageLabel": "Section 3",
+          "url": "https://jobs.ea.com/en_US/careers/Register?jobId=213675&source=LinkedIn",
+          "reason": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T11:40:44.671Z"
+        }
+      }
+    ],
+    "lastUpdatedAt": "2026-05-22T11:40:44.671Z",
+    "currentUrl": "https://jobs.ea.com/en_US/careers/Register?jobId=213675&source=LinkedIn",
+    "currentStep": "stage_3",
+    "currentStageLabel": "Section 3",
+    "lastDecision": {
+      "kind": "wait_for_user_input",
+      "source": "system",
+      "stageIndex": 2,
+      "stageLabel": "Section 3",
+      "url": "https://jobs.ea.com/en_US/careers/Register?jobId=213675&source=LinkedIn",
+      "reason": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+      "fieldLabels": [],
+      "createdAt": "2026-05-22T11:40:44.671Z"
+    }
+  },
+  "notes": [
+    "GradLaunch paused because this screen still needs manual answers: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+    "Browser fill status: handoff_required.",
+    "Filled fields: 1. Skipped fields: 0."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "blocked",
+    "externalSubmitted": false,
+    "confirmation": "GradLaunch paused because this screen still needs manual answers: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+    "submittedAt": "2026-05-22T11:41:15.436Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "shivscribe@gmail.com",
+      "subject": "GradLaunch filled Jobs - Software Engineer, AI Solutions(Contarct-12 Months)",
+      "sentAt": "2026-05-22T11:41:15.436Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "handoff_required",
+      "sourceUrl": "https://jobs.ea.com/en_US/careers/JobDetail/Software-Engineer-AI-Solutions-Contract-12-Months/213675?source=LinkedIn",
+      "openedAt": "2026-05-22T11:39:56.080Z",
+      "completedAt": "2026-05-22T11:41:15.436Z",
+      "filledLabels": [
+        "Resume upload"
+      ],
+      "skippedLabels": [],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-stage-1-start.png",
+        "browser-stage-2-start.png",
+        "browser-handoff-needed.png",
+        "browser-stage-3-start.png",
+        "browser-handoff-needed.png"
+      ],
+      "message": "GradLaunch paused because this screen still needs manual answers: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+      "planner": {
+        "sessionId": "planner-job_url_aHR0cHM6Ly9qb2JzLmVhLmNv",
+        "resumeToken": "job_url_aHR0cHM6Ly9qb2JzLmVhLmNv:2026-05-22T11:39:56.080Z",
+        "goal": "Complete the Software Engineer, AI Solutions(Contarct-12 Months) application at Jobs autonomously until a protected or review checkpoint.",
+        "status": "handoff_required",
+        "summary": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+        "formMode": "multi_stage",
+        "retryCount": 0,
+        "handoffCount": 2,
+        "validationErrors": [
+          "Username",
+          "Password",
+          "Preferred First Name",
+          "Address 1",
+          "City",
+          "Postal Code",
+          "How did you hear about this opportunity?",
+          "Are you willing to relocate?",
+          "Have you ever worked at EA in any capacity (employee, intern, contractor)?",
+          "How many years of relevant experience do you have related to this role (excluding internships)?",
+          "Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive",
+          "Password confirmation",
+          "I certify I am 18 years of age or older",
+          "Consent",
+          "Do Not Consent"
+        ],
+        "subgoals": [
+          {
+            "id": "open_job_page",
+            "label": "Open job page",
+            "status": "completed",
+            "detail": "Job page opened successfully in a visible Chrome session.",
+            "attempts": 1,
+            "lastUpdatedAt": "2026-05-22T11:40:01.515Z",
+            "completedAt": "2026-05-22T11:40:01.515Z"
+          },
+          {
+            "id": "authenticate_if_needed",
+            "label": "Handle login if needed",
+            "status": "needs_user",
+            "detail": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-22T11:40:44.671Z"
+          },
+          {
+            "id": "finish_current_section",
+            "label": "Finish active section",
+            "status": "running",
+            "detail": "Reading Section 3 and planning the next safe action.",
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-22T11:40:40.922Z",
+            "completedAt": "2026-05-22T11:40:12.729Z"
+          },
+          {
+            "id": "recover_from_validation_errors",
+            "label": "Recover from validation errors",
+            "status": "blocked",
+            "detail": "Validation or required-answer blockers were found: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+            "attempts": 2,
+            "lastUpdatedAt": "2026-05-22T11:40:44.404Z"
+          },
+          {
+            "id": "retry_alternative_path",
+            "label": "Retry alternative path",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T11:39:56.080Z"
+          },
+          {
+            "id": "reach_submit_gate",
+            "label": "Reach submit/review gate",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T11:39:56.080Z"
+          },
+          {
+            "id": "save_checkpoint",
+            "label": "Save checkpoint",
+            "status": "completed",
+            "detail": "Saved checkpoint before handing control to the student.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T11:40:44.671Z",
+            "completedAt": "2026-05-22T11:40:44.671Z"
+          }
+        ],
+        "stageHistory": [
+          {
+            "stageIndex": 0,
+            "label": "Section 1",
+            "url": "https://jobs.ea.com/en_US/careers/ApplicationMethods?jobId=213675&source=LinkedIn",
+            "visibleFieldLabels": [],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [],
+            "outcome": "advanced",
+            "lastUpdatedAt": "2026-05-22T11:40:12.729Z",
+            "decision": {
+              "kind": "navigate_next",
+              "source": "heuristic",
+              "stageIndex": 0,
+              "stageLabel": "Section 1",
+              "url": "https://jobs.ea.com/en_US/careers/JobDetail/Software-Engineer-AI-Solutions-Contract-12-Months/213675?source=LinkedIn",
+              "reason": "Page classified as start; continuing to the next logical stage.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T11:40:09.735Z"
+            }
+          },
+          {
+            "stageIndex": 1,
+            "label": "Section 2",
+            "url": "https://jobs.ea.com/en_US/careers/ApplicationMethods?jobId=213675&source=LinkedIn",
+            "visibleFieldLabels": [
+              "Username",
+              "Password"
+            ],
+            "requiredFieldLabels": [
+              "Username",
+              "Password"
+            ],
+            "filledFieldLabels": [],
+            "outcome": "handoff",
+            "lastUpdatedAt": "2026-05-22T11:40:16.847Z",
+            "decision": {
+              "kind": "wait_for_user_input",
+              "source": "system",
+              "stageIndex": 1,
+              "stageLabel": "Section 2",
+              "url": "https://jobs.ea.com/en_US/careers/ApplicationMethods?jobId=213675&source=LinkedIn",
+              "reason": "GradLaunch needs your help with required answers on this screen: Username, Password.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T11:40:16.847Z"
+            }
+          },
+          {
+            "stageIndex": 2,
+            "label": "Section 3",
+            "url": "https://jobs.ea.com/en_US/careers/Register?jobId=213675&source=LinkedIn",
+            "visibleFieldLabels": [
+              "Legal First name",
+              "Preferred First Name",
+              "Legal Last Name",
+              "Email",
+              "Address 1",
+              "Address 2",
+              "Country Select an option",
+              "State/ Province Select an option",
+              "City",
+              "Postal Code",
+              "Mobile Country Code Select an option",
+              "Mobile Phone Number",
+              "Secondary Country CodeSelect an option",
+              "Secondary Phone Number",
+              "How did you hear about this opportunity?",
+              "Are you willing to relocate?",
+              "Most Recent Company",
+              "Most Recent Position Title",
+              "Have you ever worked at EA in any capacity (employee, intern, contractor)?",
+              "How many years of relevant experience do you have related to this role (excluding internships)?",
+              "Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/university or Military Service?",
+              "Company",
+              "Position title",
+              "Is current position?",
+              "Start date",
+              "End date",
+              "Type of Degree",
+              "Major/ Subject of study",
+              "College/ UniversitySelect an option",
+              "Graduation Date",
+              "Language",
+              "Written level",
+              "Spoken level",
+              "Skills",
+              "Cover Letter",
+              "Portfolio",
+              "Website/Portfolio Link",
+              "Website/Portfolio Link Password",
+              "Password",
+              "Password confirmation",
+              "I certify I am 18 years of age or older",
+              "Consent",
+              "Do Not Consent",
+              "I want EA recruiters to contact me in relation to other relevant job opportunities, including related events. I understand that I can withdraw my consent at any"
+            ],
+            "requiredFieldLabels": [
+              "Legal First name",
+              "Preferred First Name",
+              "Legal Last Name",
+              "Email",
+              "Address 1",
+              "Country Select an option",
+              "State/ Province Select an option",
+              "City",
+              "Postal Code",
+              "Mobile Country Code Select an option",
+              "Mobile Phone Number",
+              "How did you hear about this opportunity?",
+              "Are you willing to relocate?",
+              "Have you ever worked at EA in any capacity (employee, intern, contractor)?",
+              "How many years of relevant experience do you have related to this role (excluding internships)?",
+              "Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/university or Military Service?",
+              "Password",
+              "Password confirmation",
+              "I certify I am 18 years of age or older",
+              "Consent",
+              "Do Not Consent"
+            ],
+            "filledFieldLabels": [],
+            "outcome": "handoff",
+            "lastUpdatedAt": "2026-05-22T11:40:44.671Z",
+            "decision": {
+              "kind": "wait_for_user_input",
+              "source": "system",
+              "stageIndex": 2,
+              "stageLabel": "Section 3",
+              "url": "https://jobs.ea.com/en_US/careers/Register?jobId=213675&source=LinkedIn",
+              "reason": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+              "fieldLabels": [],
+              "createdAt": "2026-05-22T11:40:44.671Z"
+            }
+          }
+        ],
+        "lastUpdatedAt": "2026-05-22T11:40:44.671Z",
+        "currentUrl": "https://jobs.ea.com/en_US/careers/Register?jobId=213675&source=LinkedIn",
+        "currentStep": "stage_3",
+        "currentStageLabel": "Section 3",
+        "lastDecision": {
+          "kind": "wait_for_user_input",
+          "source": "system",
+          "stageIndex": 2,
+          "stageLabel": "Section 3",
+          "url": "https://jobs.ea.com/en_US/careers/Register?jobId=213675&source=LinkedIn",
+          "reason": "GradLaunch needs your help with required answers on this screen: Preferred First Name, Address 1, City, Postal Code, How did you hear about this opportunity?, Are you willing to relocate?, Have you ever worked at EA in any capacity (employee, intern, contractor)?, How many years of relevant experience do you have related to this role (excluding internships)?, Have you completed one of the following in the last 18 months: a Coding Boot Camp, a Degree program from a college/unive, Password, Password confirmation, I certify I am 18 years of age or older, Consent, Do Not Consent.",
+          "fieldLabels": [],
+          "createdAt": "2026-05-22T11:40:44.671Z"
+        }
+      }
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-stage-1-start.png",
+    "browser-stage-2-start.png",
+    "browser-handoff-needed.png",
+    "browser-stage-3-start.png"
+  ]
+}

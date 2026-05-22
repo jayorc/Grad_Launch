@@ -21,6 +21,13 @@ export type SubmissionOutcome = "confirmed" | "blocked";
 export type EmailDeliveryStatus = "sent" | "queued" | "skipped" | "failed";
 export type BrowserApplyStatus = "filled" | "submitted" | "needs_manual_review" | "handoff_required" | "blocked";
 export type PlannerStatus = "idle" | "running" | "handoff_required" | "needs_review" | "completed" | "blocked";
+export type BrowserExecutionSessionStatus =
+  | "running"
+  | "waiting"
+  | "review_ready"
+  | "submitted"
+  | "blocked"
+  | "resumable";
 export type PlannerTaskStatus = "pending" | "running" | "completed" | "blocked" | "needs_user" | "retrying" | "skipped";
 export type PlannerFormMode = "unknown" | "single_stage" | "multi_stage";
 export type PlannerDecisionSource = "system" | "heuristic" | "llm";
@@ -82,6 +89,92 @@ export type AgentEventType =
   | "policy.decided"
   | "memory.updated";
 
+export interface ProfileEducationRecord {
+  school: string;
+  degree: string;
+  fieldOfStudy?: string;
+  startYear?: number;
+  endYear?: number;
+  grade?: string;
+  city?: string;
+  country?: string;
+}
+
+export interface ProfileEmploymentRecord {
+  company: string;
+  title: string;
+  startDate?: string;
+  endDate?: string;
+  current?: boolean;
+  location?: string;
+  summary?: string;
+}
+
+export interface ProfileProjectRecord {
+  name: string;
+  role?: string;
+  techStack?: string;
+  summary?: string;
+  url?: string;
+}
+
+export interface ProfileScreeningAnswer {
+  question: string;
+  answer: string;
+}
+
+export interface ProfileCustomFact {
+  label: string;
+  value: string;
+}
+
+export interface StudentProfileEeo {
+  ethnicity?: string;
+  veteranStatus?: string;
+  disabilityStatus?: string;
+}
+
+export interface StudentProfileDetails {
+  headline?: string;
+  phone?: string;
+  alternateEmail?: string;
+  linkedInUrl?: string;
+  githubUrl?: string;
+  portfolioUrl?: string;
+  websiteUrl?: string;
+  leetcodeUrl?: string;
+  kaggleUrl?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  nationality?: string;
+  pronouns?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  currentCompany?: string;
+  currentTitle?: string;
+  totalExperienceYears?: number;
+  noticePeriodDays?: number;
+  currentSalaryLpa?: number;
+  sponsorshipRequired?: boolean;
+  openToRelocate?: boolean;
+  willingToTravel?: boolean;
+  workAuthorizationCountries: string[];
+  preferredEmploymentTypes: string[];
+  certifications: string[];
+  languages: string[];
+  achievements: string[];
+  educationHistory: ProfileEducationRecord[];
+  employmentHistory: ProfileEmploymentRecord[];
+  projectHistory: ProfileProjectRecord[];
+  screeningAnswers: ProfileScreeningAnswer[];
+  customFacts: ProfileCustomFact[];
+  eeo: StudentProfileEeo;
+}
+
 export interface StudentProfile {
   id: string;
   fullName: string;
@@ -99,6 +192,7 @@ export interface StudentProfile {
   bio?: string;
   avatarUrl?: string;
   resumeId?: string;
+  completeProfile?: StudentProfileDetails;
 }
 
 export interface StudentAccount {
@@ -289,6 +383,46 @@ export interface ApplicationRun {
   submission?: ApplicationSubmission;
 }
 
+export interface BrowserStageSignature {
+  url: string;
+  title: string;
+  fingerprint: string;
+  visibleFieldLabels: string[];
+  requiredFieldLabels: string[];
+  controlLabels: string[];
+  progressText?: string;
+  savedAt: string;
+}
+
+export interface BrowserExecutionSession {
+  id: string;
+  studentId: string;
+  applicationId: string;
+  runId: string;
+  jobId: string;
+  status: BrowserExecutionSessionStatus;
+  sourceUrl: string;
+  currentUrl?: string;
+  currentStageIndex?: number;
+  currentStageLabel?: string;
+  workspacePath?: string;
+  latestMessage: string;
+  latestSteps: AgentTimelineStep[];
+  lastDecision?: PlannerDecision;
+  lastStageSignature?: BrowserStageSignature;
+  pendingHandoff?: {
+    kind: AgentHandoffKind;
+    title: string;
+    detail: string;
+    requestedAt: string;
+  };
+  browserStatus?: BrowserApplyStatus;
+  filledCount: number;
+  manualCount: number;
+  updatedAt: string;
+  createdAt: string;
+}
+
 export interface AgentGoal {
   id: string;
   studentId: string;
@@ -435,6 +569,7 @@ export interface AgentControlPlaneSnapshot {
   tasks: AgentTask[];
   handoffs: AgentHandoff[];
   recentEvents: AgentEvent[];
+  browserSessions: BrowserExecutionSession[];
   memory?: StudentMemory;
 }
 
@@ -483,6 +618,8 @@ export interface RegisterInput {
   targetRoles: string[];
   preferredLocations: string[];
   skills: string[];
+  resumeId?: string;
+  completeProfile?: StudentProfileDetails;
 }
 
 export interface UpdateProfileInput {
@@ -498,6 +635,7 @@ export interface UpdateProfileInput {
   automationMode: AutomationMode;
   defaultStrictness: MatchStrictness;
   bio?: string;
+  completeProfile: StudentProfileDetails;
 }
 
 export interface AuthResponse {
@@ -525,6 +663,7 @@ export interface ResumeProfileDraft {
   preferredLocations: string[];
   skills: string[];
   bio?: string;
+  completeProfile?: StudentProfileDetails;
 }
 
 export interface ResumeDraftResponse {

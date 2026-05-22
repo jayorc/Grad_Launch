@@ -17,7 +17,8 @@ const studentSchema = new Schema(
     defaultStrictness: { type: String, default: "balanced" },
     bio: { type: String, default: "" },
     avatarUrl: { type: String, required: false },
-    resumeId: { type: String, required: false }
+    resumeId: { type: String, required: false },
+    completeProfile: { type: Schema.Types.Mixed, default: {} }
   },
   { timestamps: true, versionKey: false }
 );

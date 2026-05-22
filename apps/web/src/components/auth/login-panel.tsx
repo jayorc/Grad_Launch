@@ -3,6 +3,7 @@
 import type { ChangeEvent, FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { ResumeDraftResponse, StudentProfileDetails } from "@gradlaunch/shared";
 import { parseResumeDraft } from "../../lib/api";
 import { useAuth } from "../../providers/auth-provider";
 
@@ -38,6 +39,20 @@ const emptyRegisterFields: RegisterFields = {
   skills: ""
 };
 
+const emptyCompleteProfileDraft: StudentProfileDetails = {
+  workAuthorizationCountries: [],
+  preferredEmploymentTypes: [],
+  certifications: [],
+  languages: [],
+  achievements: [],
+  educationHistory: [],
+  employmentHistory: [],
+  projectHistory: [],
+  screeningAnswers: [],
+  customFacts: [],
+  eeo: {}
+};
+
 export function LoginPanel() {
   const { loginUser, registerUser, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -47,6 +62,7 @@ export function LoginPanel() {
   const [resumeLoading, setResumeLoading] = useState(false);
   const [loginFields, setLoginFields] = useState<LoginFields>(emptyLoginFields);
   const [registerFields, setRegisterFields] = useState<RegisterFields>(emptyRegisterFields);
+  const [resumeDraft, setResumeDraft] = useState<ResumeDraftResponse | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -74,7 +90,9 @@ export function LoginPanel() {
           graduationYear: Number(registerFields.graduationYear || new Date().getFullYear()),
           targetRoles: splitList(registerFields.targetRoles),
           preferredLocations: splitList(registerFields.preferredLocations),
-          skills: splitList(registerFields.skills)
+          skills: splitList(registerFields.skills),
+          resumeId: resumeDraft?.resume.id,
+          completeProfile: resumeDraft?.draft.completeProfile ?? emptyCompleteProfileDraft
         });
       }
 
@@ -98,6 +116,7 @@ export function LoginPanel() {
 
     try {
       const result = await parseResumeDraft(file);
+      setResumeDraft(result);
       setRegisterFields((current) => ({
         ...current,
         fullName: result.draft.fullName || current.fullName,
@@ -169,9 +188,24 @@ export function LoginPanel() {
               <label className="upload-dropzone">
                 <span className="kicker">Resume upload</span>
                 <strong>{resumeLoading ? "Reading resume..." : "Upload resume to prefill your profile"}</strong>
-                <span className="muted">GradLaunch will extract your email, name, degree, skills, and likely target roles.</span>
+                <span className="muted">GradLaunch will extract links, contact details, skills, roles, education, and as much complete-profile context as it can.</span>
                 <input accept=".pdf,.doc,.docx,.txt" className="hidden-input" onChange={handleResumeChange} type="file" />
               </label>
+              {resumeDraft ? (
+                <div className="soft-panel">
+                  <p className="detail-label">Resume parsed</p>
+                  <p className="detail-value">{resumeDraft.resume.filename}</p>
+                  <p className="muted">
+                    Links found: {[
+                      resumeDraft.draft.completeProfile?.linkedInUrl,
+                      resumeDraft.draft.completeProfile?.githubUrl,
+                      resumeDraft.draft.completeProfile?.portfolioUrl
+                    ].filter(Boolean).length}
+                    {" "}• Education entries: {resumeDraft.draft.completeProfile?.educationHistory.length ?? 0}
+                    {" "}• Work entries: {resumeDraft.draft.completeProfile?.employmentHistory.length ?? 0}
+                  </p>
+                </div>
+              ) : null}
               <label>
                 <span className="kicker">Full name</span>
                 <input className="input" name="fullName" onChange={(event) => updateRegisterField("fullName", event.target.value)} required value={registerFields.fullName} />

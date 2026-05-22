@@ -1,8 +1,12 @@
-import type { Page } from "playwright-core";
+import type { Frame, Locator, Page } from "playwright-core";
 import type { BrowserFillField } from "./types";
 import { normalizeKey } from "./util";
 
 export async function fillFormField(page: Page, field: BrowserFillField) {
+  if (field.inputType === "file") {
+    return false;
+  }
+
   const filledByAgentTarget = await fillByAgentFieldId(page, field);
 
   if (filledByAgentTarget) {
@@ -17,27 +21,237 @@ export async function fillFormField(page: Page, field: BrowserFillField) {
     return fillSelectField(page, field);
   }
 
-  return fillTextField(page, field) || fillChoiceField(page, field);
+  return fillSelectLikeField(page, field) || fillTextField(page, field) || fillChoiceField(page, field);
 }
 
 export async function attachResume(page: Page, resumePath: string) {
-  for (const frame of page.frames()) {
-    const locator = frame.locator("input[type='file']").first();
+  if (await hasExistingAttachedFile(page)) {
+    return true;
+  }
 
+  for (const frame of page.frames()) {
     try {
-      await locator.setInputFiles(resumePath, { timeout: 2000 });
-      return true;
+      const targetIndex = await frame.evaluate(() => {
+        const controls = Array.from(document.querySelectorAll("input[type='file']")) as HTMLInputElement[];
+        let bestIndex = -1;
+        let bestScore = Number.NEGATIVE_INFINITY;
+
+        for (const [index, control] of controls.entries()) {
+          if (control.disabled) {
+            continue;
+          }
+
+          const descriptor = normalize([
+            control.accept,
+            control.name,
+            control.id,
+            control.className,
+            control.getAttribute("aria-label"),
+            control.getAttribute("data-testid"),
+            control.labels?.[0]?.textContent,
+            control.closest("label")?.textContent,
+            control.closest("section, article, form, fieldset, [role='group'], div")?.textContent
+          ].filter(Boolean).join(" "));
+          let score = 0;
+
+          if (/\b(resume|cv|curriculum vitae)\b/.test(descriptor)) {
+            score += 80;
+          }
+
+          if (/\b(easy apply|autofill|application)\b/.test(descriptor)) {
+            score += 35;
+          }
+
+          if (/\b(photo|image|avatar|profile picture|profile photo)\b/.test(descriptor)) {
+            score -= 120;
+          }
+
+          if (/pdf/.test(control.accept)) {
+            score += 20;
+          }
+
+          if (/\b(upload|attach|browse|drop)\b/.test(descriptor)) {
+            score += 18;
+          }
+
+          if (/\bcover letter\b/.test(descriptor)) {
+            score -= 40;
+          }
+
+          if (control.multiple) {
+            score += 4;
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestIndex = index;
+          }
+        }
+
+        return bestIndex;
+
+        function normalize(value: string) {
+          return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        }
+      }).catch(() => -1);
+
+      if (targetIndex < 0) {
+        continue;
+      }
+
+      await frame.locator("input[type='file']").nth(targetIndex).setInputFiles(resumePath, { timeout: 2500 });
+      const verified = await frame.locator("input[type='file']").nth(targetIndex).evaluate((control) => {
+        return control instanceof HTMLInputElement && (control.files?.length ?? 0) > 0;
+      }).catch(() => false);
+
+      if (verified) {
+        return true;
+      }
     } catch (_error) {
       // Try the next frame.
+    }
+  }
+
+  const uploadedViaChooser = await attachResumeViaUploadTrigger(page, resumePath);
+
+  if (uploadedViaChooser) {
+    return true;
+  }
+
+  return false;
+}
+
+async function hasExistingAttachedFile(page: Page) {
+  for (const frame of page.frames()) {
+    const alreadyAttached = await frame.evaluate(() => {
+      return Array.from(document.querySelectorAll("input[type='file']")).some((control) => {
+        return control instanceof HTMLInputElement && !control.disabled && (control.files?.length ?? 0) > 0;
+      });
+    }).catch(() => false);
+
+    if (alreadyAttached) {
+      return true;
     }
   }
 
   return false;
 }
 
+async function attachResumeViaUploadTrigger(page: Page, resumePath: string) {
+  const triggerSelectors = [
+    "text=/browse file/i",
+    "text=/drag and drop your resume/i",
+    "text=/upload resume/i",
+    "text=/attach resume/i",
+    "text=/choose file/i",
+    "text=/select file/i",
+    "button:has-text('Browse File')",
+    "[role='button']:has-text('Browse File')",
+    "label:has-text('Browse File')"
+  ];
+
+  for (const frame of page.frames()) {
+    for (const selector of triggerSelectors) {
+      try {
+        const trigger = frame.locator(selector).first();
+
+        if (!await trigger.isVisible({ timeout: 300 })) {
+          continue;
+        }
+
+        const uploadedViaAssociatedInput = await attachResumeToAssociatedInput(frame, trigger, resumePath);
+
+        if (uploadedViaAssociatedInput) {
+          return true;
+        }
+
+        const [chooser] = await Promise.all([
+          page.waitForEvent("filechooser", { timeout: 2000 }),
+          trigger.click({ force: true, timeout: 1500 })
+        ]);
+
+        await chooser.setFiles(resumePath);
+        await page.waitForTimeout(700).catch(() => undefined);
+        return true;
+      } catch (_error) {
+        // Try the next trigger candidate.
+      }
+    }
+  }
+
+  return false;
+}
+
+async function attachResumeToAssociatedInput(frame: Frame, trigger: Locator, resumePath: string) {
+  const marker = `gl-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const found = await trigger.evaluate((element, targetMarker) => {
+    const candidates = new Set<HTMLInputElement>();
+
+    const addIfFileInput = (candidate: Element | null | undefined) => {
+      if (candidate instanceof HTMLInputElement && candidate.type === "file" && !candidate.disabled) {
+        candidates.add(candidate);
+      }
+    };
+
+    addIfFileInput(element.querySelector("input[type='file']"));
+    addIfFileInput(element.closest("label")?.querySelector("input[type='file']"));
+    addIfFileInput(element.closest("form, section, article, fieldset, [role='group'], div")?.querySelector("input[type='file']"));
+
+    if (element instanceof HTMLLabelElement && element.htmlFor) {
+      addIfFileInput(document.getElementById(element.htmlFor));
+    }
+
+    if (element instanceof HTMLElement) {
+      const labelledBy = element.getAttribute("aria-labelledby");
+
+      if (labelledBy) {
+        for (const id of labelledBy.split(/\s+/)) {
+          addIfFileInput(document.getElementById(id)?.querySelector("input[type='file']"));
+        }
+      }
+    }
+
+    const best = [...candidates][0];
+
+    if (!best) {
+      return false;
+    }
+
+    best.setAttribute("data-gradlaunch-upload-target", targetMarker);
+    return true;
+  }, marker).catch(() => false);
+
+  if (!found) {
+    return false;
+  }
+
+  const inputLocator = frame.locator(`[data-gradlaunch-upload-target="${marker}"]`).first();
+
+  try {
+    await inputLocator.setInputFiles(resumePath, { timeout: 2500 });
+    return await inputLocator.evaluate((control) => {
+      return control instanceof HTMLInputElement && (control.files?.length ?? 0) > 0;
+    }).catch(() => false);
+  } catch (_error) {
+    return false;
+  } finally {
+    await inputLocator.evaluate((control) => {
+      if (control instanceof HTMLElement) {
+        control.removeAttribute("data-gradlaunch-upload-target");
+      }
+    }).catch(() => undefined);
+  }
+}
+
 async function fillByAgentFieldId(page: Page, field: BrowserFillField) {
   if (!field.fieldId || !field.value.trim()) {
     return false;
+  }
+
+  const filledByPlaywright = await fillByPlaywrightFieldTarget(page, field);
+
+  if (filledByPlaywright) {
+    return true;
   }
 
   for (const frame of page.frames()) {
@@ -50,6 +264,7 @@ async function fillByAgentFieldId(page: Page, field: BrowserFillField) {
           || !(control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement)
           || (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button"].includes(control.type))
           || ("disabled" in control && control.disabled)
+          || isCustomSelectLike(control)
         ) {
           return false;
         }
@@ -127,12 +342,88 @@ async function fillByAgentFieldId(page: Page, field: BrowserFillField) {
         function normalize(value: string) {
           return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
         }
+
+        function isCustomSelectLike(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
+          if (control instanceof HTMLSelectElement) {
+            return false;
+          }
+
+          const popup = control.getAttribute("aria-haspopup")
+            ?? control.closest("[aria-haspopup]")?.getAttribute("aria-haspopup")
+            ?? "";
+          const role = control.getAttribute("role")
+            ?? control.closest("[role]")?.getAttribute("role")
+            ?? "";
+          const expanded = control.getAttribute("aria-expanded") ?? control.closest("[aria-expanded]")?.getAttribute("aria-expanded");
+
+          return role === "combobox"
+            || /listbox|menu|dialog|tree/.test(popup)
+            || expanded !== null
+            || Boolean(control.closest("[role='combobox'], [aria-haspopup='listbox'], [data-radix-select-trigger], [data-headlessui-state], [class*='select'], [class*='combobox']"));
+        }
       },
       { fieldId: field.fieldId, fieldValue: field.value }
     ).catch(() => false);
 
     if (filled) {
       return true;
+    }
+  }
+
+  return false;
+}
+
+async function fillByPlaywrightFieldTarget(page: Page, field: BrowserFillField) {
+  if (!field.fieldId || !field.value.trim()) {
+    return false;
+  }
+
+  const normalizedExpected = normalizeInline(field.value);
+
+  for (const frame of page.frames()) {
+    const locator = frame.locator(`[data-gradlaunch-field-id="${field.fieldId}"]`).first();
+
+    try {
+      if (!await locator.isVisible({ timeout: 300 })) {
+        continue;
+      }
+
+      if (field.inputType === "select") {
+        await locator.selectOption({ label: field.value }).catch(async () => {
+          await locator.selectOption({ value: field.value });
+        });
+      } else if (field.inputType === "checkbox" || field.inputType === "radio") {
+        await locator.check({ force: true });
+      } else {
+        await locator.click({ timeout: 1000 });
+        await locator.fill("", { timeout: 1000 }).catch(() => undefined);
+        await locator.fill(field.value, { timeout: 1500 });
+        await locator.blur().catch(() => undefined);
+      }
+
+      const verified = await locator.evaluate((element, expected) => {
+        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) {
+          const actual = normalize(element.value);
+
+          if (element instanceof HTMLInputElement && ["checkbox", "radio"].includes(element.type)) {
+            return element.checked;
+          }
+
+          return actual === expected || actual.includes(expected) || expected.includes(actual);
+        }
+
+        return false;
+
+        function normalize(value: string) {
+          return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        }
+      }, normalizedExpected).catch(() => false);
+
+      if (verified) {
+        return true;
+      }
+    } catch (_error) {
+      // Fall back to DOM-level setters below.
     }
   }
 
@@ -242,6 +533,82 @@ async function fillTextField(page: Page, field: BrowserFillField) {
 
     if (filled) {
       return true;
+    }
+  }
+
+  return false;
+}
+
+async function fillSelectLikeField(page: Page, field: BrowserFillField) {
+  const value = field.value.trim();
+
+  if (!value || field.inputType === "file") {
+    return false;
+  }
+
+  const aliases = getFieldAliases(field.label);
+
+  for (const frame of page.frames()) {
+    const targets = [
+      field.fieldId ? frame.locator(`[data-gradlaunch-field-id="${field.fieldId}"]`).first() : undefined,
+      ...aliases.flatMap((alias) => [
+        frame.getByRole("combobox", { name: alias, exact: false }).first(),
+        frame.getByLabel(alias, { exact: false }).first(),
+        frame.getByPlaceholder(alias, { exact: false }).first(),
+        frame.getByRole("button", { name: alias, exact: false }).first()
+      ])
+    ].filter(Boolean);
+
+    for (const target of targets) {
+      try {
+        const visible = await target!.isVisible({ timeout: 250 }).catch(() => false);
+
+        if (!visible) {
+          continue;
+        }
+
+        const isFileInput = await target!.evaluate((element) => {
+          return element instanceof HTMLInputElement && element.type === "file";
+        }).catch(() => false);
+
+        if (isFileInput) {
+          continue;
+        }
+
+        await target!.scrollIntoViewIfNeeded().catch(() => undefined);
+        await target!.click({ force: true, timeout: 1000 }).catch(() => undefined);
+        await page.waitForTimeout(120).catch(() => undefined);
+
+        await target!.fill(value, { timeout: 800 }).catch(async () => {
+          await target!.press(process.platform === "darwin" ? "Meta+A" : "Control+A", { timeout: 250 }).catch(() => undefined);
+          await target!.type(value, { delay: 25, timeout: 1200 }).catch(() => undefined);
+        });
+        await page.waitForTimeout(180).catch(() => undefined);
+
+        const optionClicked = await clickVisibleSelectOption(frame, value);
+
+        if (optionClicked) {
+          return true;
+        }
+
+        await target!.press("Enter", { timeout: 400 }).catch(() => undefined);
+        const verified = await target!.evaluate((element, expected) => {
+          if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) {
+            return false;
+          }
+
+          const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+          const actual = normalize(element.value);
+          const wanted = normalize(expected);
+          return actual === wanted || actual.includes(wanted) || wanted.includes(actual);
+        }, value).catch(() => false);
+
+        if (verified) {
+          return true;
+        }
+      } catch (_error) {
+        // Try the next select-like target.
+      }
     }
   }
 
@@ -413,4 +780,116 @@ async function fillChoiceField(page: Page, field: BrowserFillField) {
   }
 
   return false;
+}
+
+function normalizeInline(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+async function clickVisibleSelectOption(frame: Awaited<ReturnType<Page["mainFrame"]>>, value: string) {
+  return frame.evaluate((expected) => {
+    const normalizedExpected = normalize(expected);
+    const candidates = Array.from(document.querySelectorAll([
+      "[role='option']",
+      "[role='menuitemradio']",
+      "[role='menuitemcheckbox']",
+      "[role='radio']",
+      "[data-radix-collection-item]",
+      "[cmdk-item]",
+      "li",
+      "button"
+    ].join(","))) as HTMLElement[];
+    let best: HTMLElement | undefined;
+    let bestScore = 0;
+
+    for (const candidate of candidates) {
+      if (!isVisible(candidate)) {
+        continue;
+      }
+
+      const text = normalize(candidate.innerText || candidate.textContent || "");
+
+      if (!text) {
+        continue;
+      }
+
+      let score = 0;
+
+      if (text === normalizedExpected) {
+        score = 100;
+      } else if (text.includes(normalizedExpected) || normalizedExpected.includes(text)) {
+        score = 72;
+      }
+
+      if (candidate.getAttribute("role") === "option") {
+        score += 15;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+
+    if (!best || bestScore < 60) {
+      return false;
+    }
+
+    best.click();
+    best.dispatchEvent(new Event("input", { bubbles: true }));
+    best.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+
+    function isVisible(element: HTMLElement) {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity || "1") > 0 && rect.width > 0 && rect.height > 0;
+    }
+
+    function normalize(value: string) {
+      return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    }
+  }, value).catch(() => false);
+}
+
+function getFieldAliases(label: string) {
+  const normalizedLabel = label.toLowerCase().trim();
+  const aliases = new Set([label]);
+
+  if (normalizedLabel.includes("country")) {
+    aliases.add("Country");
+    aliases.add("Country/Region");
+    aliases.add("Country region");
+  }
+
+  if (normalizedLabel.includes("location")) {
+    aliases.add("Location");
+    aliases.add("Location (City)");
+    aliases.add("City");
+  }
+
+  if (normalizedLabel.includes("city")) {
+    aliases.add("City");
+    aliases.add("Current city");
+    aliases.add("Location (City)");
+  }
+
+  if (normalizedLabel.includes("authorized") || normalizedLabel.includes("work authorization") || normalizedLabel.includes("eligible")) {
+    aliases.add("Work authorization");
+    aliases.add("Legally authorized to work");
+    aliases.add("Are you legally authorized to work");
+  }
+
+  if (normalizedLabel.includes("visa") || normalizedLabel.includes("sponsorship")) {
+    aliases.add("Visa sponsorship required");
+    aliases.add("Visa required");
+    aliases.add("Require sponsorship");
+  }
+
+  if (normalizedLabel.includes("remote")) {
+    aliases.add("Remote");
+    aliases.add("Work remotely");
+  }
+
+  return [...aliases];
 }

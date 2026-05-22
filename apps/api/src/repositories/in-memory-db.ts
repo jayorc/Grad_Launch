@@ -6,6 +6,7 @@ import type {
   AgentTaskRun,
   Application,
   ApplicationRun,
+  BrowserExecutionSession,
   Job,
   PolicyDecision,
   ResumeRecord,
@@ -49,6 +50,7 @@ class InMemoryDatabase {
   policyDecisions: PolicyDecision[] = [];
   studentMemories: StudentMemory[] = [];
   agentEvents: AgentEvent[] = [];
+  browserExecutionSessions: BrowserExecutionSession[] = [];
 }
 
 export const db = new InMemoryDatabase();
@@ -69,6 +71,7 @@ export async function resetMemoryDatabase(seedDemoData: boolean) {
   db.policyDecisions = [];
   db.studentMemories = [];
   db.agentEvents = [];
+  db.browserExecutionSessions = [];
   db.accounts = seedDemoData
     ? await Promise.all(
         seedAccounts.map(async (account) => ({

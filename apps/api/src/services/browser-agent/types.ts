@@ -1,5 +1,7 @@
 import type {
   AgentHandoffKind,
+  BrowserExecutionSession,
+  BrowserStageSignature,
   FilledField,
   Job,
   PlannerCheckpoint,
@@ -11,6 +13,10 @@ import type {
 import type { BrowserContext, Page } from "playwright-core";
 
 export type BrowserApplyInput = {
+  studentId?: string;
+  applicationId?: string;
+  runId?: string;
+  executionSessionId?: string;
   job: Job;
   fields: FilledField[];
   workspacePath?: string;
@@ -82,6 +88,25 @@ export type BrowserAgentObservation = {
   groupedFields: BrowserFieldGroup[];
   adapter?: AtsAdapterHint;
 };
+
+export type NavigationCandidate = {
+  id: string;
+  label: string;
+  role: string;
+  score: number;
+  strategy: "role_button" | "role_link" | "dom_control";
+};
+
+export type TransitionWaitResult = {
+  changed: boolean;
+  activePage: Page;
+  reason: string;
+  signatureBefore: BrowserStageSignature;
+  signatureAfter: BrowserStageSignature;
+  outcome: "advanced" | "review_ready" | "submit_ready" | "same_stage";
+};
+
+export type BrowserExecutionSessionState = BrowserExecutionSession;
 
 export type BrowserAgentAction =
   | { kind: "fill"; reason: string; source: PlannerDecisionSource }

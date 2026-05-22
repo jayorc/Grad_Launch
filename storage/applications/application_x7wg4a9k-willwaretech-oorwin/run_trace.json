@@ -1,0 +1,498 @@
+{
+  "id": "run_yddhm8cc",
+  "status": "completed",
+  "executionMode": "browser_apply",
+  "adapterId": "gradlaunch-browser-agent",
+  "startedAt": "2026-05-22T11:31:16.415Z",
+  "completedAt": "2026-05-22T11:31:53.610Z",
+  "filledFields": [
+    {
+      "label": "First name",
+      "value": "Jay"
+    },
+    {
+      "label": "Last name",
+      "value": "Kumar Gupta"
+    },
+    {
+      "label": "Full name",
+      "value": "Jay Kumar Gupta"
+    },
+    {
+      "label": "Email",
+      "value": "jaynrk@gmail.com"
+    },
+    {
+      "label": "Confirm your email",
+      "value": "jaynrk@gmail.com"
+    },
+    {
+      "label": "City",
+      "value": "Bengluru"
+    },
+    {
+      "label": "Location",
+      "value": "Bengluru"
+    },
+    {
+      "label": "Location (City)",
+      "value": "Bengluru"
+    },
+    {
+      "label": "Country",
+      "value": "India"
+    },
+    {
+      "label": "Phone number",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Phone",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Mobile",
+      "value": "+91-7320967983"
+    },
+    {
+      "label": "Degree",
+      "value": "B.Tech in Computer Science"
+    },
+    {
+      "label": "Graduation year",
+      "value": "2022"
+    },
+    {
+      "label": "Preferred location",
+      "value": "Bengluru"
+    },
+    {
+      "label": "Target role",
+      "value": "Software Enginnering"
+    },
+    {
+      "label": "LinkedIn",
+      "value": "https://linkedin.com/in/jay-kumar-gupta-b53368250/"
+    },
+    {
+      "label": "Website",
+      "value": "https://github.com/JAYKUMARGUPTA73"
+    },
+    {
+      "label": "Work authorization",
+      "value": "Yes"
+    },
+    {
+      "label": "Legally authorized to work",
+      "value": "Yes"
+    },
+    {
+      "label": "Visa sponsorship required",
+      "value": "No"
+    },
+    {
+      "label": "Visa required",
+      "value": "No"
+    },
+    {
+      "label": "Current CTC",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Current salary",
+      "value": "0 LPA"
+    },
+    {
+      "label": "Message to the Hiring Team",
+      "value": "I am excited to apply for the Oorwin role at Willwaretech. My background in JavaScript, React, Next.js and my focus on becoming a strong Software Enginnering make this opportunity especially compelling to me. I would be glad to contribute to Willwaretech's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Bengluru opportunities."
+    },
+    {
+      "label": "Primary skills",
+      "value": "JavaScript, React, Next.js, Node.js, Express"
+    },
+    {
+      "label": "Resume context",
+      "value": "jay_kumar_gupta_nit_kkr.pdf"
+    },
+    {
+      "label": "Why are you interested in this role?",
+      "value": "This role aligns with my goal of becoming a strong Software Enginnering and uses skills I have practiced through projects and coursework."
+    },
+    {
+      "label": "What makes you a match?",
+      "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "open",
+      "label": "Opening exact job URL",
+      "detail": "Chrome opens https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "fill",
+      "label": "Filling visible form fields",
+      "detail": "The form is filled across 1 stage and is ready for review or direct submit. Planner action: Backend Developer Intern at CalInfo Pvt. Ltd. with expertise in AI, ML, and web development.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "pause",
+      "label": "Pausing before submit",
+      "detail": "Chrome stays open so the student can inspect the filled form and submit manually.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "planner",
+      "label": "Planner checkpoint updated",
+      "detail": "Planner completed the form fill and paused at the review gate. Form mode: single_stage. Stages tracked: 1. Last action: fill_fields. Resume token: job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-22T09:16:35.555Z.",
+      "state": "done",
+      "source": "gradlaunch"
+    },
+    {
+      "id": "workspace",
+      "label": "Saving screenshots and receipt",
+      "detail": "Workspace updated at /Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_x7wg4a9k-willwaretech-oorwin.",
+      "state": "done",
+      "source": "gradlaunch"
+    }
+  ],
+  "planner": {
+    "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
+    "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-22T09:16:35.555Z",
+    "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or review checkpoint.",
+    "status": "completed",
+    "summary": "Planner completed the form fill and paused at the review gate.",
+    "formMode": "single_stage",
+    "currentStep": "stage_1",
+    "currentStageLabel": "Section 1",
+    "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+    "retryCount": 0,
+    "handoffCount": 0,
+    "validationErrors": [],
+    "subgoals": [
+      {
+        "id": "open_job_page",
+        "label": "Open job page",
+        "status": "completed",
+        "detail": "Job page opened successfully in a visible Chrome session.",
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-22T11:31:17.619Z",
+        "completedAt": "2026-05-22T11:31:17.619Z"
+      },
+      {
+        "id": "authenticate_if_needed",
+        "label": "Handle login if needed",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T09:16:35.555Z"
+      },
+      {
+        "id": "finish_current_section",
+        "label": "Finish active section",
+        "status": "running",
+        "detail": "Reading Section 1 and planning the next safe action.",
+        "attempts": 3,
+        "lastUpdatedAt": "2026-05-22T11:31:21.756Z"
+      },
+      {
+        "id": "recover_from_validation_errors",
+        "label": "Recover from validation errors",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T09:16:35.555Z"
+      },
+      {
+        "id": "retry_alternative_path",
+        "label": "Retry alternative path",
+        "status": "pending",
+        "detail": "Waiting to start.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T09:16:35.555Z"
+      },
+      {
+        "id": "reach_submit_gate",
+        "label": "Reach submit/review gate",
+        "status": "completed",
+        "detail": "Reached the review/submit checkpoint safely.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T11:31:28.393Z",
+        "completedAt": "2026-05-22T11:31:28.393Z"
+      },
+      {
+        "id": "save_checkpoint",
+        "label": "Save checkpoint",
+        "status": "completed",
+        "detail": "Saved checkpoint while waiting for manual stage progress.",
+        "attempts": 0,
+        "lastUpdatedAt": "2026-05-22T11:31:28.604Z",
+        "completedAt": "2026-05-22T11:31:28.604Z"
+      }
+    ],
+    "lastDecision": {
+      "kind": "fill_fields",
+      "source": "llm",
+      "stageIndex": 0,
+      "stageLabel": "Section 1",
+      "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+      "reason": "Backend Developer Intern at CalInfo Pvt. Ltd. with expertise in AI, ML, and web development.",
+      "fieldLabels": [
+        "Last Name",
+        "First Name",
+        "Email",
+        "mat-input-3",
+        "Years of Experience",
+        "City",
+        "Current CTC"
+      ],
+      "createdAt": "2026-05-22T11:31:27.935Z"
+    },
+    "stageHistory": [
+      {
+        "stageIndex": 0,
+        "label": "Section 1",
+        "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+        "visibleFieldLabels": [
+          "document_file",
+          "Last Name",
+          "First Name",
+          "Email",
+          "mat-input-3",
+          "Years of Experience",
+          "City",
+          "Current CTC",
+          "add_docs"
+        ],
+        "requiredFieldLabels": [],
+        "filledFieldLabels": [
+          "Resume upload",
+          "Last Name",
+          "First Name",
+          "Email",
+          "mat-input-3",
+          "Years of Experience",
+          "City",
+          "Current CTC"
+        ],
+        "outcome": "review",
+        "decision": {
+          "kind": "fill_fields",
+          "source": "llm",
+          "stageIndex": 0,
+          "stageLabel": "Section 1",
+          "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+          "reason": "Backend Developer Intern at CalInfo Pvt. Ltd. with expertise in AI, ML, and web development.",
+          "fieldLabels": [
+            "Last Name",
+            "First Name",
+            "Email",
+            "mat-input-3",
+            "Years of Experience",
+            "City",
+            "Current CTC"
+          ],
+          "createdAt": "2026-05-22T11:31:27.935Z"
+        },
+        "lastUpdatedAt": "2026-05-22T11:31:28.393Z"
+      }
+    ],
+    "lastUpdatedAt": "2026-05-22T11:31:28.604Z"
+  },
+  "notes": [
+    "The form is filled across 1 stage and is ready for review or direct submit.",
+    "Browser fill status: filled.",
+    "Filled fields: 8. Skipped fields: 0."
+  ],
+  "submission": {
+    "intent": "browser_fill",
+    "outcome": "confirmed",
+    "externalSubmitted": false,
+    "confirmation": "The form is filled across 1 stage and is ready for review or direct submit.",
+    "submittedAt": "2026-05-22T11:31:53.610Z",
+    "email": {
+      "status": "skipped",
+      "provider": "outbox",
+      "to": "jaynrk@gmail.com",
+      "subject": "GradLaunch filled Willwaretech - Oorwin",
+      "sentAt": "2026-05-22T11:31:53.610Z",
+      "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+    },
+    "browser": {
+      "status": "filled",
+      "sourceUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+      "openedAt": "2026-05-22T11:31:16.535Z",
+      "completedAt": "2026-05-22T11:31:53.610Z",
+      "filledLabels": [
+        "Resume upload",
+        "Last Name",
+        "First Name",
+        "Email",
+        "mat-input-3",
+        "Years of Experience",
+        "City",
+        "Current CTC"
+      ],
+      "skippedLabels": [],
+      "screenshots": [
+        "browser-opened.png",
+        "browser-stage-1-start.png",
+        "browser-filled.png"
+      ],
+      "message": "The form is filled across 1 stage and is ready for review or direct submit.",
+      "planner": {
+        "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
+        "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-22T09:16:35.555Z",
+        "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or review checkpoint.",
+        "status": "completed",
+        "summary": "Planner completed the form fill and paused at the review gate.",
+        "formMode": "single_stage",
+        "currentStep": "stage_1",
+        "currentStageLabel": "Section 1",
+        "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+        "retryCount": 0,
+        "handoffCount": 0,
+        "validationErrors": [],
+        "subgoals": [
+          {
+            "id": "open_job_page",
+            "label": "Open job page",
+            "status": "completed",
+            "detail": "Job page opened successfully in a visible Chrome session.",
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-22T11:31:17.619Z",
+            "completedAt": "2026-05-22T11:31:17.619Z"
+          },
+          {
+            "id": "authenticate_if_needed",
+            "label": "Handle login if needed",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T09:16:35.555Z"
+          },
+          {
+            "id": "finish_current_section",
+            "label": "Finish active section",
+            "status": "running",
+            "detail": "Reading Section 1 and planning the next safe action.",
+            "attempts": 3,
+            "lastUpdatedAt": "2026-05-22T11:31:21.756Z"
+          },
+          {
+            "id": "recover_from_validation_errors",
+            "label": "Recover from validation errors",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T09:16:35.555Z"
+          },
+          {
+            "id": "retry_alternative_path",
+            "label": "Retry alternative path",
+            "status": "pending",
+            "detail": "Waiting to start.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T09:16:35.555Z"
+          },
+          {
+            "id": "reach_submit_gate",
+            "label": "Reach submit/review gate",
+            "status": "completed",
+            "detail": "Reached the review/submit checkpoint safely.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T11:31:28.393Z",
+            "completedAt": "2026-05-22T11:31:28.393Z"
+          },
+          {
+            "id": "save_checkpoint",
+            "label": "Save checkpoint",
+            "status": "completed",
+            "detail": "Saved checkpoint while waiting for manual stage progress.",
+            "attempts": 0,
+            "lastUpdatedAt": "2026-05-22T11:31:28.604Z",
+            "completedAt": "2026-05-22T11:31:28.604Z"
+          }
+        ],
+        "lastDecision": {
+          "kind": "fill_fields",
+          "source": "llm",
+          "stageIndex": 0,
+          "stageLabel": "Section 1",
+          "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+          "reason": "Backend Developer Intern at CalInfo Pvt. Ltd. with expertise in AI, ML, and web development.",
+          "fieldLabels": [
+            "Last Name",
+            "First Name",
+            "Email",
+            "mat-input-3",
+            "Years of Experience",
+            "City",
+            "Current CTC"
+          ],
+          "createdAt": "2026-05-22T11:31:27.935Z"
+        },
+        "stageHistory": [
+          {
+            "stageIndex": 0,
+            "label": "Section 1",
+            "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+            "visibleFieldLabels": [
+              "document_file",
+              "Last Name",
+              "First Name",
+              "Email",
+              "mat-input-3",
+              "Years of Experience",
+              "City",
+              "Current CTC",
+              "add_docs"
+            ],
+            "requiredFieldLabels": [],
+            "filledFieldLabels": [
+              "Resume upload",
+              "Last Name",
+              "First Name",
+              "Email",
+              "mat-input-3",
+              "Years of Experience",
+              "City",
+              "Current CTC"
+            ],
+            "outcome": "review",
+            "decision": {
+              "kind": "fill_fields",
+              "source": "llm",
+              "stageIndex": 0,
+              "stageLabel": "Section 1",
+              "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+              "reason": "Backend Developer Intern at CalInfo Pvt. Ltd. with expertise in AI, ML, and web development.",
+              "fieldLabels": [
+                "Last Name",
+                "First Name",
+                "Email",
+                "mat-input-3",
+                "Years of Experience",
+                "City",
+                "Current CTC"
+              ],
+              "createdAt": "2026-05-22T11:31:27.935Z"
+            },
+            "lastUpdatedAt": "2026-05-22T11:31:28.393Z"
+          }
+        ],
+        "lastUpdatedAt": "2026-05-22T11:31:28.604Z"
+      }
+    }
+  },
+  "screenshots": [
+    "review-gate.png",
+    "browser-opened.png",
+    "browser-stage-1-start.png",
+    "browser-filled.png"
+  ]
+}

@@ -2,66 +2,47 @@
   "intent": "browser_fill",
   "outcome": "confirmed",
   "externalSubmitted": false,
-  "confirmation": "The form is filled across 2 stages and is ready for review or direct submit.",
-  "submittedAt": "2026-05-22T06:46:10.364Z",
+  "confirmation": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+  "submittedAt": "2026-05-22T08:12:20.793Z",
   "email": {
     "status": "skipped",
     "provider": "outbox",
     "to": "jaynrk200211@gmail.com",
     "subject": "GradLaunch filled Jobs - Eef87aa2 Aa70 443f 9288 59777a64f3f2",
-    "sentAt": "2026-05-22T06:46:10.364Z",
+    "sentAt": "2026-05-22T08:12:20.793Z",
     "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
   },
   "browser": {
-    "status": "filled",
+    "status": "needs_manual_review",
     "sourceUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-    "openedAt": "2026-05-22T06:45:13.742Z",
-    "completedAt": "2026-05-22T06:46:10.364Z",
-    "filledLabels": [
-      "Resume upload",
-      "Last Name",
-      "First Name",
-      "Email",
-      "Years of Experience",
-      "City",
-      "Current CTC"
-    ],
-    "skippedLabels": [
-      "First name",
-      "Last name",
-      "Email",
-      "Confirm your email",
-      "Let the company know about your interest working there",
-      "City",
-      "Phone number"
-    ],
+    "openedAt": "2026-05-22T08:12:18.145Z",
+    "completedAt": "2026-05-22T08:12:20.793Z",
+    "filledLabels": [],
+    "skippedLabels": [],
     "screenshots": [
-      "browser-opened.png",
-      "browser-stage-1-start.png",
-      "browser-handoff-needed.png",
-      "browser-stage-2-start.png",
-      "browser-filled.png"
+      "browser-opened.png"
     ],
-    "message": "The form is filled across 2 stages and is ready for review or direct submit.",
+    "message": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
     "planner": {
       "sessionId": "planner-job_u13nx3ht",
       "resumeToken": "job_u13nx3ht:2026-05-21T10:30:48.952Z",
       "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or final review checkpoint.",
-      "status": "completed",
-      "summary": "Planner completed the form fill and paused at the review gate.",
+      "status": "needs_review",
+      "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
       "formMode": "multi_stage",
-      "currentStep": "stage_2",
-      "currentStageLabel": "Section 2",
+      "currentStep": "prepare_application",
+      "currentStageLabel": "Section 1",
       "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
       "retryCount": 4,
-      "handoffCount": 6,
+      "handoffCount": 9,
       "validationErrors": [
         "First name",
         "Last name",
         "Email",
         "Confirm your email",
         "City",
-        "Phone number"
+        "Phone number",
+        "Email address"
       ],
       "subgoals": [
         {
@@ -69,33 +50,34 @@
           "label": "Open job page",
           "status": "completed",
           "detail": "Job page opened successfully in a visible Chrome session.",
-          "attempts": 6,
-          "lastUpdatedAt": "2026-05-22T06:45:15.681Z",
-          "completedAt": "2026-05-22T06:45:15.681Z"
+          "attempts": 16,
+          "lastUpdatedAt": "2026-05-22T08:12:19.329Z",
+          "completedAt": "2026-05-22T08:12:19.329Z"
         },
         {
           "id": "authenticate_if_needed",
           "label": "Handle login if needed",
           "status": "running",
           "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
-          "attempts": 12,
-          "lastUpdatedAt": "2026-05-22T06:46:05.440Z"
+          "attempts": 17,
+          "lastUpdatedAt": "2026-05-22T07:50:41.022Z"
         },
         {
           "id": "finish_current_section",
           "label": "Finish active section",
           "status": "running",
-          "detail": "Reading Section 2 and planning the next safe action.",
-          "attempts": 27,
-          "lastUpdatedAt": "2026-05-22T06:46:05.845Z"
+          "detail": "Reading Section 1 and planning the next safe action.",
+          "attempts": 39,
+          "lastUpdatedAt": "2026-05-22T08:11:20.917Z",
+          "completedAt": "2026-05-22T07:50:35.772Z"
         },
         {
           "id": "recover_from_validation_errors",
           "label": "Recover from validation errors",
           "status": "blocked",
-          "detail": "Validation or required-answer blockers were found: First name, Last name, Email, Confirm your email, City, Phone number.",
-          "attempts": 2,
-          "lastUpdatedAt": "2026-05-22T06:45:25.791Z"
+          "detail": "Validation or required-answer blockers were found: Email address.",
+          "attempts": 5,
+          "lastUpdatedAt": "2026-05-22T07:50:39.141Z"
         },
         {
           "id": "retry_alternative_path",
@@ -111,93 +93,41 @@
           "status": "completed",
           "detail": "Reached the review/submit checkpoint safely.",
           "attempts": 0,
-          "lastUpdatedAt": "2026-05-22T06:46:10.059Z",
-          "completedAt": "2026-05-22T06:46:10.059Z"
+          "lastUpdatedAt": "2026-05-22T08:11:26.717Z",
+          "completedAt": "2026-05-22T08:11:26.717Z"
         },
         {
           "id": "save_checkpoint",
           "label": "Save checkpoint",
           "status": "completed",
-          "detail": "Saved planner state so the run can continue from the latest checkpoint.",
+          "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
           "attempts": 0,
-          "lastUpdatedAt": "2026-05-22T06:46:10.059Z",
-          "completedAt": "2026-05-22T06:46:10.059Z"
+          "lastUpdatedAt": "2026-05-22T08:12:20.707Z",
+          "completedAt": "2026-05-22T08:12:20.707Z"
         }
       ],
       "lastDecision": {
         "kind": "fill_fields",
         "source": "llm",
-        "stageIndex": 1,
-        "stageLabel": "Section 2",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
         "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-        "reason": "Jay Kumar Gupta is excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, leveraging his skills in JavaScript, React, Next.js, and Node.js to contribute to the team with a practical approach.",
+        "reason": "Jay Kumar Gupta is a recent B.Tech in Computer Science graduate with a strong background in JavaScript, React, Next.js, and a focus on becoming a strong Eef87aa2 Aa70 443f 9288 59777a64f3f2.",
         "fieldLabels": [
           "Last Name",
           "First Name",
           "Email",
+          "mat-input-3",
           "Years of Experience",
           "City",
           "Current CTC"
         ],
-        "createdAt": "2026-05-22T06:46:10.003Z"
+        "createdAt": "2026-05-22T08:11:25.885Z"
       },
       "stageHistory": [
         {
           "stageIndex": 0,
           "label": "Section 1",
-          "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-          "visibleFieldLabels": [
-            "Choose a file or drop it here",
-            "First name",
-            "Last name",
-            "Email",
-            "Confirm your email",
-            "LinkedIn",
-            "Facebook",
-            "X (fka Twitter)",
-            "Website",
-            "Let the company know about your interest working there",
-            "City",
-            "Phone number"
-          ],
-          "requiredFieldLabels": [
-            "First name",
-            "Last name",
-            "Email",
-            "Confirm your email",
-            "City",
-            "Phone number"
-          ],
-          "filledFieldLabels": [
-            "First name",
-            "Last name",
-            "Email",
-            "Confirm your email",
-            "City",
-            "Location",
-            "Location (City)",
-            "Phone number",
-            "Phone",
-            "Mobile",
-            "Preferred location",
-            "Let the company know about your interest working there"
-          ],
-          "outcome": "handoff",
-          "decision": {
-            "kind": "wait_for_user_input",
-            "source": "system",
-            "stageIndex": 0,
-            "stageLabel": "Section 1",
-            "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-            "reason": "GradLaunch needs your help with required answers on this screen: First name, Last name, Email, Confirm your email, City, Phone number.",
-            "fieldLabels": [],
-            "createdAt": "2026-05-22T06:45:25.955Z"
-          },
-          "lastUpdatedAt": "2026-05-22T06:45:25.955Z"
-        },
-        {
-          "stageIndex": 1,
-          "label": "Section 2",
           "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
           "visibleFieldLabels": [
             "document_file",
@@ -233,68 +163,108 @@
           "decision": {
             "kind": "fill_fields",
             "source": "llm",
-            "stageIndex": 1,
-            "stageLabel": "Section 2",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
             "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-            "reason": "Jay Kumar Gupta is excited to apply for the Eef87aa2 Aa70 443f 9288 59777a64f3f2 role at Jobs, leveraging his skills in JavaScript, React, Next.js, and Node.js to contribute to the team with a practical approach.",
+            "reason": "Jay Kumar Gupta is a recent B.Tech in Computer Science graduate with a strong background in JavaScript, React, Next.js, and a focus on becoming a strong Eef87aa2 Aa70 443f 9288 59777a64f3f2.",
             "fieldLabels": [
               "Last Name",
               "First Name",
               "Email",
+              "mat-input-3",
               "Years of Experience",
               "City",
               "Current CTC"
             ],
-            "createdAt": "2026-05-22T06:46:10.003Z"
+            "createdAt": "2026-05-22T08:11:25.885Z"
           },
-          "lastUpdatedAt": "2026-05-22T06:46:10.059Z"
+          "lastUpdatedAt": "2026-05-22T08:11:26.717Z"
         },
         {
-          "stageIndex": 2,
-          "label": "Section 3",
-          "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+          "stageIndex": 1,
+          "label": "Section 2",
+          "url": "chrome://new-tab-page/",
           "visibleFieldLabels": [
+            "Search Google or type a URL"
+          ],
+          "requiredFieldLabels": [],
+          "filledFieldLabels": [
             "First name",
             "Last name",
             "Email",
             "Confirm your email",
-            "LinkedIn",
-            "Facebook",
-            "X (fka Twitter)",
-            "Website",
-            "Let the company know about your interest working there",
             "City",
-            "Phone number"
+            "Location",
+            "Location (City)",
+            "Phone number",
+            "Phone",
+            "Mobile",
+            "Preferred location",
+            "Let the company know about your interest working there",
+            "Resume upload",
+            "mat-input-3",
+            "Years of Experience",
+            "Current CTC"
           ],
+          "outcome": "advanced",
+          "decision": {
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 1,
+            "stageLabel": "Section 2",
+            "url": "chrome://new-tab-page/",
+            "reason": "Page classified as account_gate; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T07:55:38.625Z"
+          },
+          "lastUpdatedAt": "2026-05-22T07:55:38.625Z"
+        },
+        {
+          "stageIndex": 2,
+          "label": "Section 3",
+          "url": "https://secure.indeed.com/auth?oauth_client_id=27a34e574e9b7ad0b96c2767a3ee6bc31828fc4e605f074e4153f1b9fe4dfa85&from=oauth&continue=https%3A%2F%2Fsecure.indeed.com%2Foauth%2Fv2%2Fauthorize%3Fclient_id%3D27a34e574e9b7ad0b96c2767a3ee6bc31828fc4e605f074e4153f1b9fe4dfa85%26response_type%3Dcode%26scope%3Djob_seeker.resume.read%26redirect_uri%3Dhttps%253A%252F%252Fjobs.smartrecruiters.com%252Foneclick-ui%252Fapi%252Fcallback%252Findeed%253FclientHost%253Dhttps%253A%252F%252Fjobs.smartrecruiters.com%2526dcr_id%253DDCRA1%26login_attempted%3D1",
+          "visibleFieldLabels": [
+            "Email address"
+          ],
+          "requiredFieldLabels": [
+            "Email address"
+          ],
+          "filledFieldLabels": [],
+          "outcome": "handoff",
+          "decision": {
+            "kind": "wait_for_user_input",
+            "source": "system",
+            "stageIndex": 2,
+            "stageLabel": "Section 3",
+            "url": "https://secure.indeed.com/auth?oauth_client_id=27a34e574e9b7ad0b96c2767a3ee6bc31828fc4e605f074e4153f1b9fe4dfa85&from=oauth&continue=https%3A%2F%2Fsecure.indeed.com%2Foauth%2Fv2%2Fauthorize%3Fclient_id%3D27a34e574e9b7ad0b96c2767a3ee6bc31828fc4e605f074e4153f1b9fe4dfa85%26response_type%3Dcode%26scope%3Djob_seeker.resume.read%26redirect_uri%3Dhttps%253A%252F%252Fjobs.smartrecruiters.com%252Foneclick-ui%252Fapi%252Fcallback%252Findeed%253FclientHost%253Dhttps%253A%252F%252Fjobs.smartrecruiters.com%2526dcr_id%253DDCRA1%26login_attempted%3D1",
+            "reason": "GradLaunch needs your help with required answers on this screen: Email address.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T07:50:39.342Z"
+          },
+          "lastUpdatedAt": "2026-05-22T07:50:39.342Z"
+        },
+        {
+          "stageIndex": 3,
+          "label": "Section 4",
+          "url": "https://accounts.google.com/v3/signin/identifier?opparams=%253Fui_locales%253Den-IN%252Ben&dsh=S423322184%3A1779436239374885&client_id=1047839414793-v442kdo3pt0vb43l8nu2c5sh9lf4bsnj.apps.googleusercontent.com&nonce=vRdE0Z5evkZKRLVC&o2v=2&redirect_uri=https%3A%2F%2Fsecure.indeed.com%2Faccount%2Fgoogleauth&response_type=code&scope=openid+email+profile&service=lso&state=qawnu5tOoJMKgIX7uNsssUF7pRY9UnAJ&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAOvJKBRUiA1MVYhgOoMfXVzL5giVhVaFF-FcigkU5w_nsyzAKzQPYraQdHgS0bQl-Os29ZaOiLecbnj6wIeCCO8hl-LK-dy-46Wzw_ZecU4NXTwyspEaB7_63LMjg_Q6C2gN3LnbQOtiws4AsJkN5UIZ8Bj2YfmFNnt0B_KB_aj64j1xIKmbxpNFk_5qsqJ3tA5H1Kay0cauKEuHPtAoEZbbIGibZdNZ7vb4cTPWs0AyK3xZAXN_t2v70qnSpfMbXUQvKMR-GxkzX0xDjWO-By4aqv8AQsLjBI_oDZeGZ_DwvhRpYcGiS5ZHQhyZr4SwavHGdJkY70oy0v3VHjN7iAQ066kqtLcFaqlSOZqO-P3pZbx88Vmtlb_CF0za2qt2FhGplIzuds28im3EEzNATlslubdg4yirC_5yesKyhd3d7HgX2Dy_g0regWmAOb2e_r81sAilWp05VKp5yNOO4XOtb1oYg%26flowName%3DGeneralOAuthFlow%26as%3DS423322184%253A1779436239374885%26client_id%3D1047839414793-v442kdo3pt0vb43l8nu2c5sh9lf4bsnj.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Fsecure.indeed.com&rart=ANgoxce-2jZsAJp5_1JeTbPYhF_cH7_PF3DDclGmpAYp3NPmZHxfZGB64EkBgByiwTamGzkYflFIAVMFxbwv35Vm0M7_YS7obIrk502vigRXFckU16TABBA",
+          "visibleFieldLabels": [],
           "requiredFieldLabels": [],
           "filledFieldLabels": [],
           "outcome": "observed",
           "decision": {
-            "kind": "fill_fields",
-            "source": "llm",
-            "stageIndex": 2,
-            "stageLabel": "Section 3",
-            "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-            "reason": "Prepared a field-fill plan for 11 visible fields. Filled in first name, last name, email, confirm email, city, and phone number. Needs LinkedIn profile and a message to the hiring team.",
-            "fieldLabels": [
-              "First name",
-              "Last name",
-              "Email",
-              "Confirm your email",
-              "LinkedIn",
-              "Facebook",
-              "X (fka Twitter)",
-              "Website",
-              "Let the company know about your interest working there",
-              "City",
-              "Phone number"
-            ],
-            "createdAt": "2026-05-22T05:30:29.857Z"
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 3,
+            "stageLabel": "Section 4",
+            "url": "https://accounts.google.com/v3/signin/identifier?opparams=%253Fui_locales%253Den-IN%252Ben&dsh=S423322184%3A1779436239374885&client_id=1047839414793-v442kdo3pt0vb43l8nu2c5sh9lf4bsnj.apps.googleusercontent.com&nonce=vRdE0Z5evkZKRLVC&o2v=2&redirect_uri=https%3A%2F%2Fsecure.indeed.com%2Faccount%2Fgoogleauth&response_type=code&scope=openid+email+profile&service=lso&state=qawnu5tOoJMKgIX7uNsssUF7pRY9UnAJ&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAOvJKBRUiA1MVYhgOoMfXVzL5giVhVaFF-FcigkU5w_nsyzAKzQPYraQdHgS0bQl-Os29ZaOiLecbnj6wIeCCO8hl-LK-dy-46Wzw_ZecU4NXTwyspEaB7_63LMjg_Q6C2gN3LnbQOtiws4AsJkN5UIZ8Bj2YfmFNnt0B_KB_aj64j1xIKmbxpNFk_5qsqJ3tA5H1Kay0cauKEuHPtAoEZbbIGibZdNZ7vb4cTPWs0AyK3xZAXN_t2v70qnSpfMbXUQvKMR-GxkzX0xDjWO-By4aqv8AQsLjBI_oDZeGZ_DwvhRpYcGiS5ZHQhyZr4SwavHGdJkY70oy0v3VHjN7iAQ066kqtLcFaqlSOZqO-P3pZbx88Vmtlb_CF0za2qt2FhGplIzuds28im3EEzNATlslubdg4yirC_5yesKyhd3d7HgX2Dy_g0regWmAOb2e_r81sAilWp05VKp5yNOO4XOtb1oYg%26flowName%3DGeneralOAuthFlow%26as%3DS423322184%253A1779436239374885%26client_id%3D1047839414793-v442kdo3pt0vb43l8nu2c5sh9lf4bsnj.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Fsecure.indeed.com&rart=ANgoxce-2jZsAJp5_1JeTbPYhF_cH7_PF3DDclGmpAYp3NPmZHxfZGB64EkBgByiwTamGzkYflFIAVMFxbwv35Vm0M7_YS7obIrk502vigRXFckU16TABBA",
+            "reason": "Page classified as empty; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-22T07:50:42.032Z"
           },
-          "lastUpdatedAt": "2026-05-22T05:30:29.857Z"
+          "lastUpdatedAt": "2026-05-22T07:50:42.032Z"
         }
       ],
-      "lastUpdatedAt": "2026-05-22T06:46:10.059Z"
+      "lastUpdatedAt": "2026-05-22T08:12:20.707Z"
     }
   }
 }

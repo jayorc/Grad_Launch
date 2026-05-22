@@ -1,0 +1,184 @@
+{
+  "sessionId": "planner-job_greenhouse_c3RyaXBlLTc1ODk4OTc",
+  "resumeToken": "job_greenhouse_c3RyaXBlLTc1ODk4OTc:2026-05-22T08:43:48.302Z",
+  "goal": "Complete the Network Solution Lead application at Stripe autonomously until a protected or review checkpoint.",
+  "status": "needs_review",
+  "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+  "formMode": "multi_stage",
+  "retryCount": 0,
+  "handoffCount": 1,
+  "validationErrors": [
+    "Country",
+    "Location (City)",
+    "Who is your current or previous employer?",
+    "What is your current or previous job title?",
+    "Please include your LinkedIn profile below.",
+    "What is the most recent school you attended?",
+    "Please select the country where you currently reside.",
+    "If you do not reside in the location(s) where the role is based, do you plan on relocating?",
+    "Are you authorized to work in the location(s) you selected in your previous response?",
+    "Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in you",
+    "Have you ever been employed by Stripe or a Stripe affiliate?",
+    "Do you opt-in to receive WhatsApp messages from Stripe Recruiting?"
+  ],
+  "subgoals": [
+    {
+      "id": "open_job_page",
+      "label": "Open job page",
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 1,
+      "lastUpdatedAt": "2026-05-22T08:43:50.399Z",
+      "completedAt": "2026-05-22T08:43:50.399Z"
+    },
+    {
+      "id": "authenticate_if_needed",
+      "label": "Handle login if needed",
+      "status": "running",
+      "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-22T08:44:27.424Z"
+    },
+    {
+      "id": "finish_current_section",
+      "label": "Finish active section",
+      "status": "running",
+      "detail": "Reading Section 2 and planning the next safe action.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-22T08:44:01.179Z",
+      "completedAt": "2026-05-22T08:44:00.775Z"
+    },
+    {
+      "id": "recover_from_validation_errors",
+      "label": "Recover from validation errors",
+      "status": "blocked",
+      "detail": "Validation or required-answer blockers were found: Country, Location (City), Who is your current or previous employer?, What is your current or previous job title?, Please include your LinkedIn profile below., What is the most recent school you attended?, Please select the country where you currently reside., If you do not reside in the location(s) where the role is based, do you plan on relocating?, Are you authorized to work in the location(s) you selected in your previous response?, Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in you, Have you ever been employed by Stripe or a Stripe affiliate?, Do you opt-in to receive WhatsApp messages from Stripe Recruiting?.",
+      "attempts": 1,
+      "lastUpdatedAt": "2026-05-22T08:44:08.646Z"
+    },
+    {
+      "id": "retry_alternative_path",
+      "label": "Retry alternative path",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T08:43:48.302Z"
+    },
+    {
+      "id": "reach_submit_gate",
+      "label": "Reach submit/review gate",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T08:43:48.302Z"
+    },
+    {
+      "id": "save_checkpoint",
+      "label": "Save checkpoint",
+      "status": "completed",
+      "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-22T08:44:27.424Z",
+      "completedAt": "2026-05-22T08:44:27.424Z"
+    }
+  ],
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "https://stripe.com/jobs/listing/network-solution-lead/7589897/apply",
+      "visibleFieldLabels": [],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [],
+      "outcome": "advanced",
+      "lastUpdatedAt": "2026-05-22T08:44:00.775Z",
+      "decision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://stripe.com/jobs/listing/network-solution-lead/7589897",
+        "reason": "Page classified as start; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T08:43:57.777Z"
+      }
+    },
+    {
+      "stageIndex": 1,
+      "label": "Section 2",
+      "url": "https://stripe.com/jobs/listing/network-solution-lead/7589897/apply",
+      "visibleFieldLabels": [
+        "First Name",
+        "Last Name",
+        "Email",
+        "Country",
+        "Phone",
+        "Location (City)",
+        "Attach",
+        "Who is your current or previous employer?",
+        "What is your current or previous job title?",
+        "Please include your LinkedIn profile below.",
+        "What is the most recent school you attended?",
+        "What is the most recent degree you obtained?",
+        "Please select the country where you currently reside.",
+        "If located in the US, in what city and state do you reside?",
+        "If you do not reside in the location(s) where the role is based, do you plan on relocating?",
+        "Are you authorized to work in the location(s) you selected in your previous response?",
+        "Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in your previous response?",
+        "Have you ever been employed by Stripe or a Stripe affiliate?",
+        "Do you opt-in to receive WhatsApp messages from Stripe Recruiting?",
+        "Gender",
+        "Are you Hispanic/Latino?",
+        "Veteran Status",
+        "Disability Status"
+      ],
+      "requiredFieldLabels": [
+        "First Name",
+        "Last Name",
+        "Email",
+        "Country",
+        "Phone",
+        "Location (City)",
+        "Who is your current or previous employer?",
+        "What is your current or previous job title?",
+        "Please include your LinkedIn profile below.",
+        "What is the most recent school you attended?",
+        "What is the most recent degree you obtained?",
+        "Please select the country where you currently reside.",
+        "If located in the US, in what city and state do you reside?",
+        "If you do not reside in the location(s) where the role is based, do you plan on relocating?",
+        "Are you authorized to work in the location(s) you selected in your previous response?",
+        "Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in your previous response?",
+        "Have you ever been employed by Stripe or a Stripe affiliate?",
+        "Do you opt-in to receive WhatsApp messages from Stripe Recruiting?"
+      ],
+      "filledFieldLabels": [],
+      "outcome": "handoff",
+      "lastUpdatedAt": "2026-05-22T08:44:09.012Z",
+      "decision": {
+        "kind": "wait_for_user_input",
+        "source": "system",
+        "stageIndex": 1,
+        "stageLabel": "Section 2",
+        "url": "https://stripe.com/jobs/listing/network-solution-lead/7589897/apply",
+        "reason": "GradLaunch needs your help with required answers on this screen: Country, Location (City), Who is your current or previous employer?, What is your current or previous job title?, Please include your LinkedIn profile below., What is the most recent school you attended?, Please select the country where you currently reside., If you do not reside in the location(s) where the role is based, do you plan on relocating?, Are you authorized to work in the location(s) you selected in your previous response?, Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in you, Have you ever been employed by Stripe or a Stripe affiliate?, Do you opt-in to receive WhatsApp messages from Stripe Recruiting?.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-22T08:44:09.012Z"
+      }
+    }
+  ],
+  "lastUpdatedAt": "2026-05-22T08:44:27.424Z",
+  "currentUrl": "https://stripe.com/jobs/listing/network-solution-lead/7589897/apply",
+  "currentStep": "stage_2",
+  "currentStageLabel": "Section 2",
+  "lastDecision": {
+    "kind": "wait_for_user_input",
+    "source": "system",
+    "stageIndex": 1,
+    "stageLabel": "Section 2",
+    "url": "https://stripe.com/jobs/listing/network-solution-lead/7589897/apply",
+    "reason": "GradLaunch needs your help with required answers on this screen: Country, Location (City), Who is your current or previous employer?, What is your current or previous job title?, Please include your LinkedIn profile below., What is the most recent school you attended?, Please select the country where you currently reside., If you do not reside in the location(s) where the role is based, do you plan on relocating?, Are you authorized to work in the location(s) you selected in your previous response?, Will you require Stripe to sponsor you for a work permit now or in the future for the location(s) you selected in in you, Have you ever been employed by Stripe or a Stripe affiliate?, Do you opt-in to receive WhatsApp messages from Stripe Recruiting?.",
+    "fieldLabels": [],
+    "createdAt": "2026-05-22T08:44:09.012Z"
+  }
+}
