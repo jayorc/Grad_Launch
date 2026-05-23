@@ -5,4 +5,4 @@ coverage
 .env
 .DS_Store
 *.log
-
+storage/logged-browser-profile

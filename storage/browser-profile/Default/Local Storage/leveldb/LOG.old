@@ -1,3 +1,6 @@
-2026/05/23-10:50:36.213 ec2f8 Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/Local Storage/leveldb/MANIFEST-000001
-2026/05/23-10:50:36.216 ec2f8 Recovering log #13
-2026/05/23-10:50:36.216 ec2f8 Reusing old log /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/Local Storage/leveldb/000013.log 
+2026/05/23-10:57:56.853 eef21 Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/Local Storage/leveldb/MANIFEST-000001
+2026/05/23-10:57:56.856 eef21 Recovering log #13
+2026/05/23-10:57:56.856 eef21 Reusing old log /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/Local Storage/leveldb/000013.log 
+2026/05/23-11:09:52.756 eef24 Level-0 table #18: started
+2026/05/23-11:09:52.763 eef24 Level-0 table #18: 23103 bytes OK
+2026/05/23-11:09:52.765 eef24 Delete type=0 #13

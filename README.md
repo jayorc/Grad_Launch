@@ -89,7 +89,7 @@ The current codebase includes:
 - AIHawk local adapter detection is supported via `AIHAWK_REPO_PATH`
 - every application run also writes a structured package to `APPLICATION_ARTIFACT_STORAGE_DIR`
 - notifications use Nodemailer when SMTP variables are configured, otherwise receipts are saved in `EMAIL_OUTBOX_DIR`
-- browser autofill uses a persistent managed GradLaunch Chrome profile, reattaches to that managed browser session when it is already open, opens each application in a new controlled tab, and saves screenshots/receipts; login, captcha, unsupported portals, and unknown multi-step forms pause for manual review
+- browser autofill first tries a logged Chrome session/profile (`BROWSER_LOGGED_CDP_URL` or `BROWSER_LOGGED_PROFILE_DIR`), then falls back to the persistent managed GradLaunch Chrome profile; run `npm run browser:prepare-logged-profile` after quitting Chrome to refresh the GradLaunch-owned logged profile copy, and set `BROWSER_REQUIRE_LOGGED_PROFILE=true` to prevent fallback to an empty managed session
 - background autopilot can queue a browser run behind the API request, and the Applications page will keep refreshing while that run is active
 - browser runs open Chrome visibly by default because `BROWSER_HEADLESS=false`; set it to `true` only for automated tests
 

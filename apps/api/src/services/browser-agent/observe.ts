@@ -516,7 +516,39 @@ export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCh
     }
 
     const bodyText = normalize(document.body?.innerText ?? "");
+    const currentHost = window.location.hostname.toLowerCase();
     const visiblePasswordField = Array.from(document.querySelectorAll("input[type='password']")).some((field) => isVisible(field));
+    const visibleApplicationField = Array.from(document.querySelectorAll("input, textarea, select")).some((field) => {
+      if (!isVisible(field)) {
+        return false;
+      }
+
+      const descriptor = normalize([
+        field.getAttribute("name") ?? "",
+        field.getAttribute("id") ?? "",
+        field.getAttribute("aria-label") ?? "",
+        field.getAttribute("placeholder") ?? "",
+        field.closest("label")?.textContent ?? ""
+      ].join(" "));
+
+      return /\b(first name|last name|full name|resume|cv|phone|mobile|location|city|school|degree)\b/.test(descriptor);
+    });
+    const visibleLoginProviderControl = Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit']"))
+      .some((control) => {
+        if (!isVisible(control)) {
+          return false;
+        }
+
+        const text = normalize([
+          control.textContent ?? "",
+          control.getAttribute("aria-label") ?? "",
+          control.getAttribute("title") ?? "",
+          control instanceof HTMLInputElement ? control.value : ""
+        ].join(" "));
+
+        return /\b(sign in|signin|log in|login|continue)\b/.test(text)
+          && /\b(google|gmail|email|e mail|mail|sso|account)\b/.test(text);
+      });
     const visibleOtpField = Array.from(document.querySelectorAll("input, textarea")).some((field) => {
       if (!isVisible(field)) {
         return false;
@@ -550,11 +582,27 @@ export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCh
       };
     }
 
+    if (/(^|\.)accounts\.google\.com$/.test(currentHost) && /\b(sign in|email or phone|choose an account|password|continue|verify|2-step verification)\b/.test(bodyText)) {
+      return {
+        blocked: true,
+        kind: "login" as const,
+        reason: "Google sign-in is open. GradLaunch will choose the existing account when possible, otherwise it will enter the applicant email and wait if Google asks for password or verification."
+      };
+    }
+
     if (visiblePasswordField && /sign in|log in|login|password|account/.test(bodyText)) {
       return {
         blocked: true,
         kind: "login" as const,
         reason: "Human intervention needed: sign in to the job portal in the open browser."
+      };
+    }
+
+    if (visibleLoginProviderControl && !visibleApplicationField && /\b(sign in|signin|log in|login|continue with google|continue with email|account)\b/.test(bodyText)) {
+      return {
+        blocked: true,
+        kind: "login" as const,
+        reason: "Login panel detected. GradLaunch will try the existing browser profile first, then wait if the portal still needs input."
       };
     }
 

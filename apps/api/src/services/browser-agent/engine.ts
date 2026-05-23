@@ -1,9 +1,9 @@
 import { request as httpRequest } from "node:http";
-import { mkdir } from "node:fs/promises";
+import { lstat, mkdir, readFile, readlink, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentHandoffKind, BrowserApplyReceipt } from "@gradlaunch/shared";
-import { chromium, type Browser, type BrowserContext, type Dialog, type Page } from "playwright-core";
-import { getBrowserWorkspaceStorageDir, getManagedBrowserProfileDir } from "../../config/storage";
+import { chromium, type Browser, type BrowserContext, type Dialog, type Frame, type Page } from "playwright-core";
+import { getBrowserWorkspaceStorageDir, getLoggedBrowserProfileDir, getManagedBrowserProfileDir } from "../../config/storage";
 import { nowIso } from "../../lib/time";
 import { buildStageAnswerPlan } from "./answer";
 import { evaluateStageReadiness } from "./eval";
@@ -48,16 +48,25 @@ import { pathExists, writeBrowserDebug } from "./util";
 
 const defaultChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
+type BrowserLaunchMode = "logged_cdp" | "logged_profile" | "managed_cdp" | "managed_profile" | "ephemeral";
+type BrowserLaunchResult = {
+  browser: Browser | undefined;
+  context: BrowserContext;
+  keepContextOpen: boolean;
+  attachedToExistingBrowser: boolean;
+  launchMode: BrowserLaunchMode;
+};
+
 export class BrowserAgentEngine {
   private readonly executionSessions = new BrowserExecutionSessionService();
 
   async getAvailability(): Promise<BrowserAvailability> {
-    const cdpUrl = await resolveManagedChromeCdpUrl();
+    const loggedCdpUrl = shouldPreferLoggedBrowser() ? await resolveLoggedChromeCdpUrl() : undefined;
 
-    if (cdpUrl) {
+    if (loggedCdpUrl) {
       return {
         available: true,
-        message: `Browser worker can attach to the managed GradLaunch browser session at ${cdpUrl}.`
+        message: `Browser worker can attach to the logged Chrome session at ${loggedCdpUrl}.`
       };
     }
 
@@ -68,9 +77,45 @@ export class BrowserAgentEngine {
       };
     }
 
+    const cdpUrl = await resolveManagedChromeCdpUrl();
     const chromePath = resolveChromePath();
+    const chromeExists = await pathExists(chromePath);
+    const loggedProfileDir = shouldPreferLoggedBrowser() ? getLoggedBrowserProfileDir() : undefined;
 
-    if (!(await pathExists(chromePath))) {
+    if (chromeExists && loggedProfileDir && await pathExists(loggedProfileDir)) {
+      const loggedProfileLocked = await isBrowserProfileLocked(loggedProfileDir, { clearStaleGradLaunchLock: true });
+
+      if (loggedProfileLocked && shouldRequireLoggedBrowser()) {
+        return {
+          available: false,
+          chromePath,
+          message: buildLockedLoggedProfileMessage(loggedProfileDir)
+        };
+      }
+
+      if (loggedProfileLocked) {
+        return {
+          available: true,
+          chromePath,
+          message: `The logged Chrome profile at ${loggedProfileDir} is already open without remote debugging, so GradLaunch will skip it and use the managed browser profile.`
+        };
+      }
+
+      return {
+        available: true,
+        chromePath,
+        message: `Browser worker will try the logged Chrome profile at ${loggedProfileDir} before the managed GradLaunch profile.`
+      };
+    }
+
+    if (cdpUrl) {
+      return {
+        available: true,
+        message: `Browser worker can attach to the managed GradLaunch browser session at ${cdpUrl}.`
+      };
+    }
+
+    if (!chromeExists) {
       return {
         available: false,
         chromePath,
@@ -119,15 +164,22 @@ export class BrowserAgentEngine {
     let context: BrowserContext | undefined;
     let keepContextOpen = false;
     let attachedToExistingBrowser = false;
+    let launchMode: BrowserLaunchMode = "ephemeral";
     let executionSessionId = input.executionSessionId;
     const resumeUrl = sanitizeBrowserResumeUrl(input.planner?.currentUrl);
 
     try {
-      ({ browser, context, keepContextOpen, attachedToExistingBrowser } = await launchContext(availability.chromePath));
+      ({ browser, context, keepContextOpen, attachedToExistingBrowser, launchMode } = await launchContext(availability.chromePath));
       installContextSafety(context, workspacePath);
       console.log(
-        `[GradLaunch][Browser] Mode=${attachedToExistingBrowser ? "attached_cdp" : keepContextOpen ? "persistent_profile" : "ephemeral"} headless=${process.env.BROWSER_HEADLESS === "true"}`
+        `[GradLaunch][Browser] Mode=${launchMode} headless=${process.env.BROWSER_HEADLESS === "true"}`
       );
+      await writeBrowserDebug(workspacePath, "browser-launch-mode", {
+        mode: launchMode,
+        attachedToExistingBrowser,
+        keepContextOpen,
+        preferLoggedProfile: shouldPreferLoggedBrowser()
+      });
       const page = await openOrResumePage(context, input.job.sourceUrl, resumeUrl);
       await clearUserStopRequest(page);
       if (input.studentId && input.applicationId && input.runId) {
@@ -153,10 +205,7 @@ export class BrowserAgentEngine {
       page.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
       markPlannerTask(planner, "open_job_page", "running", "Opening the target application URL in a new Chrome tab.");
       setPlannerStatus(planner, "running", "Opening the job page in a new Chrome tab.");
-      await page.goto(resumeUrl ?? input.job.sourceUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000)
-      });
+      await navigateToJobPage(page, resumeUrl ?? input.job.sourceUrl, workspacePath);
       let activePage = await getActivePage(context, page);
       markPlannerTask(planner, "open_job_page", "completed", "Job page opened successfully in a visible Chrome session.");
       planner.currentUrl = activePage.url();
@@ -182,7 +231,21 @@ export class BrowserAgentEngine {
       });
       await clickSoftGate(activePage);
 
-      const initialCheckpoint = await detectProtectedCheckpoint(activePage);
+      let initialCheckpoint = await detectProtectedCheckpoint(activePage);
+
+      if (initialCheckpoint.blocked && initialCheckpoint.kind === "login") {
+        const loginRecovery = await tryResolveLoginWithExistingProfile({
+          context,
+          page: activePage,
+          sourceUrl: input.job.sourceUrl,
+          studentEmail: resolveApplicantEmail(input),
+          workspacePath,
+          stageIndex: 0,
+          reason: initialCheckpoint.reason
+        });
+        activePage = loginRecovery.activePage;
+        initialCheckpoint = await detectProtectedCheckpoint(activePage);
+      }
 
       if (initialCheckpoint.blocked) {
         await updateExecutionSession(this.executionSessions, executionSessionId, {
@@ -300,7 +363,21 @@ export class BrowserAgentEngine {
         await saveScreenshot(activePage, workspacePath, screenshots, `browser-stage-${stageIndex + 1}-start.png`);
         await clickSoftGate(activePage);
 
-        const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
+        let protectedCheckpoint = await detectProtectedCheckpoint(activePage);
+
+        if (protectedCheckpoint.blocked && protectedCheckpoint.kind === "login") {
+          const loginRecovery = await tryResolveLoginWithExistingProfile({
+            context,
+            page: activePage,
+            sourceUrl: input.job.sourceUrl,
+            studentEmail: resolveApplicantEmail(input),
+            workspacePath,
+            stageIndex,
+            reason: protectedCheckpoint.reason
+          });
+          activePage = loginRecovery.activePage;
+          protectedCheckpoint = await detectProtectedCheckpoint(activePage);
+        }
 
         if (protectedCheckpoint.blocked) {
           await updateExecutionSession(this.executionSessions, executionSessionId, {
@@ -402,6 +479,53 @@ export class BrowserAgentEngine {
           filledCount: filledLabels.length,
           manualCount: skippedLabels.length
         });
+
+        if (stagePlan.action === "ask_user" && (observation.pageState === "login" || observation.pageState === "account_gate")) {
+          const loginRecovery = await tryResolveLoginWithExistingProfile({
+            context,
+            page: activePage,
+            sourceUrl: input.job.sourceUrl,
+            studentEmail: resolveApplicantEmail(input),
+            workspacePath,
+            stageIndex,
+            reason: stagePlan.reason
+          });
+
+          if (loginRecovery.resolved) {
+            activePage = loginRecovery.activePage;
+            markPlannerTask(planner, "authenticate_if_needed", "running", "Login gate cleared using the existing browser profile. Resuming autonomous execution.");
+            setPlannerStatus(planner, "running", "Login gate cleared using the existing browser profile.");
+            continue;
+          }
+
+          const handoff = await waitForHumanIntervention({
+            context,
+            page: loginRecovery.activePage,
+            stageIndex,
+            workspacePath,
+            screenshots,
+            planner,
+            reason: "Sign in is still required. Use Google/email in the open browser if the existing profile does not complete it automatically.",
+            handoffKind: "login"
+          });
+          activePage = handoff.activePage;
+
+          if (!handoff.resolved) {
+            return {
+              status: "handoff_required",
+              sourceUrl: input.job.sourceUrl,
+              openedAt,
+              completedAt: nowIso(),
+              filledLabels,
+              skippedLabels,
+              screenshots,
+              message: "The job portal still needs login before GradLaunch can continue.",
+              planner
+            };
+          }
+
+          continue;
+        }
 
         if (sameScreenAttempts > loopThreshold) {
           const message = `The agent saw the same screen repeatedly after ${sameScreenAttempts + 1} attempts and paused to avoid looping.`;
@@ -1055,12 +1179,688 @@ async function openOrResumePage(context: BrowserContext, sourceUrl: string, resu
   return context.newPage();
 }
 
+async function navigateToJobPage(page: Page, targetUrl: string, workspacePath: string) {
+  let gotoError: string | undefined;
+
+  await page.bringToFront().catch(() => undefined);
+  await writeBrowserDebug(workspacePath, "job-navigation-start", {
+    fromUrl: page.url(),
+    targetUrl
+  });
+
+  try {
+    await page.goto(targetUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000)
+    });
+  } catch (error) {
+    gotoError = error instanceof Error ? error.message : String(error);
+    await writeBrowserDebug(workspacePath, "job-navigation-goto-failed", {
+      currentUrl: page.url(),
+      targetUrl,
+      error: gotoError
+    });
+  }
+
+  await page.waitForLoadState("domcontentloaded", { timeout: 3000 }).catch(() => undefined);
+
+  if (!isBlankBrowserUrl(page.url())) {
+    await writeBrowserDebug(workspacePath, "job-navigation-complete", {
+      strategy: "goto",
+      currentUrl: page.url(),
+      targetUrl
+    });
+    return;
+  }
+
+  await writeBrowserDebug(workspacePath, "job-navigation-retry-location", {
+    currentUrl: page.url(),
+    targetUrl
+  });
+  await page.evaluate((url) => {
+    window.location.assign(url);
+  }, targetUrl).catch(() => undefined);
+  await page.waitForLoadState("domcontentloaded", { timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000) }).catch(() => undefined);
+
+  if (!isBlankBrowserUrl(page.url())) {
+    await writeBrowserDebug(workspacePath, "job-navigation-complete", {
+      strategy: "window-location",
+      currentUrl: page.url(),
+      targetUrl
+    });
+    return;
+  }
+
+  await writeBrowserDebug(workspacePath, "job-navigation-retry-address-bar", {
+    currentUrl: page.url(),
+    targetUrl
+  });
+  await page.bringToFront().catch(() => undefined);
+  await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+L`).catch(() => undefined);
+  await page.keyboard.type(targetUrl).catch(() => undefined);
+  await page.keyboard.press("Enter").catch(() => undefined);
+  await page.waitForLoadState("domcontentloaded", { timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000) }).catch(() => undefined);
+
+  if (!isBlankBrowserUrl(page.url())) {
+    await writeBrowserDebug(workspacePath, "job-navigation-complete", {
+      strategy: "address-bar",
+      currentUrl: page.url(),
+      targetUrl
+    });
+    return;
+  }
+
+  throw new Error(
+    `Chrome opened a controlled tab, but the job URL did not load and the tab stayed on ${page.url()}. ${gotoError ? `Initial navigation failed: ${gotoError}` : "Initial navigation did not change the tab URL."}`
+  );
+}
+
+function isBlankBrowserUrl(value: string) {
+  return value === "about:blank" || value === "chrome://newtab/" || value.startsWith("chrome://new-tab-page");
+}
+
 function sanitizeBrowserResumeUrl(value: string | undefined) {
   if (!value || value === "about:blank" || value.startsWith("chrome://newtab")) {
     return undefined;
   }
 
+  if (looksLikeLoginUrl(value)) {
+    return undefined;
+  }
+
   return value;
+}
+
+async function tryResolveLoginWithExistingProfile(input: {
+  context: BrowserContext;
+  page: Page;
+  sourceUrl: string;
+  studentEmail?: string;
+  workspacePath: string;
+  stageIndex: number;
+  reason?: string;
+}) {
+  if (process.env.BROWSER_LOGIN_PROFILE_RECOVERY === "false") {
+    return {
+      resolved: false,
+      activePage: input.page
+    };
+  }
+
+  let activePage = input.page;
+  await writeBrowserDebug(input.workspacePath, "login-profile-recovery-start", {
+    stageIndex: input.stageIndex,
+    url: activePage.url(),
+    sourceUrl: input.sourceUrl,
+    reason: input.reason,
+    hasStudentEmail: Boolean(input.studentEmail)
+  });
+
+  await updateLiveBot(activePage, {
+    step: `Stage ${input.stageIndex + 1}`,
+    mood: "acting",
+    message: "Trying the existing logged-in browser profile before asking you to sign in manually."
+  });
+
+  activePage = await tryLoginButtonsInCurrentProfile({
+    context: input.context,
+    page: activePage,
+    studentEmail: input.studentEmail,
+    workspacePath: input.workspacePath,
+    stageIndex: input.stageIndex
+  });
+
+  if (await loginGateCleared(activePage)) {
+    await writeBrowserDebug(input.workspacePath, "login-profile-recovery-resolved", {
+      stageIndex: input.stageIndex,
+      strategy: "current-tab-login-button",
+      url: activePage.url()
+    });
+    return {
+      resolved: true,
+      activePage
+    };
+  }
+
+  const freshPage = await input.context.newPage();
+  activePage = freshPage;
+  await activePage.bringToFront().catch(() => undefined);
+  await writeBrowserDebug(input.workspacePath, "login-profile-recovery-fresh-tab", {
+    stageIndex: input.stageIndex,
+    sourceUrl: input.sourceUrl
+  });
+  await updateLiveBot(activePage, {
+    step: `Stage ${input.stageIndex + 1}`,
+    mood: "acting",
+    message: "Opening the original job in a fresh tab inside the logged browser profile."
+  });
+  await activePage.goto(input.sourceUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000)
+  }).catch(() => undefined);
+  await activePage.waitForTimeout(1000).catch(() => undefined);
+  await clickSoftGate(activePage);
+
+  if (await loginGateCleared(activePage)) {
+    await writeBrowserDebug(input.workspacePath, "login-profile-recovery-resolved", {
+      stageIndex: input.stageIndex,
+      strategy: "fresh-job-tab",
+      url: activePage.url()
+    });
+    return {
+      resolved: true,
+      activePage
+    };
+  }
+
+  activePage = await tryLoginButtonsInCurrentProfile({
+    context: input.context,
+    page: activePage,
+    studentEmail: input.studentEmail,
+    workspacePath: input.workspacePath,
+    stageIndex: input.stageIndex
+  });
+
+  const resolved = await loginGateCleared(activePage);
+  await writeBrowserDebug(input.workspacePath, resolved ? "login-profile-recovery-resolved" : "login-profile-recovery-unresolved", {
+    stageIndex: input.stageIndex,
+    strategy: "fresh-tab-login-button",
+    url: activePage.url()
+  });
+
+  return {
+    resolved,
+    activePage
+  };
+}
+
+async function tryLoginButtonsInCurrentProfile(input: {
+  context: BrowserContext;
+  page: Page;
+  studentEmail?: string;
+  workspacePath: string;
+  stageIndex: number;
+}) {
+  let activePage = input.page;
+
+  activePage = await clickLoginEntryPoint({
+    context: input.context,
+    page: activePage,
+    mode: "google",
+    workspacePath: input.workspacePath,
+    stageIndex: input.stageIndex
+  });
+  activePage = await maybeClickGoogleAccount(activePage, input.studentEmail);
+  await maybeContinueGoogleOAuthConsent(activePage);
+
+  if (await loginGateCleared(activePage)) {
+    return activePage;
+  }
+
+  if (input.studentEmail) {
+    activePage = await clickLoginEntryPoint({
+      context: input.context,
+      page: activePage,
+      mode: "email",
+      workspacePath: input.workspacePath,
+      stageIndex: input.stageIndex
+    });
+    await fillLoginEmailOnly(activePage, input.studentEmail);
+  }
+
+  return await getActivePage(input.context, activePage);
+}
+
+async function clickLoginEntryPoint(input: {
+  context: BrowserContext;
+  page: Page;
+  mode: "google" | "email";
+  workspacePath: string;
+  stageIndex: number;
+}) {
+  if (input.mode === "google" && isGoogleAuthUrl(input.page.url())) {
+    return input.page;
+  }
+
+  const popupPromise = input.context.waitForEvent("page", { timeout: 2500 }).catch(() => undefined);
+  const clicked = await clickLoginControl(input.page, input.mode);
+  const popup = clicked ? await popupPromise : undefined;
+
+  await writeBrowserDebug(input.workspacePath, clicked ? "login-entry-clicked" : "login-entry-not-found", {
+    stageIndex: input.stageIndex,
+    mode: input.mode,
+    url: input.page.url(),
+    popupOpened: Boolean(popup)
+  });
+
+  const activePage = popup ?? await getActivePage(input.context, input.page);
+  await activePage.bringToFront().catch(() => undefined);
+  await activePage.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
+  await activePage.waitForTimeout(1200).catch(() => undefined);
+  return activePage;
+}
+
+async function clickLoginControl(page: Page, mode: "google" | "email") {
+  for (const frame of page.frames()) {
+    const marker = `gl-login-${mode}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const found = await frame.evaluate(({ marker, mode }) => {
+      const candidates = Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit'], div, span")) as HTMLElement[];
+      let best: HTMLElement | undefined;
+      let bestScore = 0;
+
+      for (const candidate of candidates) {
+        if (!isVisible(candidate)) {
+          continue;
+        }
+
+        const text = normalize([
+          candidate.innerText,
+          candidate.textContent,
+          candidate.getAttribute("aria-label"),
+          candidate.getAttribute("title"),
+          candidate instanceof HTMLInputElement ? candidate.value : ""
+        ].filter(Boolean).join(" "));
+
+        if (!text || text.length > 120) {
+          continue;
+        }
+
+        const score = scoreCandidate(text, candidate, mode);
+
+        if (score > bestScore) {
+          bestScore = score;
+          best = candidate;
+        }
+      }
+
+      if (!best || bestScore < 70) {
+        return false;
+      }
+
+      best.setAttribute("data-gradlaunch-login-target", marker);
+      return true;
+
+      function scoreCandidate(text: string, element: HTMLElement, targetMode: "google" | "email") {
+        let score = 0;
+
+        if (targetMode === "google") {
+          if (/\b(google|gmail)\b/.test(text)) {
+            score += 80;
+          }
+
+          if (/\b(sign in|signin|log in|login|continue|use|connect)\b/.test(text)) {
+            score += 25;
+          }
+        } else {
+          if (/\b(email|e mail|mail)\b/.test(text)) {
+            score += 80;
+          }
+
+          if (/\b(sign in|signin|log in|login|continue|use|magic link|one time)\b/.test(text)) {
+            score += 25;
+          }
+        }
+
+        if (element.matches("button, a, [role='button'], input[type='button'], input[type='submit']")) {
+          score += 20;
+        }
+
+        if (/\b(password|forgot|create account|register|sign up)\b/.test(text)) {
+          score -= 30;
+        }
+
+        return score;
+      }
+
+      function isVisible(element: HTMLElement) {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity || "1") > 0 && rect.width > 0 && rect.height > 0;
+      }
+
+      function normalize(value: string) {
+        return value.toLowerCase().replace(/[^a-z0-9@._+-]+/g, " ").trim();
+      }
+    }, { marker, mode }).catch(() => false);
+
+    if (!found) {
+      continue;
+    }
+
+    const target = frame.locator(`[data-gradlaunch-login-target="${marker}"]`).first();
+
+    try {
+      await target.click({ force: true, timeout: 1200 });
+      return true;
+    } catch (_error) {
+      const box = await target.boundingBox().catch(() => undefined);
+
+      if (!box) {
+        return false;
+      }
+
+      await frame.page().mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => undefined);
+      return true;
+    } finally {
+      await target.evaluate((element) => {
+        if (element instanceof HTMLElement) {
+          element.removeAttribute("data-gradlaunch-login-target");
+        }
+      }).catch(() => undefined);
+    }
+  }
+
+  return false;
+}
+
+async function maybeClickGoogleAccount(page: Page, studentEmail: string | undefined) {
+  if (!studentEmail || !isGoogleAuthUrl(page.url())) {
+    return page;
+  }
+
+  for (const frame of page.frames()) {
+    const account = frame.locator(`text=${studentEmail}`).first();
+
+    if (await account.isVisible({ timeout: 600 }).catch(() => false)) {
+      await account.click({ force: true, timeout: 1200 }).catch(() => undefined);
+      await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
+      await page.waitForTimeout(1200).catch(() => undefined);
+      return page;
+    }
+
+    const clicked = await frame.evaluate((emailSource) => {
+      const pattern = new RegExp(emailSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const candidates = Array.from(document.querySelectorAll("button, a, [role='button'], div")) as HTMLElement[];
+
+      for (const candidate of candidates) {
+        const text = candidate.innerText || candidate.textContent || "";
+
+        if (pattern.test(text) && isVisible(candidate)) {
+          candidate.click();
+          return true;
+        }
+      }
+
+      return false;
+
+      function isVisible(element: HTMLElement) {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+      }
+    }, studentEmail).catch(() => false);
+
+    if (clicked) {
+      await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
+      await page.waitForTimeout(1200).catch(() => undefined);
+      return page;
+    }
+  }
+
+  await fillLoginEmailOnly(page, studentEmail);
+  return page;
+}
+
+async function maybeContinueGoogleOAuthConsent(page: Page) {
+  if (!isGoogleAuthUrl(page.url())) {
+    return false;
+  }
+
+  for (const frame of page.frames()) {
+    const clicked = await frame.evaluate(() => {
+      const hasVisiblePassword = Array.from(document.querySelectorAll("input[type='password']")).some((control) => isVisible(control));
+      const hasVisibleIdentifier = Array.from(document.querySelectorAll("input")).some((control) => {
+        if (!(control instanceof HTMLInputElement) || !isVisible(control)) {
+          return false;
+        }
+
+        const descriptor = normalize([
+          control.type,
+          control.autocomplete,
+          control.name,
+          control.id,
+          control.placeholder,
+          control.getAttribute("aria-label")
+        ].filter(Boolean).join(" "));
+        return /\b(email|phone|identifier|username)\b/.test(descriptor);
+      });
+
+      if (hasVisiblePassword || hasVisibleIdentifier) {
+        return false;
+      }
+
+      const candidates = Array.from(document.querySelectorAll("button, [role='button'], input[type='button'], input[type='submit']")) as HTMLElement[];
+
+      for (const candidate of candidates) {
+        if (!isVisible(candidate)) {
+          continue;
+        }
+
+        const text = normalize([
+          candidate.innerText,
+          candidate.textContent,
+          candidate.getAttribute("aria-label"),
+          candidate.getAttribute("title"),
+          candidate instanceof HTMLInputElement ? candidate.value : ""
+        ].filter(Boolean).join(" "));
+
+        if (/\b(continue|allow|next)\b/.test(text) && !/\b(create|forgot|cancel|back|privacy|terms)\b/.test(text)) {
+          candidate.click();
+          return true;
+        }
+      }
+
+      return false;
+
+      function isVisible(element: Element | null) {
+        if (!(element instanceof HTMLElement)) {
+          return false;
+        }
+
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity || "1") > 0 && rect.width > 0 && rect.height > 0;
+      }
+
+      function normalize(value: string) {
+        return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      }
+    }).catch(() => false);
+
+    if (!clicked) {
+      continue;
+    }
+
+    await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
+    await page.waitForTimeout(1200).catch(() => undefined);
+    return true;
+  }
+
+  return false;
+}
+
+async function fillLoginEmailOnly(page: Page, email: string) {
+  for (const frame of page.frames()) {
+    const filled = await frame.evaluate((emailValue) => {
+      const controls = Array.from(document.querySelectorAll("input")) as HTMLInputElement[];
+      const target = controls.find((control) => {
+        if (control.disabled || !isVisible(control)) {
+          return false;
+        }
+
+        const descriptor = normalize([
+          control.type,
+          control.autocomplete,
+          control.name,
+          control.id,
+          control.placeholder,
+          control.getAttribute("aria-label")
+        ].filter(Boolean).join(" "));
+
+        return /\b(email|username|user name|login)\b/.test(descriptor) && !/\b(password|otp|code)\b/.test(descriptor);
+      });
+
+      if (!target) {
+        return false;
+      }
+
+      target.focus();
+      setNativeValue(target, emailValue);
+      target.dispatchEvent(new Event("input", { bubbles: true }));
+      target.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+
+      function setNativeValue(control: HTMLInputElement, value: string) {
+        const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+
+        if (descriptor?.set) {
+          descriptor.set.call(control, value);
+        } else {
+          control.value = value;
+        }
+      }
+
+      function isVisible(element: HTMLElement) {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+      }
+
+      function normalize(value: string) {
+        return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      }
+    }, email).catch(() => false);
+
+    if (!filled) {
+      continue;
+    }
+
+    const nextClicked = await clickLoginContinue(frame);
+
+    if (!nextClicked) {
+      await frame.page().keyboard.press("Enter").catch(() => undefined);
+    }
+
+    await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
+    await page.waitForTimeout(1200).catch(() => undefined);
+    return true;
+  }
+
+  return false;
+}
+
+async function clickLoginContinue(frame: Frame) {
+  const marker = `gl-login-continue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const found = await frame.evaluate((targetMarker) => {
+    const candidates = Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit']")) as HTMLElement[];
+    let best: HTMLElement | undefined;
+    let bestScore = 0;
+
+    for (const candidate of candidates) {
+      if (!isVisible(candidate)) {
+        continue;
+      }
+
+      const text = normalize([
+        candidate.innerText,
+        candidate.textContent,
+        candidate.getAttribute("aria-label"),
+        candidate instanceof HTMLInputElement ? candidate.value : ""
+      ].filter(Boolean).join(" "));
+      let score = 0;
+
+      if (/\b(continue|next|sign in|log in|submit)\b/.test(text)) {
+        score += 100;
+      }
+
+      if (/\b(google|facebook|github|sso|forgot|create account|sign up)\b/.test(text)) {
+        score -= 70;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+
+    if (!best || bestScore < 70) {
+      return false;
+    }
+
+    best.setAttribute("data-gradlaunch-login-continue-target", targetMarker);
+    return true;
+
+    function isVisible(element: HTMLElement) {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+    }
+
+    function normalize(value: string) {
+      return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    }
+  }, marker).catch(() => false);
+
+  if (!found) {
+    return false;
+  }
+
+  const target = frame.locator(`[data-gradlaunch-login-continue-target="${marker}"]`).first();
+  await target.click({ force: true, timeout: 1200 }).catch(() => undefined);
+  await target.evaluate((element) => {
+    if (element instanceof HTMLElement) {
+      element.removeAttribute("data-gradlaunch-login-continue-target");
+    }
+  }).catch(() => undefined);
+  return true;
+}
+
+async function loginGateCleared(page: Page) {
+  await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => undefined);
+  await page.waitForTimeout(600).catch(() => undefined);
+
+  if (isBlankBrowserUrl(page.url()) || isGoogleAuthUrl(page.url())) {
+    return false;
+  }
+
+  const checkpoint = await detectProtectedCheckpoint(page);
+
+  if (checkpoint.blocked) {
+    return false;
+  }
+
+  const visibleFields = await discoverVisibleFields(page).catch(() => []);
+  const observation = await observeBrowserPage(page, visibleFields).catch(() => undefined);
+
+  return Boolean(observation && observation.pageState !== "login" && observation.pageState !== "account_gate");
+}
+
+function resolveApplicantEmail(input: BrowserApplyInput) {
+  return [input.student?.email, ...input.fields.filter((field) => /email/i.test(field.label)).map((field) => field.value)]
+    .find((value): value is string => typeof value === "string" && isLikelyEmail(value));
+}
+
+function looksLikeLoginUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    const haystack = `${parsed.hostname} ${parsed.pathname} ${parsed.search}`.toLowerCase();
+    return /\b(login|signin|sign-in|sign_in|auth|oauth|sso|account)\b/.test(haystack);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isGoogleAuthUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return /(^|\.)accounts\.google\.com$/i.test(parsed.hostname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isLikelyEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 async function updateExecutionSession(
@@ -1226,30 +2026,76 @@ async function waitForManualProgress(input: {
   };
 }
 
-async function launchContext(chromePath: string | undefined) {
-  let browser: Browser | undefined;
-  let context: BrowserContext | undefined;
-  let keepContextOpen = false;
-  let attachedToExistingBrowser = false;
+async function launchContext(chromePath: string | undefined): Promise<BrowserLaunchResult> {
   const launchOptions = {
     executablePath: chromePath,
     headless: process.env.BROWSER_HEADLESS === "true",
     args: ["--disable-blink-features=AutomationControlled"]
   };
+  const loggedCdpUrl = shouldPreferLoggedBrowser() ? await resolveLoggedChromeCdpUrl() : undefined;
+
+  if (loggedCdpUrl) {
+    return connectToChromeCdp(loggedCdpUrl, "logged_cdp");
+  }
+
+  if (shouldPreferLoggedBrowser() && process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
+    const loggedProfileDir = getLoggedBrowserProfileDir();
+
+    if (loggedProfileDir && await pathExists(loggedProfileDir)) {
+      if (await isBrowserProfileLocked(loggedProfileDir, { clearStaleGradLaunchLock: true })) {
+        const message = buildLockedLoggedProfileMessage(loggedProfileDir);
+
+        if (shouldRequireLoggedBrowser()) {
+          throw new Error(message);
+        }
+
+        console.warn(`[GradLaunch][Browser] ${message} Falling back to managed profile.`);
+      } else {
+        try {
+          const loggedProfileName = await resolveLoggedChromeProfileName(loggedProfileDir);
+          const context = await chromium.launchPersistentContext(loggedProfileDir, {
+            ...launchOptions,
+            args: [
+              ...launchOptions.args,
+              `--profile-directory=${loggedProfileName}`,
+              `--remote-debugging-port=${resolveLoggedChromeDebugPort()}`
+            ],
+            viewport: { width: 1280, height: 900 }
+          });
+
+          return {
+            browser: undefined,
+            context,
+            keepContextOpen: false,
+            attachedToExistingBrowser: false,
+            launchMode: "logged_profile" satisfies BrowserLaunchMode
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+
+          if (shouldRequireLoggedBrowser()) {
+            throw new Error(
+              `GradLaunch could not use the logged Chrome profile at ${loggedProfileDir}. ${message}. Start your normal Chrome with remote debugging on port ${resolveLoggedChromeDebugPort()}, or close Chrome so GradLaunch can launch that logged profile.`
+            );
+          }
+
+          console.warn(
+            `[GradLaunch][Browser] Could not use logged Chrome profile at ${loggedProfileDir}; falling back to managed profile. ${message}`
+          );
+        }
+      }
+    }
+  }
+
   const cdpUrl = await resolveManagedChromeCdpUrl();
 
   if (cdpUrl) {
-    browser = await chromium.connectOverCDP(cdpUrl);
-    context = browser.contexts()[0];
-    attachedToExistingBrowser = true;
-    keepContextOpen = true;
+    return connectToChromeCdp(cdpUrl, "managed_cdp");
+  }
 
-    if (!context) {
-      throw new Error("GradLaunch attached to Chrome, but no browser context was available.");
-    }
-  } else if (process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
+  if (process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
     try {
-      context = await chromium.launchPersistentContext(getManagedBrowserProfileDir(), {
+      const context = await chromium.launchPersistentContext(getManagedBrowserProfileDir(), {
         ...launchOptions,
         args: [
           ...launchOptions.args,
@@ -1257,7 +2103,14 @@ async function launchContext(chromePath: string | undefined) {
         ],
         viewport: { width: 1280, height: 900 }
       });
-      keepContextOpen = true;
+
+      return {
+        browser: undefined,
+        context,
+        keepContextOpen: true,
+        attachedToExistingBrowser: false,
+        launchMode: "managed_profile" satisfies BrowserLaunchMode
+      };
     } catch (error) {
       if (shouldFallbackFromLockedProfile(error)) {
         throw new Error(
@@ -1267,16 +2120,34 @@ async function launchContext(chromePath: string | undefined) {
 
       throw error;
     }
-  } else {
-    browser = await chromium.launch(launchOptions);
-    context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  }
+
+  const browser = await chromium.launch(launchOptions);
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+
+  return {
+    browser,
+    context,
+    keepContextOpen: false,
+    attachedToExistingBrowser: false,
+    launchMode: "ephemeral" satisfies BrowserLaunchMode
+  };
+}
+
+async function connectToChromeCdp(cdpUrl: string, launchMode: Extract<BrowserLaunchMode, "logged_cdp" | "managed_cdp">): Promise<BrowserLaunchResult> {
+  const browser = await chromium.connectOverCDP(cdpUrl);
+  const context = browser.contexts()[0];
+
+  if (!context) {
+    throw new Error("GradLaunch attached to Chrome, but no browser context was available.");
   }
 
   return {
     browser,
     context,
-    keepContextOpen,
-    attachedToExistingBrowser
+    keepContextOpen: true,
+    attachedToExistingBrowser: true,
+    launchMode
   };
 }
 
@@ -1454,11 +2325,123 @@ function resolveChromePath() {
   return process.env.CHROME_EXECUTABLE_PATH ?? defaultChromePath;
 }
 
+function shouldPreferLoggedBrowser() {
+  return process.env.BROWSER_PREFER_LOGGED_PROFILE !== "false";
+}
+
+function shouldRequireLoggedBrowser() {
+  return process.env.BROWSER_REQUIRE_LOGGED_PROFILE === "true";
+}
+
+async function isBrowserProfileLocked(profileDir: string, options: { clearStaleGradLaunchLock?: boolean } = {}) {
+  const state = await getBrowserProfileLockState(profileDir);
+
+  if (!state.locked) {
+    return false;
+  }
+
+  if (state.stale && options.clearStaleGradLaunchLock && await canClearStaleGradLaunchProfileLock(profileDir)) {
+    await clearBrowserProfileSingletonFiles(profileDir);
+    return false;
+  }
+
+  return true;
+}
+
+async function getBrowserProfileLockState(profileDir: string) {
+  const singletonFiles = ["SingletonLock", "SingletonSocket", "SingletonCookie"];
+  let locked = false;
+  let lockPid: number | undefined;
+
+  for (const filename of singletonFiles) {
+    try {
+      await lstat(join(profileDir, filename));
+      locked = true;
+
+      if (filename === "SingletonLock") {
+        lockPid = await readBrowserProfileLockPid(profileDir);
+      }
+    } catch (_error) {
+      // Missing singleton files mean Chrome is not currently holding this profile.
+    }
+  }
+
+  if (!locked) {
+    return {
+      locked: false,
+      stale: false,
+      lockPid
+    };
+  }
+
+  return {
+    locked: true,
+    stale: lockPid ? !isProcessRunning(lockPid) : true,
+    lockPid
+  };
+}
+
+async function readBrowserProfileLockPid(profileDir: string) {
+  try {
+    const target = await readlink(join(profileDir, "SingletonLock"));
+    const match = target.match(/-(\d+)$/);
+    return match ? Number(match[1]) : undefined;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function isProcessRunning(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return code === "EPERM";
+  }
+}
+
+async function canClearStaleGradLaunchProfileLock(profileDir: string) {
+  return process.env.BROWSER_CLEAR_STALE_LOGGED_PROFILE_LOCKS !== "false"
+    && await pathExists(join(profileDir, ".gradlaunch-profile-source.json"));
+}
+
+async function clearBrowserProfileSingletonFiles(profileDir: string) {
+  for (const filename of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
+    await rm(join(profileDir, filename), { force: true }).catch(() => undefined);
+  }
+}
+
+function buildLockedLoggedProfileMessage(profileDir: string) {
+  return `The logged Chrome profile at ${profileDir} is already open, but GradLaunch cannot attach because remote debugging is not available on ${resolveLoggedChromeCdpHint()}. Close the old GradLaunch Chrome window, or quit Chrome and retry. Stale copied-profile locks are cleared automatically.`;
+}
+
+function resolveLoggedChromeCdpHint() {
+  return process.env.BROWSER_LOGGED_CDP_URL?.trim() || `http://127.0.0.1:${resolveLoggedChromeDebugPort()}`;
+}
+
+async function resolveLoggedChromeCdpUrl() {
+  const configuredValue = process.env.BROWSER_LOGGED_CDP_URL?.trim();
+  const candidates = configuredValue
+    ? [normalizeChromeCdpUrl(configuredValue)]
+    : process.env.BROWSER_PROBE_LOGGED_CDP === "false"
+      ? []
+      : [`http://127.0.0.1:${resolveLoggedChromeDebugPort()}`];
+
+  for (const candidate of candidates) {
+    if (candidate && await canConnectToChromeCdp(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
 async function resolveManagedChromeCdpUrl() {
   const configuredValue = process.env.BROWSER_CDP_URL?.trim();
 
   if (configuredValue) {
-    return configuredValue;
+    return normalizeChromeCdpUrl(configuredValue);
   }
 
   const autoDetectUrl = `http://127.0.0.1:${resolveManagedChromeDebugPort()}`;
@@ -1510,6 +2493,61 @@ function requestJson(url: URL): Promise<Record<string, unknown>> {
 
 function resolveManagedChromeDebugPort() {
   return Number(process.env.BROWSER_MANAGED_DEBUG_PORT ?? 9333);
+}
+
+function resolveLoggedChromeDebugPort() {
+  return Number(process.env.BROWSER_LOGGED_DEBUG_PORT ?? 9222);
+}
+
+function normalizeChromeCdpUrl(value: string) {
+  const trimmed = value.trim();
+
+  if (/^\d+$/.test(trimmed)) {
+    return `http://127.0.0.1:${trimmed}`;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `http://${trimmed}`;
+}
+
+async function resolveLoggedChromeProfileName(profileDir: string) {
+  const configuredProfileName = process.env.BROWSER_LOGGED_PROFILE_NAME?.trim();
+
+  if (configuredProfileName) {
+    return configuredProfileName;
+  }
+
+  try {
+    const text = await readFile(join(profileDir, "Local State"), "utf8");
+    const localState = JSON.parse(text) as {
+      profile?: {
+        last_used?: unknown;
+        last_active_profiles?: unknown;
+      };
+    };
+    const lastUsed = localState.profile?.last_used;
+
+    if (typeof lastUsed === "string" && lastUsed.trim()) {
+      return lastUsed.trim();
+    }
+
+    const lastActiveProfiles = localState.profile?.last_active_profiles;
+
+    if (Array.isArray(lastActiveProfiles)) {
+      const firstProfile = lastActiveProfiles.find((profile): profile is string => typeof profile === "string" && profile.trim().length > 0);
+
+      if (firstProfile) {
+        return firstProfile.trim();
+      }
+    }
+  } catch (_error) {
+    // Chrome can still start its default profile if Local State cannot be read.
+  }
+
+  return "Default";
 }
 
 function validateSourceUrl(value: string) {

@@ -1,6 +1,6 @@
-2026/05/23-10:50:36.305 ec2f8 Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/Session Storage/MANIFEST-000001
-2026/05/23-10:50:36.306 ec2f8 Recovering log #12
-2026/05/23-10:50:36.307 ec2f8 Reusing old log /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/Session Storage/000012.log 
-2026/05/23-10:50:48.059 ec2fb Level-0 table #17: started
-2026/05/23-10:50:48.065 ec2fb Level-0 table #17: 21371 bytes OK
-2026/05/23-10:50:48.068 ec2fb Delete type=0 #12
+2026/05/23-10:57:56.933 eef21 Reusing MANIFEST /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/Session Storage/MANIFEST-000001
+2026/05/23-10:57:56.935 eef21 Recovering log #16
+2026/05/23-10:57:56.935 eef21 Reusing old log /Users/jaykumargupta/Codes/gradlaunch/storage/browser-profile/Default/Session Storage/000016.log 
+2026/05/23-11:10:44.274 eef24 Level-0 table #20: started
+2026/05/23-11:10:44.277 eef24 Level-0 table #20: 30616 bytes OK
+2026/05/23-11:10:44.281 eef24 Delete type=0 #16
