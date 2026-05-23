@@ -1,0 +1,135 @@
+{
+  "intent": "browser_fill",
+  "outcome": "confirmed",
+  "externalSubmitted": false,
+  "confirmation": "GradLaunch could not confidently find the next action on this page.",
+  "submittedAt": "2026-05-23T05:34:43.882Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "jaynrk200211@gmail.com",
+    "subject": "GradLaunch filled Linkedin - Go",
+    "sentAt": "2026-05-23T05:34:43.882Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "needs_manual_review",
+    "sourceUrl": "https://www.linkedin.com/safety/go/?url=https%3A%2F%2Fibmglobal%2Eavature%2Enet%2Fen_US%2Fcareers%2FJobDetail%3FjobId%3D116910%26source%3DSN_LinkedIn&urlhash=eRQ7&mt=oW4DNszlVB5giTszcNKHFV4yBAyT2cy50mJ2tUQmmoA0quBM5z85KdcKJIfc6qbjtlhC-EXsYx0ZeIO3gjAuQ95jPH-Q&isSdui=true",
+    "openedAt": "2026-05-23T05:34:33.092Z",
+    "completedAt": "2026-05-23T05:34:43.882Z",
+    "filledLabels": [],
+    "skippedLabels": [],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-stage-1-start.png"
+    ],
+    "message": "GradLaunch could not confidently find the next action on this page.",
+    "planner": {
+      "sessionId": "planner-job_349g1nry",
+      "resumeToken": "job_349g1nry:2026-05-23T05:34:33.092Z",
+      "goal": "Complete the Go application at Linkedin autonomously until a protected or review checkpoint.",
+      "status": "needs_review",
+      "summary": "GradLaunch could not find a confident next-step control on this page.",
+      "formMode": "single_stage",
+      "retryCount": 0,
+      "handoffCount": 0,
+      "validationErrors": [],
+      "subgoals": [
+        {
+          "id": "open_job_page",
+          "label": "Open job page",
+          "status": "completed",
+          "detail": "Job page opened successfully in a visible Chrome session.",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-23T05:34:34.333Z",
+          "completedAt": "2026-05-23T05:34:34.333Z"
+        },
+        {
+          "id": "authenticate_if_needed",
+          "label": "Handle login if needed",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:34:33.092Z"
+        },
+        {
+          "id": "finish_current_section",
+          "label": "Finish active section",
+          "status": "running",
+          "detail": "Reading Section 1 and planning the next safe action.",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-23T05:34:38.225Z"
+        },
+        {
+          "id": "recover_from_validation_errors",
+          "label": "Recover from validation errors",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:34:33.092Z"
+        },
+        {
+          "id": "retry_alternative_path",
+          "label": "Retry alternative path",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:34:33.092Z"
+        },
+        {
+          "id": "reach_submit_gate",
+          "label": "Reach submit/review gate",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:34:33.092Z"
+        },
+        {
+          "id": "save_checkpoint",
+          "label": "Save checkpoint",
+          "status": "completed",
+          "detail": "Saved checkpoint while waiting for manual stage progress.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:34:41.858Z",
+          "completedAt": "2026-05-23T05:34:41.858Z"
+        }
+      ],
+      "stageHistory": [
+        {
+          "stageIndex": 0,
+          "label": "Section 1",
+          "url": "https://www.linkedin.com/safety/go/?_l=en_US",
+          "visibleFieldLabels": [],
+          "requiredFieldLabels": [],
+          "filledFieldLabels": [],
+          "outcome": "observed",
+          "lastUpdatedAt": "2026-05-23T05:34:41.847Z",
+          "decision": {
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 0,
+            "stageLabel": "Section 1",
+            "url": "https://www.linkedin.com/safety/go/?_l=en_US",
+            "reason": "Page classified as unknown; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-23T05:34:41.847Z"
+          }
+        }
+      ],
+      "lastUpdatedAt": "2026-05-23T05:34:43.816Z",
+      "currentUrl": "https://www.linkedin.com/safety/go/?_l=en_US",
+      "currentStep": "stage_1",
+      "currentStageLabel": "Section 1",
+      "lastDecision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://www.linkedin.com/safety/go/?_l=en_US",
+        "reason": "Page classified as unknown; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-23T05:34:41.847Z"
+      }
+    }
+  }
+}

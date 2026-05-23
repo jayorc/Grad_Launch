@@ -1,4 +1,5 @@
 import type { FilledField, Job, StudentMemory, StudentProfile } from "@gradlaunch/shared";
+import { cityFromLocationLabel, inferCountryFromPhoneNumber, resolveBestProfileLocation } from "../location-resolver";
 import { createStudentProfileSummary, retrieveProfileAnswer } from "./profile-knowledge";
 import type { StageAnswerPlan, VisibleField } from "./types";
 import { dedupeLabels, jsonBlock, normalizeKey, writeBrowserDebug } from "./util";
@@ -14,36 +15,30 @@ type BuildAnswerPlanInput = {
 };
 
 export async function buildStageAnswerPlan(input: BuildAnswerPlanInput): Promise<StageAnswerPlan> {
-  const deterministicAnswers = createDeterministicAnswerMap(input.visibleFields, input.baseFields, input.student, input.job, input.memory);
-  const requiredWithoutAnswer = input.visibleFields
-    .filter((field) => field.required && !deterministicAnswers.has(field.id))
-    .map((field) => field.label);
+  const deterministicAnswers = createDeterministicAnswerMap(input.visibleFields, input.baseFields, input.student, input.job, input.memory, input.resumeText);
 
   if (shouldUseLlm() && input.visibleFields.length > 0) {
     const llmPlan = await askLlmForStageAnswers(input).catch(() => undefined);
 
     if (llmPlan) {
-      const answers = input.visibleFields
+      const answers = normalizeChoiceAnswers(input.visibleFields
         .map((field) => llmPlan.answers.get(field.id) ?? deterministicAnswers.get(field.id))
-        .filter((value): value is NonNullable<typeof value> => Boolean(value));
-      const unresolvedRequiredLabels = dedupeLabels(
-        input.visibleFields
-          .filter((field) => field.required && !answers.some((answer) => answer.fieldId === field.id))
-          .map((field) => field.label)
-      );
+        .filter((value): value is NonNullable<typeof value> => Boolean(value)), input);
 
       return {
         answers,
-        unresolvedRequiredLabels,
+        unresolvedRequiredLabels: resolveUnansweredRequiredLabels(input.visibleFields, answers),
         usedLlm: llmPlan.answers.size > 0,
         summary: llmPlan.summary
       };
     }
   }
 
+  const answers = normalizeChoiceAnswers([...deterministicAnswers.values()], input);
+
   return {
-    answers: [...deterministicAnswers.values()],
-    unresolvedRequiredLabels: dedupeLabels(requiredWithoutAnswer),
+    answers,
+    unresolvedRequiredLabels: resolveUnansweredRequiredLabels(input.visibleFields, answers),
     usedLlm: false,
     summary: deterministicAnswers.size > 0 ? "Using stored GradLaunch profile facts and prepared answers for the visible fields." : undefined
   };
@@ -54,17 +49,10 @@ function createDeterministicAnswerMap(
   baseFields: FilledField[],
   student: StudentProfile | undefined,
   job: Job,
-  memory: StudentMemory | undefined
+  memory: StudentMemory | undefined,
+  resumeText: string | undefined
 ) {
-  const prepared = new Map<string, string>();
-
-  for (const field of baseFields) {
-    addPreparedValue(prepared, field.label, field.value.trim());
-  }
-
-  for (const correction of memory?.corrections ?? []) {
-    addPreparedValue(prepared, correction.label, correction.value.trim());
-  }
+  const prepared = createPreparedValueMap(baseFields, memory);
 
   const answers = new Map<string, {
     label: string;
@@ -82,7 +70,9 @@ function createDeterministicAnswerMap(
     }
 
     const fieldKey = normalizeKey(field.label);
-    const value = resolvePreparedValue(field.label, prepared)
+    const value = resolvePreparedChoiceValue(field, prepared, student, job, resumeText)
+      ?? resolveLocationFieldValue(field, prepared, student, job, resumeText)
+      ?? resolvePreparedValue(field.label, prepared)
       ?? fallbackForVisibleField(field, student, job)
       ?? retrieveProfileAnswer(field, student, job);
 
@@ -106,6 +96,235 @@ function createDeterministicAnswerMap(
   return answers;
 }
 
+function resolvePreparedChoiceValue(
+  field: VisibleField,
+  prepared: Map<string, string>,
+  student: StudentProfile | undefined,
+  job: Job,
+  resumeText: string | undefined
+) {
+  if (field.inputType !== "checkbox" && field.inputType !== "radio" && !isCountryOptionLabel(field.label)) {
+    return undefined;
+  }
+
+  const option = normalizeKey(field.label);
+
+  if (!option) {
+    return undefined;
+  }
+
+  const resolvedLocation = resolveBestProfileLocation({
+    student,
+    job,
+    resumeText,
+    preparedLocations: getPreparedLocationHints(prepared),
+    countryHint: resolveCountryHint(prepared, student, resumeText),
+    phone: resolvePreparedPhone(prepared)
+  });
+  const desiredRawValues = [
+    prepared.get("country"),
+    prepared.get("current country"),
+    prepared.get("location country"),
+    prepared.get("country where you currently reside"),
+    resolvedLocation?.country,
+    student?.completeProfile?.country,
+    ...(student?.completeProfile?.workAuthorizationCountries ?? [])
+  ].filter((value): value is string => Boolean(value?.trim()));
+  const desiredValues = desiredRawValues.map((value) => normalizeKey(value));
+
+  if (field.inputType === "checkbox" && /\b(select|country|countries|working in|role in which you are applying)\b/.test(normalizeKey(`${field.label} ${field.context}`))) {
+    const desiredCountry = desiredRawValues.find((value) => /\bindia|australia|united states|usa|united kingdom|uk\b/i.test(value));
+
+    if (desiredCountry) {
+      return normalizeCountryAnswer(desiredCountry);
+    }
+  }
+
+  if (desiredValues.some((value) => value === option || value.includes(option) || option.includes(value))) {
+    return field.label;
+  }
+
+  return undefined;
+}
+
+function normalizeCountryAnswer(value: string) {
+  const normalized = normalizeKey(value);
+
+  if (/\bindia\b/.test(normalized)) {
+    return "India";
+  }
+
+  if (/\baustralia\b/.test(normalized)) {
+    return "Australia";
+  }
+
+  if (/\bunited states\b|\busa\b|\bus\b/.test(normalized)) {
+    return "United States";
+  }
+
+  if (/\bunited kingdom\b|\buk\b/.test(normalized)) {
+    return "United Kingdom";
+  }
+
+  return value.trim();
+}
+
+function resolveLocationFieldValue(
+  field: VisibleField,
+  prepared: Map<string, string>,
+  student: StudentProfile | undefined,
+  job: Job,
+  resumeText: string | undefined,
+  proposedValue?: string
+) {
+  const fieldLabel = normalizeKey(field.label);
+  const label = normalizeKey([field.label, field.context].join(" "));
+
+  if (/\b(authorized|authorization|sponsor|sponsorship|work permit|remote|relocat|employed|stripe affiliate|whatsapp|sms|text messages|opt in)\b/.test(label)) {
+    return undefined;
+  }
+
+  if (!/\b(location|city|current city|current location)\b/.test(label) || (/\bcountry\b/.test(fieldLabel) && !/\bcity\b/.test(fieldLabel))) {
+    return undefined;
+  }
+
+  const preparedLocations = proposedValue
+    ? [proposedValue, ...getPreparedLocationHints(prepared)]
+    : getPreparedLocationHints(prepared);
+  const resolved = resolveBestProfileLocation({
+    student,
+    job,
+    resumeText,
+    proposedLocation: proposedValue,
+    preparedLocations,
+    countryHint: resolveCountryHint(prepared, student, resumeText),
+    phone: resolvePreparedPhone(prepared)
+  });
+
+  if (!resolved) {
+    return undefined;
+  }
+
+  const needsSelectablePlace = field.inputType === "combobox"
+    || label.includes("location")
+    || label.includes("autocomplete")
+    || label.includes("search");
+
+  return needsSelectablePlace ? resolved.label : resolved.city;
+}
+
+function normalizeChoiceAnswers(
+  answers: Array<{
+    label: string;
+    value: string;
+    fieldId: string;
+    inputType?: string;
+    options?: string[];
+    required?: boolean;
+    reason?: string;
+  }>,
+  input: BuildAnswerPlanInput
+) {
+  const prepared = createPreparedValueMap(input.baseFields, input.memory);
+  const resolvedLocation = resolveBestProfileLocation({
+    student: input.student,
+    job: input.job,
+    resumeText: input.resumeText,
+    preparedLocations: getPreparedLocationHints(prepared),
+    countryHint: resolveCountryHint(prepared, input.student, input.resumeText),
+    phone: resolvePreparedPhone(prepared)
+  });
+  const desiredCountry = normalizeCountryAnswer(
+    resolvedLocation?.country
+      ?? resolveCountryHint(prepared, input.student, input.resumeText)
+      ?? input.student?.completeProfile?.country
+      ?? "India"
+  );
+  const desiredCountryKey = normalizeKey(desiredCountry);
+  const countryOptionIds = new Set(
+    input.visibleFields
+      .filter((field) => isCountryOptionLabel(field.label))
+      .map((field) => field.id)
+  );
+  const hasCountryGroupQuestion = answers.some((answer) => {
+    const visibleField = input.visibleFields.find((field) => field.id === answer.fieldId);
+    return Boolean(visibleField && !isCountryOptionLabel(visibleField.label) && isCountryChoiceGroupQuestion(`${visibleField.label} ${visibleField.context}`));
+  });
+
+  return answers
+    .flatMap((answer) => {
+      const visibleField = input.visibleFields.find((field) => field.id === answer.fieldId);
+      const labelKey = normalizeKey(answer.label);
+      const valueKey = normalizeKey(answer.value);
+      const inputType = visibleField?.inputType ?? answer.inputType ?? "";
+
+      if (hasCountryGroupQuestion && countryOptionIds.has(answer.fieldId)) {
+        return [];
+      }
+
+      if (countryOptionIds.has(answer.fieldId)) {
+        if (labelKey === desiredCountryKey) {
+          return [{
+            ...answer,
+            value: desiredCountry,
+            reason: "Selected only the profile-matched country option."
+          }];
+        }
+
+        return [];
+      }
+
+      if ((inputType === "checkbox" || inputType === "radio") && isCountryListQuestion(`${answer.label} ${visibleField?.context ?? ""}`)) {
+        return [{
+          ...answer,
+          value: desiredCountry,
+          reason: "Selected the profile-matched country for this country choice group."
+        }];
+      }
+
+      if (isCountryOptionLabel(answer.label) && /^(yes|true|agree|accept|select|selected)$/i.test(valueKey)) {
+        return labelKey === desiredCountryKey
+          ? [{ ...answer, value: desiredCountry }]
+          : [];
+      }
+
+      return [answer];
+    });
+}
+
+function resolveUnansweredRequiredLabels(
+  visibleFields: VisibleField[],
+  answers: Array<{ fieldId?: string; label: string; value: string }>
+) {
+  const answeredIds = new Set(answers.map((answer) => answer.fieldId).filter(Boolean));
+  const hasCountryChoiceAnswer = answers.some((answer) => {
+    return isCountryChoiceGroupQuestion(answer.label) || isCountryOptionLabel(answer.label);
+  });
+
+  return dedupeLabels(
+    visibleFields
+      .filter((field) => field.required && !answeredIds.has(field.id))
+      .filter((field) => !(hasCountryChoiceAnswer && isCountryOptionLabel(field.label)))
+      .map((field) => field.label)
+  );
+}
+
+function isCountryListQuestion(value: string) {
+  return /\b(country|countries|working in|role in which you are applying|currently reside)\b/.test(normalizeKey(value));
+}
+
+function isCountryChoiceGroupQuestion(value: string) {
+  const normalized = normalizeKey(value);
+
+  return /\b(country|countries)\b/.test(normalized)
+    && /\b(anticipate|working in|role in which you are applying|selected in your previous response|previous response)\b/.test(normalized)
+    && !/\bcurrently reside\b/.test(normalized);
+}
+
+function isCountryOptionLabel(value: string) {
+  return /^(australia|belgium|brazil|canada|france|germany|india|indonesia|ireland|israel|italy|japan|luxembourg|malaysia|mexico|new zealand|poland|portugal|romania|singapore|south korea|spain|sweden|switzerland|thailand|the netherlands|netherlands|uae|uk|us|united states|united kingdom)$/i.test(value.trim());
+}
+
 function fallbackForVisibleField(field: VisibleField, student: StudentProfile | undefined, job: Job) {
   const label = normalizeKey(field.label);
 
@@ -119,6 +338,27 @@ function fallbackForVisibleField(field: VisibleField, student: StudentProfile | 
 
   if (label.includes("phone")) {
     return undefined;
+  }
+
+  if (label.includes("work authorization") || label.includes("authorized to work")) {
+    return student?.visaRequired ? "No" : "Yes";
+  }
+
+  if (label.includes("visa sponsorship") || label.includes("sponsorship") || label.includes("work permit")) {
+    return student?.visaRequired ? "Yes" : "No";
+  }
+
+  if (/\b(remote|work remotely|work remote)\b/.test(label)) {
+    return student?.workModes.some((mode) => /remote|hybrid/i.test(mode)) ? "Yes" : "No";
+  }
+
+  if (/\b(employed by|worked for|work for)\b/.test(label) && new RegExp(job.company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(field.label)) {
+    const currentCompany = student?.completeProfile?.currentCompany ?? student?.completeProfile?.employmentHistory?.[0]?.company;
+    return currentCompany && new RegExp(job.company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(currentCompany) ? "Yes" : "No";
+  }
+
+  if (/\b(whatsapp|sms updates|text messages|opt in)\b/.test(label)) {
+    return "No";
   }
 
   if (label.includes("location") || label.includes("city")) {
@@ -183,7 +423,59 @@ function addPreparedValue(prepared: Map<string, string>, label: string, value: s
   prepared.set(normalizeKey(label), cleanValue);
 }
 
+function createPreparedValueMap(baseFields: FilledField[], memory: StudentMemory | undefined) {
+  const prepared = new Map<string, string>();
+
+  for (const field of baseFields) {
+    addPreparedValue(prepared, field.label, field.value.trim());
+  }
+
+  for (const correction of memory?.corrections ?? []) {
+    addPreparedValue(prepared, correction.label, correction.value.trim());
+  }
+
+  return prepared;
+}
+
+function getPreparedLocationHints(prepared: Map<string, string>) {
+  return [
+    prepared.get("current location"),
+    prepared.get("location city"),
+    prepared.get("location"),
+    prepared.get("preferred location"),
+    prepared.get("city")
+  ].filter((value): value is string => Boolean(value?.trim()));
+}
+
+function resolveCountryHint(prepared: Map<string, string>, student: StudentProfile | undefined, resumeText: string | undefined) {
+  return prepared.get("country")
+    ?? prepared.get("current country")
+    ?? prepared.get("location country")
+    ?? prepared.get("country where you currently reside")
+    ?? student?.completeProfile?.country
+    ?? inferCountryFromPhoneNumber(resolvePreparedPhone(prepared))
+    ?? inferCountryFromPhoneNumber(resumeText);
+}
+
+function resolvePreparedPhone(prepared: Map<string, string>) {
+  return prepared.get("phone number") ?? prepared.get("phone") ?? prepared.get("mobile");
+}
+
 function resolvePreparedValue(label: string, prepared: Map<string, string>) {
+  const normalizedLabel = normalizeKey(label);
+
+  if (/\b(authorized|eligible|work authorization|legally work)\b/.test(normalizedLabel)) {
+    return prepared.get("work authorization") ?? prepared.get("legally authorized to work");
+  }
+
+  if (/\b(sponsorship|sponsor|work permit|visa)\b/.test(normalizedLabel)) {
+    return prepared.get("visa sponsorship required") ?? prepared.get("visa required");
+  }
+
+  if (/\b(remote|work remotely|employed by|worked for|stripe affiliate|whatsapp|sms updates|text messages|opt in)\b/.test(normalizedLabel)) {
+    return undefined;
+  }
+
   for (const alias of getFieldAliases(label)) {
     const direct = prepared.get(normalizeKey(alias));
 
@@ -192,22 +484,13 @@ function resolvePreparedValue(label: string, prepared: Map<string, string>) {
     }
   }
 
-  const normalizedLabel = normalizeKey(label);
-
-  if (/\b(authorized|eligible|work authorization|legally work)\b/.test(normalizedLabel)) {
-    return prepared.get("work authorization") ?? prepared.get("legally authorized to work");
-  }
-
-  if (/\b(sponsorship|visa)\b/.test(normalizedLabel)) {
-    return prepared.get("visa sponsorship required") ?? prepared.get("visa required");
-  }
-
   if (/\b(country)\b/.test(normalizedLabel)) {
     return prepared.get("country");
   }
 
   if (/\b(location|city)\b/.test(normalizedLabel)) {
-    return prepared.get("location city") ?? prepared.get("city") ?? prepared.get("location") ?? prepared.get("preferred location");
+    const location = prepared.get("location city") ?? prepared.get("city") ?? prepared.get("location") ?? prepared.get("preferred location");
+    return cityFromLocationLabel(location) ?? location;
   }
 
   return undefined;
@@ -254,11 +537,37 @@ function getFieldAliases(label: string) {
     aliases.add("Location");
     aliases.add("Location (City)");
     aliases.add("City");
+    aliases.add("Current location");
   }
 
   if (normalizedLabel.includes("city")) {
     aliases.add("City");
     aliases.add("Location (City)");
+  }
+
+  if (normalizedLabel.includes("country")) {
+    aliases.add("Country");
+    aliases.add("Current country");
+    aliases.add("Country where you currently reside");
+  }
+
+  if (normalizedLabel.includes("employer") || normalizedLabel.includes("company")) {
+    aliases.add("Employer");
+    aliases.add("Current company");
+    aliases.add("Current employer");
+    aliases.add("Current or previous employer");
+  }
+
+  if (normalizedLabel.includes("job title") || normalizedLabel.includes("title") || normalizedLabel.includes("designation")) {
+    aliases.add("Current title");
+    aliases.add("Job title");
+    aliases.add("Current or previous job title");
+  }
+
+  if (normalizedLabel.includes("school") || normalizedLabel.includes("university") || normalizedLabel.includes("college")) {
+    aliases.add("School");
+    aliases.add("University");
+    aliases.add("Most recent school you attended");
   }
 
   if (normalizedLabel.includes("authorized") || normalizedLabel.includes("work authorization") || normalizedLabel.includes("eligible")) {
@@ -281,6 +590,7 @@ async function askLlmForStageAnswers(input: BuildAnswerPlanInput) {
     "Return strict JSON only.",
     "Choose answers using the student context first, then prepared application fields, then memory corrections.",
     "Do not invent personal facts that are not present.",
+    "For current city/location autocomplete fields, use a concrete candidate location from profile, resume, address, or work history with city, region, and country. Do not copy the job office location if it conflicts with the candidate's country/profile location.",
     "",
     "Schema:",
     "{",
@@ -307,6 +617,7 @@ async function askLlmForStageAnswers(input: BuildAnswerPlanInput) {
   };
   const visibleById = new Map(input.visibleFields.map((field) => [field.id, field]));
   const visibleByLabel = new Map(input.visibleFields.map((field) => [normalizeKey(field.label), field]));
+  const prepared = createPreparedValueMap(input.baseFields, input.memory);
   const answers = new Map<string, {
     label: string;
     value: string;
@@ -320,7 +631,14 @@ async function askLlmForStageAnswers(input: BuildAnswerPlanInput) {
   for (const candidate of parsed.answers ?? []) {
     const visibleField = (candidate.fieldId ? visibleById.get(candidate.fieldId) : undefined)
       ?? (candidate.label ? visibleByLabel.get(normalizeKey(candidate.label)) : undefined);
-    const value = String(candidate.value ?? "").trim();
+    let value = String(candidate.value ?? "").trim();
+    const resolvedLocationValue = visibleField
+      ? resolveLocationFieldValue(visibleField, prepared, input.student, input.job, input.resumeText, value)
+      : undefined;
+
+    if (resolvedLocationValue) {
+      value = resolvedLocationValue;
+    }
 
     if (!visibleField || visibleField.inputType === "file" || !value) {
       continue;

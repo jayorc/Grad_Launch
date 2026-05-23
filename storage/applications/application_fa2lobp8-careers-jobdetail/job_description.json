@@ -1,0 +1,23 @@
+{
+  "id": "job_url_aHR0cHM6Ly9jYXJlZXJzLmli",
+  "title": "JobDetail",
+  "company": "Careers",
+  "location": "Remote",
+  "workMode": "onsite",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "BCA"
+  ],
+  "skills": [
+    "JavaScript",
+    "APIs",
+    "Communication"
+  ],
+  "description": "Live opening parsed from careers.ibm.com.",
+  "sourceType": "manual_url",
+  "sourceUrl": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
+  "createdAt": "Sat May 23 2026 11:08:48 GMT+0530 (India Standard Time)"
+}

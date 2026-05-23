@@ -5,9 +5,9 @@
   "status": "needs_review",
   "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
   "formMode": "multi_stage",
-  "currentStep": "stage_3",
-  "currentStageLabel": "Section 3",
-  "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
+  "currentStep": "prepare_application",
+  "currentStageLabel": "Section 2",
+  "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/d9fce17200317431b1b43b27508224cf0294759a",
   "retryCount": 0,
   "handoffCount": 0,
   "validationErrors": [
@@ -22,9 +22,9 @@
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 12,
-      "lastUpdatedAt": "2026-05-22T08:40:09.333Z",
-      "completedAt": "2026-05-22T08:40:09.333Z"
+      "attempts": 14,
+      "lastUpdatedAt": "2026-05-23T03:41:31.604Z",
+      "completedAt": "2026-05-23T03:41:31.604Z"
     },
     {
       "id": "authenticate_if_needed",
@@ -37,10 +37,10 @@
     {
       "id": "finish_current_section",
       "label": "Finish active section",
-      "status": "completed",
-      "detail": "Completed Section 2 and advanced to the next stage.",
-      "attempts": 31,
-      "lastUpdatedAt": "2026-05-22T08:40:35.941Z",
+      "status": "running",
+      "detail": "Reading Section 2 and planning the next safe action.",
+      "attempts": 33,
+      "lastUpdatedAt": "2026-05-23T03:37:29.359Z",
       "completedAt": "2026-05-22T08:40:35.941Z"
     },
     {
@@ -65,8 +65,8 @@
       "status": "completed",
       "detail": "Reached the review/submit checkpoint safely.",
       "attempts": 2,
-      "lastUpdatedAt": "2026-05-22T08:40:19.576Z",
-      "completedAt": "2026-05-22T08:40:19.576Z"
+      "lastUpdatedAt": "2026-05-23T03:38:23.595Z",
+      "completedAt": "2026-05-23T03:38:23.595Z"
     },
     {
       "id": "save_checkpoint",
@@ -74,35 +74,28 @@
       "status": "completed",
       "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
       "attempts": 0,
-      "lastUpdatedAt": "2026-05-22T08:40:35.941Z",
-      "completedAt": "2026-05-22T08:40:35.941Z"
+      "lastUpdatedAt": "2026-05-23T03:41:33.886Z",
+      "completedAt": "2026-05-23T03:41:33.886Z"
     }
   ],
   "lastDecision": {
-    "kind": "navigate_next",
+    "kind": "fill_fields",
     "source": "heuristic",
     "stageIndex": 1,
     "stageLabel": "Section 2",
-    "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
-    "reason": "Page classified as account_gate; continuing to the next logical stage.",
+    "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/d9fce17200317431b1b43b27508224cf0294759a",
+    "reason": "Visible fields detected, so the agent is filling the current stage.",
     "fieldLabels": [],
-    "createdAt": "2026-05-22T08:40:30.913Z"
+    "createdAt": "2026-05-23T03:38:01.928Z"
   },
   "stageHistory": [
     {
       "stageIndex": 0,
       "label": "Section 1",
-      "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
+      "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/d9fce17200317431b1b43b27508224cf0294759a",
       "visibleFieldLabels": [
-        "document_file",
-        "Last Name",
-        "First Name",
-        "Email",
-        "mat-input-3",
-        "Years of Experience",
-        "City",
-        "Current CTC",
-        "add_docs"
+        "Search for Job Title, Location...",
+        "Location"
       ],
       "requiredFieldLabels": [],
       "filledFieldLabels": [
@@ -117,49 +110,44 @@
       ],
       "outcome": "advanced",
       "decision": {
-        "kind": "fill_fields",
-        "source": "llm",
+        "kind": "navigate_next",
+        "source": "heuristic",
         "stageIndex": 0,
         "stageLabel": "Section 1",
-        "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-        "reason": "Jay Kumar Gupta is excited to apply for the Oorwin role at Willwaretech, leveraging his skills in JavaScript, React, Next.js, and experience in building reliable backend systems.",
-        "fieldLabels": [
-          "Last Name",
-          "First Name",
-          "Email",
-          "mat-input-3",
-          "Years of Experience",
-          "City",
-          "Current CTC",
-          "add_docs"
-        ],
-        "createdAt": "2026-05-22T08:40:18.362Z"
+        "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
+        "reason": "Page classified as account_gate; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-23T03:37:06.494Z"
       },
-      "lastUpdatedAt": "2026-05-22T08:40:26.332Z"
+      "lastUpdatedAt": "2026-05-23T03:37:28.951Z"
     },
     {
       "stageIndex": 1,
       "label": "Section 2",
-      "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
+      "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/d9fce17200317431b1b43b27508224cf0294759a",
       "visibleFieldLabels": [
-        "Search for Job Title, Location...",
-        "Location"
+        "document_file",
+        "add_docs"
       ],
       "requiredFieldLabels": [],
-      "filledFieldLabels": [],
-      "outcome": "advanced",
-      "lastUpdatedAt": "2026-05-22T08:40:35.941Z",
+      "filledFieldLabels": [
+        "Search for Job Title, Location...",
+        "Location",
+        "Resume upload"
+      ],
+      "outcome": "review",
       "decision": {
-        "kind": "navigate_next",
+        "kind": "fill_fields",
         "source": "heuristic",
         "stageIndex": 1,
         "stageLabel": "Section 2",
-        "url": "https://willwaretech.oorwin.ai/#/careers/index.html/list",
-        "reason": "Page classified as account_gate; continuing to the next logical stage.",
+        "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/d9fce17200317431b1b43b27508224cf0294759a",
+        "reason": "Visible fields detected, so the agent is filling the current stage.",
         "fieldLabels": [],
-        "createdAt": "2026-05-22T08:40:30.913Z"
-      }
+        "createdAt": "2026-05-23T03:38:01.928Z"
+      },
+      "lastUpdatedAt": "2026-05-23T03:38:23.595Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-22T08:40:35.941Z"
+  "lastUpdatedAt": "2026-05-23T03:41:33.886Z"
 }

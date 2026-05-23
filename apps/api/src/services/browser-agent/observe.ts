@@ -78,7 +78,7 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
 
         const label = findFieldLabel(control);
 
-        if (!label.trim()) {
+        if (!label.trim() || isNoiseField(control, label)) {
           continue;
         }
 
@@ -90,7 +90,11 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
           label: clean(label),
           required: isRequired(control, label),
           tagName: control.tagName.toLowerCase(),
-          inputType: control instanceof HTMLInputElement ? control.type || "text" : control instanceof HTMLSelectElement ? "select" : "textarea",
+          inputType: control instanceof HTMLSelectElement
+            ? "select"
+            : control instanceof HTMLInputElement
+              ? getInputType(control)
+              : "textarea",
           options: control instanceof HTMLSelectElement
             ? Array.from(control.options).map((option) => clean(option.textContent ?? option.value)).filter(Boolean).slice(0, 15)
             : [],
@@ -112,11 +116,75 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
         return (value ?? "").replace(/\s+/g, " ").replace(/\*/g, "").trim().slice(0, 160);
       }
 
+      function getInputType(control: HTMLInputElement) {
+        if (isCustomSelectLike(control)) {
+          return "combobox";
+        }
+
+        return control.type || "text";
+      }
+
       function isRequired(control: Element, label: string) {
         return (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).required
           || control.getAttribute("aria-required") === "true"
           || /\*/.test(label)
           || Boolean(control.closest(".required, [class*='required'], [data-required='true']"));
+      }
+
+      function isNoiseField(control: Element, label: string) {
+        const normalized = normalize(label);
+
+        if (!normalized) {
+          return true;
+        }
+
+        if (normalized.length > 140) {
+          return true;
+        }
+
+        if (/results found|no results found/.test(normalized)) {
+          return true;
+        }
+
+        if (control.closest("[role='option'], [role='listbox'], [role='menu'], [role='dialog']") && !/^location|city|country|phone|email|name/.test(normalized)) {
+          return true;
+        }
+
+        return false;
+      }
+
+      function isCustomSelectLike(control: HTMLInputElement) {
+        const popup = control.getAttribute("aria-haspopup") ?? "";
+        const role = control.getAttribute("role") ?? "";
+        const expanded = control.getAttribute("aria-expanded");
+
+        if (role === "combobox" || /^(listbox|menu|dialog|tree|true)$/i.test(popup) || expanded !== null) {
+          return true;
+        }
+
+        let ancestor = control.parentElement;
+
+        for (let depth = 0; depth < 3 && ancestor; depth += 1) {
+          const ancestorRole = ancestor.getAttribute("role") ?? "";
+          const ancestorPopup = ancestor.getAttribute("aria-haspopup") ?? "";
+          const ancestorExpanded = ancestor.getAttribute("aria-expanded");
+          const className = String(ancestor.getAttribute("class") ?? "");
+
+          if (
+            ancestorRole === "combobox"
+            || /^(listbox|menu|dialog|tree|true)$/i.test(ancestorPopup)
+            || ancestorExpanded !== null
+            || ancestor.hasAttribute("data-radix-select-trigger")
+            || ancestor.hasAttribute("data-headlessui-state")
+            || /\b(combobox|select__control|select-control|select-trigger|select-input)\b/i.test(className)
+          ) {
+            return true;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return false;
       }
 
       function findFieldLabel(control: Element) {
@@ -517,30 +585,53 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
     const frameLabels = await frame.evaluate(() => {
       const searchRoots = getSearchRoots();
       const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
+      const groups = new Map<string, { label: string; satisfied: boolean; required: boolean }>();
 
-      return controls
-        .filter((control) => {
-          if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button"].includes(control.type)) {
-            return false;
-          }
+      for (const control of controls) {
+        if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button"].includes(control.type)) {
+          continue;
+        }
 
-          const rect = control.getBoundingClientRect();
+        const rect = control.getBoundingClientRect();
 
-          if (rect.width <= 0 || rect.height <= 0 || !isRequired(control)) {
-            return false;
-          }
+        if (rect.width <= 0 || rect.height <= 0) {
+          continue;
+        }
 
-          if (control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)) {
-            const group = control.name
-              ? searchRoots.flatMap((root) => Array.from(root.querySelectorAll(`input[name="${CSS.escape(control.name)}"]`))) as HTMLInputElement[]
-              : [control];
-            return !group.some((item) => item.checked);
-          }
+        const label = findFieldLabel(control);
+        const cleanLabel = clean(label);
 
-          return !control.value.trim();
-        })
-        .map((control) => findFieldLabel(control))
-        .filter(Boolean);
+        if (!cleanLabel || isNoiseField(control, cleanLabel)) {
+          continue;
+        }
+
+        const choiceGroupLabel = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)
+          ? findChoiceGroupLabel(control) || cleanLabel
+          : cleanLabel;
+        const hasSharedChoiceLabel = control instanceof HTMLInputElement
+          && ["checkbox", "radio"].includes(control.type)
+          && normalize(choiceGroupLabel) !== normalize(cleanLabel);
+        const key = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)
+          ? hasSharedChoiceLabel
+            ? `choice:${control.type}:${normalize(choiceGroupLabel)}`
+            : control.name
+              ? `choice:${control.type}:${control.name}`
+              : normalize(choiceGroupLabel)
+          : normalize(choiceGroupLabel);
+        const existing = groups.get(key) ?? {
+          label: choiceGroupLabel,
+          satisfied: false,
+          required: false
+        };
+
+        existing.required = existing.required || isRequired(control);
+        existing.satisfied = existing.satisfied || isSatisfied(control, searchRoots);
+        groups.set(key, existing);
+      }
+
+      return Array.from(groups.values())
+        .filter((group) => group.required && !group.satisfied)
+        .map((group) => group.label);
 
       function isRequired(control: Element) {
         const label = findFieldLabel(control);
@@ -548,6 +639,44 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
           || control.getAttribute("aria-required") === "true"
           || /\*/.test(label)
           || Boolean(control.closest(".required, [class*='required'], [data-required='true']"));
+      }
+
+      function isSatisfied(
+        control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+        roots: Array<Document | ShadowRoot>
+      ) {
+        if (control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)) {
+          const group = control.name
+            ? roots.flatMap((root) => Array.from(root.querySelectorAll(`input[name="${CSS.escape(control.name)}"]`))) as HTMLInputElement[]
+            : [control];
+          return group.some((item) => item.checked);
+        }
+
+        if (control.value.trim()) {
+          return true;
+        }
+
+        if (!(control instanceof HTMLElement)) {
+          return false;
+        }
+
+        if (isCustomSelectLike(control)) {
+          const container = control.closest("[role='combobox'], [aria-haspopup='listbox'], [data-radix-select-trigger], [data-headlessui-state], [class*='select'], [class*='combobox']")
+            ?? control.parentElement;
+          const selectedText = normalize([
+            control.getAttribute("data-value"),
+            control.getAttribute("aria-valuetext"),
+            container?.getAttribute("data-value"),
+            container?.getAttribute("aria-valuetext"),
+            container?.textContent
+          ].filter(Boolean).join(" "));
+
+          if (selectedText && !/select|choose|search|type to search/.test(selectedText)) {
+            return true;
+          }
+        }
+
+        return false;
       }
 
       function findFieldLabel(control: Element) {
@@ -577,6 +706,132 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
 
       function clean(value: string | null | undefined) {
         return (value ?? "").replace(/\s+/g, " ").replace(/\*/g, "").trim().slice(0, 120);
+      }
+
+      function findChoiceGroupLabel(control: HTMLInputElement) {
+        const fieldsetLegend = control.closest("fieldset")?.querySelector("legend")?.textContent;
+
+        if (fieldsetLegend?.trim()) {
+          return clean(fieldsetLegend);
+        }
+
+        const group = control.closest("[role='group']");
+        const labelledBy = group?.getAttribute("aria-labelledby");
+
+        if (labelledBy) {
+          const labelledText = labelledBy
+            .split(/\s+/)
+            .map((id) => document.getElementById(id)?.textContent ?? "")
+            .join(" ");
+
+          if (labelledText.trim()) {
+            return clean(labelledText);
+          }
+        }
+
+        const container = control.closest("section, article, [class*='question'], [class*='field'], [class*='input']");
+        const heading = container?.querySelector("h1, h2, h3, h4, legend, label")?.textContent;
+
+        if (heading?.trim() && normalize(heading) !== normalize(findFieldLabel(control))) {
+          return clean(heading);
+        }
+
+        const inferredCountryQuestion = inferCountryQuestionFromAncestors(control);
+
+        if (inferredCountryQuestion) {
+          return inferredCountryQuestion;
+        }
+
+        return "";
+      }
+
+      function inferCountryQuestionFromAncestors(control: HTMLInputElement) {
+        if (!isCountryOption(findFieldLabel(control))) {
+          return "";
+        }
+
+        let ancestor: Element | null = control.parentElement;
+
+        for (let depth = 0; depth < 8 && ancestor; depth += 1) {
+          const text = clean(ancestor.textContent);
+          const normalized = normalize(text);
+
+          if (/\b(country|countries|working in|currently reside|previous response)\b/.test(normalized)) {
+            const match = text.match(/(Please select[^.?\n]*(?:country|countries)[^.?\n]*|Are you authorized[^.?\n]*previous response|Will you require[^.?\n]*previous response)/i);
+
+            if (match?.[1]) {
+              return clean(match[1]);
+            }
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return "";
+      }
+
+      function isCountryOption(value: string) {
+        return /^(australia|belgium|brazil|canada|france|germany|india|indonesia|ireland|israel|italy|japan|luxembourg|malaysia|mexico|new zealand|poland|portugal|romania|singapore|south korea|spain|sweden|switzerland|thailand|the netherlands|netherlands|uae|uk|us|united states|united kingdom)$/i.test(value.trim());
+      }
+
+      function isNoiseField(control: Element, label: string) {
+        const normalized = normalize(label);
+
+        if (!normalized) {
+          return true;
+        }
+
+        if (normalized.length > 140) {
+          return true;
+        }
+
+        if (/results found|no results found/.test(normalized)) {
+          return true;
+        }
+
+        if (control.closest("[role='option'], [role='listbox'], [role='menu'], [role='dialog']") && !/^location|city|country|phone|email|name/.test(normalized)) {
+          return true;
+        }
+
+        return false;
+      }
+
+      function isCustomSelectLike(control: HTMLElement) {
+        const popup = control.getAttribute("aria-haspopup") ?? "";
+        const role = control.getAttribute("role") ?? "";
+        const expanded = control.getAttribute("aria-expanded");
+
+        if (role === "combobox" || /^(listbox|menu|dialog|tree|true)$/i.test(popup) || expanded !== null) {
+          return true;
+        }
+
+        let ancestor = control.parentElement;
+
+        for (let depth = 0; depth < 3 && ancestor; depth += 1) {
+          const ancestorRole = ancestor.getAttribute("role") ?? "";
+          const ancestorPopup = ancestor.getAttribute("aria-haspopup") ?? "";
+          const ancestorExpanded = ancestor.getAttribute("aria-expanded");
+          const className = String(ancestor.getAttribute("class") ?? "");
+
+          if (
+            ancestorRole === "combobox"
+            || /^(listbox|menu|dialog|tree|true)$/i.test(ancestorPopup)
+            || ancestorExpanded !== null
+            || ancestor.hasAttribute("data-radix-select-trigger")
+            || ancestor.hasAttribute("data-headlessui-state")
+            || /\b(combobox|select__control|select-control|select-trigger|select-input)\b/i.test(className)
+          ) {
+            return true;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return false;
+      }
+
+      function normalize(value: string) {
+        return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       }
 
       function getSearchRoots() {
@@ -623,10 +878,14 @@ export async function autoResolveConsentControls(page: Page) {
           control.getAttribute("aria-label"),
           control.getAttribute("name"),
           control.id,
-          control.closest("label, fieldset, [role='group'], form")?.textContent
+          control.closest("label, fieldset, [role='group']")?.textContent
         ].filter(Boolean).join(" "));
 
         if (!/\b(terms|privacy|consent|agree|acknowledge|accept|declaration|eeo|voluntary self identification|data processing)\b/.test(descriptor)) {
+          continue;
+        }
+
+        if (/\b(country|countries|location|locations|remote|relocat|work permit|sponsor|sponsorship|whatsapp|sms|text messages)\b/.test(descriptor)) {
           continue;
         }
 
@@ -727,7 +986,8 @@ export async function getVisibleValidationMessages(page: Page) {
 }
 
 export async function hasFileUpload(page: Page) {
-  return page.evaluate(() => {
+  for (const frame of page.frames()) {
+    const found = await frame.evaluate(() => {
     const controls = getSearchRoots().flatMap((root) => Array.from(root.querySelectorAll("input[type='file']"))) as HTMLInputElement[];
     if (controls.some((control) => !control.disabled)) {
       return true;
@@ -754,10 +1014,106 @@ export async function hasFileUpload(page: Page) {
           return false;
         }
 
-        const text = `${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`.toLowerCase().replace(/\s+/g, " ").trim();
-        return /\b(upload resume|attach resume|drag and drop your resume|browse file|choose file|select file)\b/.test(text);
+        const ownText = normalize(`${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`);
+        const nearbyText = normalize(findNearbyUploadLabel(element));
+        const sectionText = normalize(findUploadSectionText(element));
+
+        return /\b(upload resume|attach resume|drag and drop your resume|browse file|choose file|select file)\b/.test(ownText)
+          || (
+            /\b(attach|upload|browse|choose file|select file)\b/.test(ownText)
+            && (/\b(resume|cv|curriculum vitae|resume cv)\b/.test(nearbyText) || /\b(resume|cv|curriculum vitae|resume cv)\b/.test(sectionText))
+            && !(/\bcover letter\b/.test(nearbyText) && !/\b(resume|cv|curriculum vitae)\b/.test(nearbyText))
+          );
       });
     });
+
+    function findUploadSectionText(element: HTMLElement) {
+      let ancestor: Element | null = element;
+      let best = "";
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      for (let depth = 0; depth < 8 && ancestor; depth += 1) {
+        const text = normalize(ancestor.textContent ?? "");
+        let score = 0;
+
+        if (/\b(resume|cv|curriculum vitae|resume cv)\b/.test(text)) {
+          score += 120;
+        }
+
+        if (/\bcover letter\b/.test(text)) {
+          score -= 90;
+        }
+
+        score -= Math.min(text.length / 100, 40);
+        score -= depth * 3;
+
+        if (score > bestScore) {
+          bestScore = score;
+          best = text;
+        }
+
+        ancestor = ancestor.parentElement;
+      }
+
+      return best;
+    }
+
+    function findNearbyUploadLabel(element: HTMLElement) {
+      const targetRect = element.getBoundingClientRect();
+      const candidates = Array.from(document.querySelectorAll("label, legend, h1, h2, h3, h4, p, span, div")) as HTMLElement[];
+      let best = "";
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      for (const candidate of candidates) {
+        if (candidate === element) {
+          continue;
+        }
+
+        const rect = candidate.getBoundingClientRect();
+
+        if (rect.width <= 0 || rect.height <= 0) {
+          continue;
+        }
+
+        const text = normalize(candidate.innerText || candidate.textContent || "");
+
+        if (!/\b(resume|cv|curriculum vitae|cover letter)\b/.test(text)) {
+          continue;
+        }
+
+        const verticalDistance = Math.max(0, targetRect.top - rect.bottom);
+        const overlapsHorizontally = rect.right >= targetRect.left - 40 && rect.left <= targetRect.right + 40;
+
+        if (verticalDistance > 260 || (!overlapsHorizontally && verticalDistance > 80)) {
+          continue;
+        }
+
+        let score = 120 - verticalDistance;
+
+        if (overlapsHorizontally) {
+          score += 50;
+        }
+
+        if (/\b(resume|cv|curriculum vitae|resume cv)\b/.test(text)) {
+          score += 120;
+        }
+
+        if (/\bcover letter\b/.test(text)) {
+          score -= 140;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          best = text;
+        }
+      }
+
+      return best;
+    }
+
+    function normalize(value: string) {
+      return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    }
 
     function getSearchRoots() {
       const roots: Array<Document | ShadowRoot> = [document];
@@ -775,7 +1131,14 @@ export async function hasFileUpload(page: Page) {
 
       return roots;
     }
-  }).catch(() => false);
+    }).catch(() => false);
+
+    if (found) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export async function hasFinalSubmitControl(page: Page) {

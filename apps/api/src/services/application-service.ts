@@ -21,6 +21,7 @@ import { nowIso } from "../lib/time";
 import { AIHawkAdapterService, type StructuredApplicationPackageResult } from "./aihawk-adapter-service";
 import { AgentOrchestratorService } from "./agent-orchestrator-service";
 import { EmailService } from "./email-service";
+import { cityFromLocationLabel, inferCountryFromLocationLabel, inferCountryFromPhoneNumber, resolveBestProfileLocation } from "./location-resolver";
 import { MatchingService } from "./matching-service";
 import { StudentMemoryService } from "./student-memory-service";
 
@@ -756,7 +757,7 @@ function buildSubmissionNotes(submission: ApplicationSubmission, workspacePath?:
 
 function createArtifacts(student: StudentProfile, job: Job, resume?: ResumeRecord) {
   const roleTarget = getPreferredRoleTarget(student, job);
-  const preferredLocation = getPreferredLocation(student, job);
+  const preferredLocation = getPreferredLocation(student, job, resume);
   const leadSkills = student.skills.slice(0, 4);
   const resumeSource = resume ? `Uploaded resume ${resume.filename} was used as the primary context.` : "No uploaded resume was available, so GradLaunch used the saved profile.";
   const coverLetterExcerpt = buildCoverLetterExcerpt(student, job, roleTarget, preferredLocation);
@@ -791,12 +792,19 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
   const nameParts = student.fullName.trim().split(/\s+/).filter(Boolean);
   const firstName = nameParts[0] ?? student.fullName;
   const lastName = nameParts.slice(1).join(" ");
-  const preferredLocation = getPreferredLocation(student, job);
-  const city = preferredLocation.split(",")[0]?.trim() || preferredLocation;
   const phoneNumber = extractPhoneNumber(resume?.extractedText) ?? process.env.DEFAULT_STUDENT_PHONE;
+  const resolvedLocation = resolveBestProfileLocation({
+    student,
+    job,
+    resumeText: resume?.extractedText,
+    phone: phoneNumber
+  });
+  const preferredLocation = resolvedLocation?.label ?? getPreferredLocation(student, job, resume, phoneNumber);
+  const city = resolvedLocation?.city ?? cityFromLocationLabel(preferredLocation) ?? preferredLocation;
   const country = process.env.DEFAULT_STUDENT_COUNTRY
-    ?? inferCountryFromPhone(phoneNumber)
-    ?? inferCountryFromLocation(preferredLocation)
+    ?? inferCountryFromPhoneNumber(phoneNumber)
+    ?? resolvedLocation?.country
+    ?? inferCountryFromLocationLabel(preferredLocation)
     ?? "India";
   const roleTarget = getPreferredRoleTarget(student, job);
   const linkedInUrl = extractUrl(resume?.extractedText, /linkedin\.com\/[^\s)>,]+/i) ?? process.env.DEFAULT_STUDENT_LINKEDIN;
@@ -813,7 +821,7 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
     { label: "Confirm your email", value: student.email },
     { label: "City", value: city },
     { label: "Location", value: preferredLocation },
-    { label: "Location (City)", value: city },
+    { label: "Location (City)", value: preferredLocation },
     { label: "Country", value: country },
     { label: "Phone number", value: phoneNumber ?? "" },
     { label: "Phone", value: phoneNumber ?? "" },
@@ -846,54 +854,6 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
   ];
 
   return fields.filter((field) => field.value.trim().length > 0);
-}
-
-function inferCountryFromPhone(phone: string | undefined) {
-  const normalized = (phone ?? "").replace(/\s+/g, "");
-
-  if (!normalized) {
-    return undefined;
-  }
-
-  if (normalized.startsWith("+91")) {
-    return "India";
-  }
-
-  if (normalized.startsWith("+1")) {
-    return "United States";
-  }
-
-  if (normalized.startsWith("+44")) {
-    return "United Kingdom";
-  }
-
-  if (normalized.startsWith("+61")) {
-    return "Australia";
-  }
-
-  return undefined;
-}
-
-function inferCountryFromLocation(location: string | undefined) {
-  const normalized = (location ?? "").toLowerCase();
-
-  if (!normalized) {
-    return undefined;
-  }
-
-  if (/\bindia|bengaluru|bangalore|chennai|hyderabad|mumbai|pune|delhi|gurgaon|noida\b/.test(normalized)) {
-    return "India";
-  }
-
-  if (/\busa|united states|new york|san francisco|seattle|austin|boston\b/.test(normalized)) {
-    return "United States";
-  }
-
-  if (/\buk|united kingdom|london|manchester\b/.test(normalized)) {
-    return "United Kingdom";
-  }
-
-  return undefined;
 }
 
 function extractPhoneNumber(text?: string) {
@@ -1005,7 +965,18 @@ function getPreferredRoleTarget(student: StudentProfile, job: Job) {
   return normalizedTargetRole ?? normalizeRoleLabel(job.title) ?? "Software Engineer";
 }
 
-function getPreferredLocation(student: StudentProfile, job: Job) {
+function getPreferredLocation(student: StudentProfile, job: Job, resume?: ResumeRecord, phone?: string) {
+  const resolved = resolveBestProfileLocation({
+    student,
+    job,
+    resumeText: resume?.extractedText,
+    phone
+  });
+
+  if (resolved?.label) {
+    return resolved.label;
+  }
+
   const candidate = sanitizeLocationLabel(student.preferredLocations[0]);
   return candidate ?? sanitizeLocationLabel(job.location) ?? "India";
 }
@@ -1125,6 +1096,10 @@ function shouldUsePrimaryFieldValue(
     return false;
   }
 
+  if (isLocationFieldKey(labelKey) && generatedValue && locationCountriesConflict(primaryValue, generatedValue)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -1143,7 +1118,7 @@ function isWeakFieldValue(labelKey: string, value: string) {
     return normalizeRoleLabel(value) === undefined;
   }
 
-  if (labelKey === "preferred location" || labelKey === "location" || labelKey === "location city" || labelKey === "city") {
+  if (isLocationFieldKey(labelKey)) {
     return sanitizeLocationLabel(value) === undefined;
   }
 
@@ -1152,6 +1127,17 @@ function isWeakFieldValue(labelKey: string, value: string) {
   }
 
   return false;
+}
+
+function isLocationFieldKey(labelKey: string) {
+  return labelKey === "preferred location" || labelKey === "location" || labelKey === "location city" || labelKey === "city";
+}
+
+function locationCountriesConflict(primaryValue: string, generatedValue: string) {
+  const primaryCountry = inferCountryFromLocationLabel(primaryValue);
+  const generatedCountry = inferCountryFromLocationLabel(generatedValue);
+
+  return Boolean(primaryCountry && generatedCountry && primaryCountry !== generatedCountry);
 }
 
 function refreshApplicationArtifactsIfNeeded(

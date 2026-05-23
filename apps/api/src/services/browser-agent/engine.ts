@@ -463,7 +463,15 @@ export class BrowserAgentEngine {
             reason: "Resume upload field detected on this screen.",
             fieldLabels: ["Resume upload"]
           });
+          await writeBrowserDebug(workspacePath, "resume-upload-attempt", {
+            stageIndex,
+            resumePath: input.resume.storagePath
+          });
           resumeUploaded = await attachResume(activePage, input.resume.storagePath);
+          await writeBrowserDebug(workspacePath, "resume-upload-result", {
+            stageIndex,
+            uploaded: resumeUploaded
+          });
 
           if (resumeUploaded && !seenFilled.has("resume upload")) {
             seenFilled.add("resume upload");
@@ -518,6 +526,13 @@ export class BrowserAgentEngine {
 
             const filled = await fillFormField(activePage, field);
             const key = field.label.toLowerCase().trim();
+            await writeBrowserDebug(workspacePath, filled ? "filled-field" : "failed-to-fill-field", {
+              stageIndex,
+              fieldId: field.fieldId,
+              label: field.label,
+              inputType: field.inputType,
+              valuePreview: field.value.length > 80 ? `${field.value.slice(0, 77)}...` : field.value
+            });
 
             if (filled) {
               if (!seenFilled.has(key)) {

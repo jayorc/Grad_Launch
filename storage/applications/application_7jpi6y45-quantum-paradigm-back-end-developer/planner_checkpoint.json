@@ -2,12 +2,12 @@
   "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
   "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-21T09:58:04.173Z",
   "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or final review checkpoint.",
-  "status": "needs_review",
-  "summary": "GradLaunch could not find a confident next-step control on this page.",
+  "status": "completed",
+  "summary": "Planner completed the form fill and paused at the review gate.",
   "formMode": "multi_stage",
-  "currentStep": "stage_2",
-  "currentStageLabel": "Section 2",
-  "currentUrl": "about:blank",
+  "currentStep": "stage_1",
+  "currentStageLabel": "Section 1",
+  "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
   "retryCount": 2,
   "handoffCount": 6,
   "validationErrors": [
@@ -21,9 +21,9 @@
       "label": "Open job page",
       "status": "completed",
       "detail": "Job page opened successfully in a visible Chrome session.",
-      "attempts": 24,
-      "lastUpdatedAt": "2026-05-22T08:24:47.063Z",
-      "completedAt": "2026-05-22T08:24:47.063Z"
+      "attempts": 27,
+      "lastUpdatedAt": "2026-05-23T05:31:06.205Z",
+      "completedAt": "2026-05-23T05:31:06.205Z"
     },
     {
       "id": "authenticate_if_needed",
@@ -37,9 +37,9 @@
       "id": "finish_current_section",
       "label": "Finish active section",
       "status": "running",
-      "detail": "Reading Section 2 and planning the next safe action.",
-      "attempts": 72,
-      "lastUpdatedAt": "2026-05-22T08:25:07.300Z"
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 76,
+      "lastUpdatedAt": "2026-05-23T05:31:10.052Z"
     },
     {
       "id": "recover_from_validation_errors",
@@ -63,8 +63,8 @@
       "status": "completed",
       "detail": "Reached the review/submit checkpoint safely.",
       "attempts": 8,
-      "lastUpdatedAt": "2026-05-22T08:24:56.971Z",
-      "completedAt": "2026-05-22T08:24:56.971Z"
+      "lastUpdatedAt": "2026-05-23T05:31:15.745Z",
+      "completedAt": "2026-05-23T05:31:15.745Z"
     },
     {
       "id": "save_checkpoint",
@@ -72,25 +72,31 @@
       "status": "completed",
       "detail": "Saved checkpoint while waiting for manual stage progress.",
       "attempts": 0,
-      "lastUpdatedAt": "2026-05-22T08:25:10.729Z",
-      "completedAt": "2026-05-22T08:25:10.729Z"
+      "lastUpdatedAt": "2026-05-23T05:31:16.082Z",
+      "completedAt": "2026-05-23T05:31:16.082Z"
     }
   ],
   "lastDecision": {
-    "kind": "navigate_next",
-    "source": "heuristic",
-    "stageIndex": 1,
-    "stageLabel": "Section 2",
-    "url": "about:blank",
-    "reason": "Page classified as unknown; continuing to the next logical stage.",
-    "fieldLabels": [],
-    "createdAt": "2026-05-22T08:25:10.715Z"
+    "kind": "fill_fields",
+    "source": "llm",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+    "reason": "Highly motivated and detail-oriented Backend Developer with expertise in JavaScript, React, Next.js, Node.js, and a strong passion for building reliable backend systems.",
+    "fieldLabels": [
+      "Full Name",
+      "Email",
+      "Phone",
+      "Cover Letter",
+      "By using this form you agree with the storage and handling of your data by this website."
+    ],
+    "createdAt": "2026-05-23T05:31:15.083Z"
   },
   "stageHistory": [
     {
       "stageIndex": 0,
       "label": "Section 1",
-      "url": "about:blank",
+      "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
       "visibleFieldLabels": [
         "Full Name",
         "Email",
@@ -119,25 +125,24 @@
         "By using this form you agree with the storage and handling of your data by this website.",
         "Resume upload"
       ],
-      "outcome": "advanced",
+      "outcome": "review",
       "decision": {
         "kind": "fill_fields",
         "source": "llm",
         "stageIndex": 0,
         "stageLabel": "Section 1",
         "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
-        "reason": "I am excited to apply for the Back-End Developer role at Quantum Paradigm. My background in JavaScript, React, Next.js and my focus on becoming a strong Back-End Developer make this opportunity especially compelling to me. I would be glad to contribute to Quantum Paradigm's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with a opportunities.",
+        "reason": "Highly motivated and detail-oriented Backend Developer with expertise in JavaScript, React, Next.js, Node.js, and a strong passion for building reliable backend systems.",
         "fieldLabels": [
           "Full Name",
           "Email",
           "Phone",
           "Cover Letter",
-          "Upload CV/Resume",
           "By using this form you agree with the storage and handling of your data by this website."
         ],
-        "createdAt": "2026-05-22T08:24:55.560Z"
+        "createdAt": "2026-05-23T05:31:15.083Z"
       },
-      "lastUpdatedAt": "2026-05-22T08:25:06.888Z"
+      "lastUpdatedAt": "2026-05-23T05:31:15.745Z"
     },
     {
       "stageIndex": 1,
@@ -153,11 +158,11 @@
         "stageIndex": 1,
         "stageLabel": "Section 2",
         "url": "about:blank",
-        "reason": "Page classified as unknown; continuing to the next logical stage.",
+        "reason": "Page classified as empty; continuing to the next logical stage.",
         "fieldLabels": [],
-        "createdAt": "2026-05-22T08:25:10.715Z"
+        "createdAt": "2026-05-23T03:36:03.823Z"
       },
-      "lastUpdatedAt": "2026-05-22T08:25:10.715Z"
+      "lastUpdatedAt": "2026-05-23T03:36:03.823Z"
     },
     {
       "stageIndex": 2,
@@ -228,5 +233,5 @@
       "lastUpdatedAt": "2026-05-22T05:58:05.642Z"
     }
   ],
-  "lastUpdatedAt": "2026-05-22T08:25:12.790Z"
+  "lastUpdatedAt": "2026-05-23T05:31:16.082Z"
 }

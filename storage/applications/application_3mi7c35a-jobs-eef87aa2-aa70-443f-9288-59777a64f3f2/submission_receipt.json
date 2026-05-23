@@ -2,35 +2,47 @@
   "intent": "browser_fill",
   "outcome": "confirmed",
   "externalSubmitted": false,
-  "confirmation": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
-  "submittedAt": "2026-05-22T08:12:20.793Z",
+  "confirmation": "The form is filled across 1 stage and is ready for review or direct submit.",
+  "submittedAt": "2026-05-23T05:29:34.309Z",
   "email": {
     "status": "skipped",
     "provider": "outbox",
     "to": "jaynrk200211@gmail.com",
     "subject": "GradLaunch filled Jobs - Eef87aa2 Aa70 443f 9288 59777a64f3f2",
-    "sentAt": "2026-05-22T08:12:20.793Z",
+    "sentAt": "2026-05-23T05:29:34.309Z",
     "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
   },
   "browser": {
-    "status": "needs_manual_review",
+    "status": "filled",
     "sourceUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
-    "openedAt": "2026-05-22T08:12:18.145Z",
-    "completedAt": "2026-05-22T08:12:20.793Z",
-    "filledLabels": [],
-    "skippedLabels": [],
-    "screenshots": [
-      "browser-opened.png"
+    "openedAt": "2026-05-23T05:29:12.531Z",
+    "completedAt": "2026-05-23T05:29:34.309Z",
+    "filledLabels": [
+      "Resume upload",
+      "Last Name",
+      "First Name",
+      "Email",
+      "mat-input-3",
+      "Years of Experience",
+      "Current CTC"
     ],
-    "message": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+    "skippedLabels": [
+      "City"
+    ],
+    "screenshots": [
+      "browser-opened.png",
+      "browser-stage-1-start.png",
+      "browser-filled.png"
+    ],
+    "message": "The form is filled across 1 stage and is ready for review or direct submit.",
     "planner": {
       "sessionId": "planner-job_u13nx3ht",
       "resumeToken": "job_u13nx3ht:2026-05-21T10:30:48.952Z",
       "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or final review checkpoint.",
-      "status": "needs_review",
-      "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+      "status": "completed",
+      "summary": "Planner completed the form fill and paused at the review gate.",
       "formMode": "multi_stage",
-      "currentStep": "prepare_application",
+      "currentStep": "stage_1",
       "currentStageLabel": "Section 1",
       "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
       "retryCount": 4,
@@ -50,9 +62,9 @@
           "label": "Open job page",
           "status": "completed",
           "detail": "Job page opened successfully in a visible Chrome session.",
-          "attempts": 16,
-          "lastUpdatedAt": "2026-05-22T08:12:19.329Z",
-          "completedAt": "2026-05-22T08:12:19.329Z"
+          "attempts": 20,
+          "lastUpdatedAt": "2026-05-23T05:29:13.903Z",
+          "completedAt": "2026-05-23T05:29:13.903Z"
         },
         {
           "id": "authenticate_if_needed",
@@ -67,8 +79,8 @@
           "label": "Finish active section",
           "status": "running",
           "detail": "Reading Section 1 and planning the next safe action.",
-          "attempts": 39,
-          "lastUpdatedAt": "2026-05-22T08:11:20.917Z",
+          "attempts": 41,
+          "lastUpdatedAt": "2026-05-23T05:29:18.143Z",
           "completedAt": "2026-05-22T07:50:35.772Z"
         },
         {
@@ -93,17 +105,17 @@
           "status": "completed",
           "detail": "Reached the review/submit checkpoint safely.",
           "attempts": 0,
-          "lastUpdatedAt": "2026-05-22T08:11:26.717Z",
-          "completedAt": "2026-05-22T08:11:26.717Z"
+          "lastUpdatedAt": "2026-05-23T05:29:27.061Z",
+          "completedAt": "2026-05-23T05:29:27.061Z"
         },
         {
           "id": "save_checkpoint",
           "label": "Save checkpoint",
           "status": "completed",
-          "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
+          "detail": "Saved checkpoint while waiting for manual stage progress.",
           "attempts": 0,
-          "lastUpdatedAt": "2026-05-22T08:12:20.707Z",
-          "completedAt": "2026-05-22T08:12:20.707Z"
+          "lastUpdatedAt": "2026-05-23T05:29:27.362Z",
+          "completedAt": "2026-05-23T05:29:27.362Z"
         }
       ],
       "lastDecision": {
@@ -112,7 +124,7 @@
         "stageIndex": 0,
         "stageLabel": "Section 1",
         "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-        "reason": "Jay Kumar Gupta is a recent B.Tech in Computer Science graduate with a strong background in JavaScript, React, Next.js, and a focus on becoming a strong Eef87aa2 Aa70 443f 9288 59777a64f3f2.",
+        "reason": "Backend Developer Intern with expertise in AI, ML, and full-stack development.",
         "fieldLabels": [
           "Last Name",
           "First Name",
@@ -122,7 +134,7 @@
           "City",
           "Current CTC"
         ],
-        "createdAt": "2026-05-22T08:11:25.885Z"
+        "createdAt": "2026-05-23T05:29:23.972Z"
       },
       "stageHistory": [
         {
@@ -166,7 +178,7 @@
             "stageIndex": 0,
             "stageLabel": "Section 1",
             "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-            "reason": "Jay Kumar Gupta is a recent B.Tech in Computer Science graduate with a strong background in JavaScript, React, Next.js, and a focus on becoming a strong Eef87aa2 Aa70 443f 9288 59777a64f3f2.",
+            "reason": "Backend Developer Intern with expertise in AI, ML, and full-stack development.",
             "fieldLabels": [
               "Last Name",
               "First Name",
@@ -176,9 +188,9 @@
               "City",
               "Current CTC"
             ],
-            "createdAt": "2026-05-22T08:11:25.885Z"
+            "createdAt": "2026-05-23T05:29:23.972Z"
           },
-          "lastUpdatedAt": "2026-05-22T08:11:26.717Z"
+          "lastUpdatedAt": "2026-05-23T05:29:27.061Z"
         },
         {
           "stageIndex": 1,
@@ -264,7 +276,7 @@
           "lastUpdatedAt": "2026-05-22T07:50:42.032Z"
         }
       ],
-      "lastUpdatedAt": "2026-05-22T08:12:20.707Z"
+      "lastUpdatedAt": "2026-05-23T05:29:27.362Z"
     }
   }
 }

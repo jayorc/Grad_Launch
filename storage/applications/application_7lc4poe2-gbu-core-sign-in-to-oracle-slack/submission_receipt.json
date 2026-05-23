@@ -1,0 +1,102 @@
+{
+  "intent": "browser_fill",
+  "outcome": "confirmed",
+  "externalSubmitted": false,
+  "confirmation": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+  "submittedAt": "2026-05-23T05:37:16.064Z",
+  "email": {
+    "status": "skipped",
+    "provider": "outbox",
+    "to": "jaynrk200211@gmail.com",
+    "subject": "GradLaunch filled Gbu Core - Sign In To Oracle | Slack",
+    "sentAt": "2026-05-23T05:37:16.064Z",
+    "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+  },
+  "browser": {
+    "status": "needs_manual_review",
+    "sourceUrl": "https://gbu-core.slack.com/archives/D0A7M5XLLL9/p1779514554724249",
+    "openedAt": "2026-05-23T05:37:11.753Z",
+    "completedAt": "2026-05-23T05:37:16.064Z",
+    "filledLabels": [],
+    "skippedLabels": [],
+    "screenshots": [
+      "browser-opened.png"
+    ],
+    "message": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+    "planner": {
+      "sessionId": "planner-job_url_aHR0cHM6Ly9nYnUtY29yZS5z",
+      "resumeToken": "job_url_aHR0cHM6Ly9nYnUtY29yZS5z:2026-05-23T05:37:11.753Z",
+      "goal": "Complete the Sign In To Oracle | Slack application at Gbu Core autonomously until a protected or review checkpoint.",
+      "status": "needs_review",
+      "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+      "formMode": "unknown",
+      "retryCount": 0,
+      "handoffCount": 0,
+      "validationErrors": [],
+      "subgoals": [
+        {
+          "id": "open_job_page",
+          "label": "Open job page",
+          "status": "completed",
+          "detail": "Job page opened successfully in a visible Chrome session.",
+          "attempts": 1,
+          "lastUpdatedAt": "2026-05-23T05:37:14.973Z",
+          "completedAt": "2026-05-23T05:37:14.973Z"
+        },
+        {
+          "id": "authenticate_if_needed",
+          "label": "Handle login if needed",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:37:11.753Z"
+        },
+        {
+          "id": "finish_current_section",
+          "label": "Finish active section",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:37:11.753Z"
+        },
+        {
+          "id": "recover_from_validation_errors",
+          "label": "Recover from validation errors",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:37:11.753Z"
+        },
+        {
+          "id": "retry_alternative_path",
+          "label": "Retry alternative path",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:37:11.753Z"
+        },
+        {
+          "id": "reach_submit_gate",
+          "label": "Reach submit/review gate",
+          "status": "pending",
+          "detail": "Waiting to start.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:37:11.753Z"
+        },
+        {
+          "id": "save_checkpoint",
+          "label": "Save checkpoint",
+          "status": "completed",
+          "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
+          "attempts": 0,
+          "lastUpdatedAt": "2026-05-23T05:37:16.003Z",
+          "completedAt": "2026-05-23T05:37:16.003Z"
+        }
+      ],
+      "stageHistory": [],
+      "lastUpdatedAt": "2026-05-23T05:37:16.003Z",
+      "currentUrl": "https://oracle.enterprise.slack.com/?redir=%2Fr-t349899550182%3Fredir%3D%252Farchives%252FD0A7M5XLLL9%252Fp1779514554724249%253Fname%253DD0A7M5XLLL9%2526perma%253D1779514554724249",
+      "currentStep": "prepare_application"
+    }
+  }
+}

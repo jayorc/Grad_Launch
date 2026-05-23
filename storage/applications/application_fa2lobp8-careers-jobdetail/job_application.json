@@ -1,0 +1,500 @@
+{
+  "applicationId": "application_fa2lobp8",
+  "studentId": "student_tcgn9yq4",
+  "jobId": "job_url_aHR0cHM6Ly9jYXJlZXJzLmli",
+  "status": "ready_for_review",
+  "sourceLabel": "Pasted URL",
+  "matchScore": 8,
+  "generatedArtifacts": {
+    "tailoredResumeSummary": "Uploaded resume jay_kumar_gupta_nit_kkr.pdf was used as the primary context. Focused JavaScript, React, Next.js, Node.js to match the JobDetail role at Careers.",
+    "coverLetterExcerpt": "I am excited to apply for the JobDetail role at Careers. My background in JavaScript, React, Next.js and my focus on becoming a strong Software Engineer make this opportunity especially compelling to me. I would be glad to contribute to Careers's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Aurangabad, Bihar, India opportunities.",
+    "shortAnswers": [
+      {
+        "question": "Why are you interested in this role?",
+        "answer": "This role aligns with my goal of becoming a strong Software Engineer and uses skills I have already practiced through projects and coursework."
+      },
+      {
+        "question": "What makes you a match?",
+        "answer": "My background in JavaScript, React, Next.js, Node.js closely matches the technical expectations in the job description."
+      }
+    ]
+  },
+  "uploadedDocuments": [
+    "jay_kumar_gupta_nit_kkr.pdf",
+    "tailored_resume_summary.txt",
+    "cover_letter_excerpt.txt",
+    "short_answers.json"
+  ],
+  "run": {
+    "id": "run_jvbrdmus",
+    "status": "needs_review",
+    "executionMode": "browser_apply",
+    "filledFields": [
+      {
+        "label": "First name",
+        "value": "Jay"
+      },
+      {
+        "label": "Last name",
+        "value": "Kumar Gupta"
+      },
+      {
+        "label": "Full name",
+        "value": "Jay Kumar Gupta"
+      },
+      {
+        "label": "Email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "Confirm your email",
+        "value": "jaynrk200211@gmail.com"
+      },
+      {
+        "label": "City",
+        "value": "Aurangabad"
+      },
+      {
+        "label": "Location",
+        "value": "Aurangabad, Bihar, India"
+      },
+      {
+        "label": "Location (City)",
+        "value": "Aurangabad, Bihar, India"
+      },
+      {
+        "label": "Country",
+        "value": "India"
+      },
+      {
+        "label": "Phone number",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Phone",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Mobile",
+        "value": "+91-7320967983"
+      },
+      {
+        "label": "Degree",
+        "value": "B.Tech in Computer Science"
+      },
+      {
+        "label": "Graduation year",
+        "value": "2022"
+      },
+      {
+        "label": "Preferred location",
+        "value": "Aurangabad, Bihar, India"
+      },
+      {
+        "label": "Target role",
+        "value": "Software Engineer"
+      },
+      {
+        "label": "LinkedIn",
+        "value": "https://linkedin.com/in/jay-kumar-gupta-b53368250/"
+      },
+      {
+        "label": "Website",
+        "value": "https://github.com/JAYKUMARGUPTA73"
+      },
+      {
+        "label": "Work authorization",
+        "value": "Yes"
+      },
+      {
+        "label": "Legally authorized to work",
+        "value": "Yes"
+      },
+      {
+        "label": "Visa sponsorship required",
+        "value": "No"
+      },
+      {
+        "label": "Visa required",
+        "value": "No"
+      },
+      {
+        "label": "Current CTC",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Current salary",
+        "value": "0 LPA"
+      },
+      {
+        "label": "Expected salary",
+        "value": "30 LPA"
+      },
+      {
+        "label": "Expected CTC",
+        "value": "30 LPA"
+      },
+      {
+        "label": "Message to the Hiring Team",
+        "value": "I am excited to apply for the JobDetail role at Careers. My background in JavaScript, React, Next.js and my focus on becoming a strong Software Engineer make this opportunity especially compelling to me. I would be glad to contribute to Careers's team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in onsite engineering environments. With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with Aurangabad, Bihar, India opportunities."
+      },
+      {
+        "label": "Primary skills",
+        "value": "JavaScript, React, Next.js, Node.js, Express"
+      },
+      {
+        "label": "Resume context",
+        "value": "jay_kumar_gupta_nit_kkr.pdf"
+      },
+      {
+        "label": "Why are you interested in this role?",
+        "value": "This role aligns with my goal of becoming a strong Software Engineer and uses skills I have practiced through projects and coursework."
+      },
+      {
+        "label": "What makes you a match?",
+        "value": "My background in JavaScript, React, Next.js, Node.js closely matches the expectations in this job description."
+      }
+    ],
+    "submission": {
+      "intent": "browser_fill",
+      "outcome": "confirmed",
+      "externalSubmitted": false,
+      "confirmation": "GradLaunch reached the stage limit for this application and paused for review.",
+      "submittedAt": "2026-05-23T05:41:00.059Z",
+      "email": {
+        "status": "skipped",
+        "provider": "outbox",
+        "to": "jaynrk200211@gmail.com",
+        "subject": "GradLaunch filled Careers - JobDetail",
+        "sentAt": "2026-05-23T05:41:00.059Z",
+        "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
+      },
+      "browser": {
+        "status": "needs_manual_review",
+        "sourceUrl": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
+        "openedAt": "2026-05-23T05:38:56.591Z",
+        "completedAt": "2026-05-23T05:41:00.059Z",
+        "filledLabels": [],
+        "skippedLabels": [
+          "First name",
+          "Last name",
+          "Full name",
+          "Email",
+          "Confirm your email",
+          "City",
+          "Location",
+          "Location (City)",
+          "Country",
+          "Phone number",
+          "Phone",
+          "Mobile",
+          "Degree",
+          "Graduation year",
+          "Preferred location",
+          "Target role",
+          "LinkedIn",
+          "Website",
+          "Work authorization",
+          "Legally authorized to work",
+          "Visa sponsorship required",
+          "Visa required",
+          "Current CTC",
+          "Current salary",
+          "Expected salary",
+          "Expected CTC",
+          "Message to the Hiring Team",
+          "Primary skills",
+          "Resume context",
+          "Why are you interested in this role?",
+          "What makes you a match?"
+        ],
+        "screenshots": [
+          "browser-opened.png",
+          "browser-stage-1-start.png",
+          "browser-stage-2-start.png",
+          "browser-stage-3-start.png",
+          "browser-stage-4-start.png",
+          "browser-stage-5-start.png",
+          "browser-stage-6-start.png",
+          "browser-stage-7-start.png",
+          "browser-stage-8-start.png"
+        ],
+        "message": "GradLaunch reached the stage limit for this application and paused for review.",
+        "planner": {
+          "sessionId": "planner-job_url_aHR0cHM6Ly9jYXJlZXJzLmli",
+          "resumeToken": "job_url_aHR0cHM6Ly9jYXJlZXJzLmli:2026-05-23T05:38:56.591Z",
+          "goal": "Complete the JobDetail application at Careers autonomously until a protected or review checkpoint.",
+          "status": "needs_review",
+          "summary": "GradLaunch reached the maximum supported stage count and paused for review.",
+          "formMode": "multi_stage",
+          "retryCount": 0,
+          "handoffCount": 0,
+          "validationErrors": [],
+          "subgoals": [
+            {
+              "id": "open_job_page",
+              "label": "Open job page",
+              "status": "completed",
+              "detail": "Job page opened successfully in a visible Chrome session.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-23T05:38:59.633Z",
+              "completedAt": "2026-05-23T05:38:59.633Z"
+            },
+            {
+              "id": "authenticate_if_needed",
+              "label": "Handle login if needed",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-23T05:38:56.591Z"
+            },
+            {
+              "id": "finish_current_section",
+              "label": "Finish active section",
+              "status": "completed",
+              "detail": "Completed Section 8 and advanced to the next stage.",
+              "attempts": 8,
+              "lastUpdatedAt": "2026-05-23T05:40:59.952Z",
+              "completedAt": "2026-05-23T05:40:59.952Z"
+            },
+            {
+              "id": "recover_from_validation_errors",
+              "label": "Recover from validation errors",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-23T05:38:56.591Z"
+            },
+            {
+              "id": "retry_alternative_path",
+              "label": "Retry alternative path",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-23T05:38:56.591Z"
+            },
+            {
+              "id": "reach_submit_gate",
+              "label": "Reach submit/review gate",
+              "status": "pending",
+              "detail": "Waiting to start.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-23T05:38:56.591Z"
+            },
+            {
+              "id": "save_checkpoint",
+              "label": "Save checkpoint",
+              "status": "completed",
+              "detail": "Saved checkpoint after Section 8.",
+              "attempts": 0,
+              "lastUpdatedAt": "2026-05-23T05:40:59.952Z",
+              "completedAt": "2026-05-23T05:40:59.952Z"
+            }
+          ],
+          "stageHistory": [
+            {
+              "stageIndex": 0,
+              "label": "Section 1",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "visibleFieldLabels": [],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-23T05:39:09.442Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 0,
+                "stageLabel": "Section 1",
+                "url": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
+                "reason": "Page classified as start; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-23T05:39:05.471Z"
+              }
+            },
+            {
+              "stageIndex": 1,
+              "label": "Section 2",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "visibleFieldLabels": [
+                "IBMid",
+                "Remember me"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-23T05:39:19.008Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 1,
+                "stageLabel": "Section 2",
+                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Page classified as questionnaire; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-23T05:39:16.023Z"
+              }
+            },
+            {
+              "stageIndex": 2,
+              "label": "Section 3",
+              "url": "https://www.ibm.com/account/reg/us-en/signup?formid=urx-53364&target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "visibleFieldLabels": [
+                "Password"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-23T05:39:47.504Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 2,
+                "stageLabel": "Section 3",
+                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Page classified as login; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-23T05:39:22.948Z"
+              }
+            },
+            {
+              "stageIndex": 3,
+              "label": "Section 4",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "visibleFieldLabels": [
+                "Email",
+                "Password",
+                "First name",
+                "Last name",
+                "Country or region of residence"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-23T05:40:20.600Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 3,
+                "stageLabel": "Section 4",
+                "url": "https://www.ibm.com/account/reg/us-en/signup?formid=urx-53364&target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Page classified as login; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-23T05:39:52.874Z"
+              }
+            },
+            {
+              "stageIndex": 4,
+              "label": "Section 5",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "visibleFieldLabels": [
+                "IBMid",
+                "Remember me"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-23T05:40:29.375Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 4,
+                "stageLabel": "Section 5",
+                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Page classified as questionnaire; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-23T05:40:26.390Z"
+              }
+            },
+            {
+              "stageIndex": 5,
+              "label": "Section 6",
+              "url": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
+              "visibleFieldLabels": [
+                "Password"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-23T05:40:39.286Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 5,
+                "stageLabel": "Section 6",
+                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Page classified as login; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-23T05:40:33.347Z"
+              }
+            },
+            {
+              "stageIndex": 6,
+              "label": "Section 7",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5747eab9-afb8-4443-9aab-341d747053bf%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "visibleFieldLabels": [],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-23T05:40:47.433Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 6,
+                "stageLabel": "Section 7",
+                "url": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
+                "reason": "Page classified as start; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-23T05:40:44.147Z"
+              }
+            },
+            {
+              "stageIndex": 7,
+              "label": "Section 8",
+              "url": "https://accounts.google.com/v3/signin/identifier?opparams=%253F&dsh=S1459850658%3A1779514858074449&client_id=1098965259977-8560kv8ot2ghegiqtubpfqbvnc6vgkl8.apps.googleusercontent.com&nonce=aZktibiSh1GXo21SEIVhI-xr2Txv7X2I1BHVTC5idaE&o2v=2&redirect_uri=https%3A%2F%2Flogin.ibm.com%2Fauth%2Fredirect&response_type=code&scope=openid+email+profile&service=lso&state=f7pGcfk2WBi3uZTSDrj9pEPdSopkVkuZOVD-FnDq4Vc&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAOy2JvurUD67DLdux1iILG8d2v9HyWDJiP_SqCsMik0moF4PpIOypwmcPUrl2SIXJLj3xyBVmKfnF5GX_u3rWxFe9vFSEhpuxgxkh6KKVEW5Vmk2NeFCPc02dLBjiqxXsBMjhbm3B3MslTvpBYbnGHXMNOAmxlhikANjN7xq7SBaH2riUFzRrU5VYi1dRwv839gy5ITcPYdZTXy6LJEiwzKBcFGc1KaGhT24iCobLNCuAiaD1I-qnyho2Vb23ydduNuUuIUbMWwdX4YZzY-6i_Nx-DkJY8yBJn-Ardc5FXGObG0MCdNpm4V-8drknPBzxygnFv0LHwZbYgGoazjZqruuFcjFgawXu0WoRIkFun3mrSzzDiupvlTX4qUke3LwTVwWDobXgvsYtoOUsdZOCAvduiQ5Z_gaj7hnsLBuErrvgaX3HFAllLUmDNx_moj0lwEa7gZHo7W2o7iZmWjoYR7nekwMA%26flowName%3DGeneralOAuthFlow%26as%3DS1459850658%253A1779514858074449%26client_id%3D1098965259977-8560kv8ot2ghegiqtubpfqbvnc6vgkl8.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Flogin.ibm.com&rart=ANgoxcfpwR-hjU9ZoJEVpm4-ugVh9ui2f-O5_RIkST5zuy2shhKUF0z2DWwnib8_VK1_FgBVX6oEyEwpH82xa4ySn5kFyjzso48D4BUpNp0oFwd6cvpQX18",
+              "visibleFieldLabels": [
+                "IBMid",
+                "Remember me"
+              ],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "advanced",
+              "lastUpdatedAt": "2026-05-23T05:40:59.952Z",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 7,
+                "stageLabel": "Section 8",
+                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5747eab9-afb8-4443-9aab-341d747053bf%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Page classified as questionnaire; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-23T05:40:50.309Z"
+              }
+            }
+          ],
+          "lastUpdatedAt": "2026-05-23T05:40:59.952Z",
+          "currentUrl": "https://accounts.google.com/v3/signin/identifier?opparams=%253F&dsh=S1459850658%3A1779514858074449&client_id=1098965259977-8560kv8ot2ghegiqtubpfqbvnc6vgkl8.apps.googleusercontent.com&nonce=aZktibiSh1GXo21SEIVhI-xr2Txv7X2I1BHVTC5idaE&o2v=2&redirect_uri=https%3A%2F%2Flogin.ibm.com%2Fauth%2Fredirect&response_type=code&scope=openid+email+profile&service=lso&state=f7pGcfk2WBi3uZTSDrj9pEPdSopkVkuZOVD-FnDq4Vc&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAOy2JvurUD67DLdux1iILG8d2v9HyWDJiP_SqCsMik0moF4PpIOypwmcPUrl2SIXJLj3xyBVmKfnF5GX_u3rWxFe9vFSEhpuxgxkh6KKVEW5Vmk2NeFCPc02dLBjiqxXsBMjhbm3B3MslTvpBYbnGHXMNOAmxlhikANjN7xq7SBaH2riUFzRrU5VYi1dRwv839gy5ITcPYdZTXy6LJEiwzKBcFGc1KaGhT24iCobLNCuAiaD1I-qnyho2Vb23ydduNuUuIUbMWwdX4YZzY-6i_Nx-DkJY8yBJn-Ardc5FXGObG0MCdNpm4V-8drknPBzxygnFv0LHwZbYgGoazjZqruuFcjFgawXu0WoRIkFun3mrSzzDiupvlTX4qUke3LwTVwWDobXgvsYtoOUsdZOCAvduiQ5Z_gaj7hnsLBuErrvgaX3HFAllLUmDNx_moj0lwEa7gZHo7W2o7iZmWjoYR7nekwMA%26flowName%3DGeneralOAuthFlow%26as%3DS1459850658%253A1779514858074449%26client_id%3D1098965259977-8560kv8ot2ghegiqtubpfqbvnc6vgkl8.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Flogin.ibm.com&rart=ANgoxcfpwR-hjU9ZoJEVpm4-ugVh9ui2f-O5_RIkST5zuy2shhKUF0z2DWwnib8_VK1_FgBVX6oEyEwpH82xa4ySn5kFyjzso48D4BUpNp0oFwd6cvpQX18",
+          "currentStep": "stage_9",
+          "currentStageLabel": "Section 9",
+          "lastDecision": {
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 7,
+            "stageLabel": "Section 8",
+            "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5747eab9-afb8-4443-9aab-341d747053bf%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+            "reason": "Page classified as questionnaire; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-23T05:40:50.309Z"
+          }
+        }
+      }
+    },
+    "notes": [
+      "GradLaunch reached the stage limit for this application and paused for review.",
+      "Browser fill status: needs_manual_review.",
+      "Filled fields: 0. Skipped fields: 31."
+    ]
+  },
+  "createdAt": "2026-05-23T05:38:56.589Z",
+  "updatedAt": "2026-05-23T05:41:00.059Z"
+}

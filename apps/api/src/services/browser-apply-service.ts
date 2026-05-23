@@ -473,7 +473,17 @@ async function fillChoiceField(page: Page, field: BrowserFillField) {
           return false;
         }
 
-        bestControl.click();
+        if (bestControl.type === "checkbox" && /^(no|false|none|not applicable|do not|dont|don t|decline)$/.test(normalizedValue)) {
+          if (bestControl.checked) {
+            bestControl.click();
+          }
+          return true;
+        }
+
+        if (!bestControl.checked) {
+          bestControl.click();
+        }
+
         bestControl.dispatchEvent(new Event("input", { bubbles: true }));
         bestControl.dispatchEvent(new Event("change", { bubbles: true }));
         return true;
@@ -2950,10 +2960,14 @@ async function autoResolveConsentControls(page: Page) {
           control.getAttribute("aria-label"),
           control.getAttribute("name"),
           control.id,
-          control.closest("label, fieldset, [role='group'], .mat-mdc-form-field, .mat-form-field, form")?.textContent
+          control.closest("label, fieldset, [role='group'], .mat-mdc-form-field, .mat-form-field")?.textContent
         ].filter(Boolean).join(" "));
 
         if (!/\b(terms|privacy|consent|agree|acknowledge|accept|declaration|storage and handling|i agree)\b/.test(descriptor)) {
+          continue;
+        }
+
+        if (/\b(country|countries|location|locations|remote|relocat|work permit|sponsor|sponsorship|whatsapp|sms|text messages)\b/.test(descriptor)) {
           continue;
         }
 
@@ -5891,7 +5905,7 @@ async function attachResumeToExistingInputs(page: Page, resumePath: string) {
 }
 
 async function attachResumeViaFileChooser(page: Page, resumePath: string) {
-  const uploadLabels = ["Autofill with Resume", "Upload", "Upload resume", "Select your resume", "Choose file", "Attach resume"];
+  const uploadLabels = ["Autofill with Resume", "Upload", "Upload resume", "Select your resume", "Choose file", "Attach resume", "Attach"];
 
   for (const label of uploadLabels) {
     const locators = [
@@ -5917,21 +5931,92 @@ async function attachResumeViaFileChooser(page: Page, resumePath: string) {
 }
 
 async function clickUploadCandidate(page: Page, candidate: Locator, resumePath: string) {
+  const marker = `gl-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   try {
     await candidate.scrollIntoViewIfNeeded({ timeout: 800 });
-    const chooserPromise = page.waitForEvent("filechooser", { timeout: Number(process.env.BROWSER_FILE_CHOOSER_TIMEOUT_MS ?? 3500) }).catch(() => undefined);
-    await candidate.click({ timeout: 1200 });
-    const chooser = await chooserPromise;
+    const foundAssociatedInput = await candidate.evaluate((element, targetMarker) => {
+      const candidates = new Set<HTMLInputElement>();
 
-    if (chooser) {
-      await chooser.setFiles(resumePath);
+      const addIfFileInput = (candidate: Element | null | undefined) => {
+        if (candidate instanceof HTMLInputElement && candidate.type === "file" && !candidate.disabled) {
+          candidates.add(candidate);
+        }
+      };
+
+      addIfFileInput(element.querySelector("input[type='file']"));
+      addIfFileInput(element.closest("label")?.querySelector("input[type='file']"));
+      addIfFileInput(element.closest("form, section, article, fieldset, [role='group'], div")?.querySelector("input[type='file']"));
+
+      if (element instanceof HTMLLabelElement && element.htmlFor) {
+        addIfFileInput(document.getElementById(element.htmlFor));
+      }
+
+      if (element instanceof HTMLElement) {
+        let ancestor: Element | null = element;
+
+        for (let depth = 0; depth < 6 && ancestor; depth += 1) {
+          addIfFileInput(ancestor.querySelector("input[type='file']"));
+          addIfFileInput(ancestor.previousElementSibling?.querySelector("input[type='file']"));
+          addIfFileInput(ancestor.nextElementSibling?.querySelector("input[type='file']"));
+          ancestor = ancestor.parentElement;
+        }
+      }
+
+      const target = [...candidates].sort((first, second) => score(second) - score(first))[0];
+
+      if (!target) {
+        return false;
+      }
+
+      target.setAttribute("data-gradlaunch-upload-target", targetMarker);
       return true;
+
+      function score(input: HTMLInputElement) {
+        const descriptor = [
+          input.accept,
+          input.name,
+          input.id,
+          input.getAttribute("aria-label"),
+          input.getAttribute("data-testid"),
+          input.closest("label, section, article, fieldset, [role='group'], div")?.textContent
+        ].filter(Boolean).join(" ").toLowerCase();
+
+        let total = 0;
+
+        if (/resume|cv|curriculum vitae/.test(descriptor)) {
+          total += 80;
+        }
+
+        if (/pdf|doc|docx/.test(input.accept)) {
+          total += 12;
+        }
+
+        if (/cover letter/.test(descriptor)) {
+          total -= 60;
+        }
+
+        return total;
+      }
+    }, marker).catch(() => false);
+
+    if (foundAssociatedInput) {
+      const input = page.locator(`[data-gradlaunch-upload-target="${marker}"]`).first();
+      await input.setInputFiles(resumePath, { timeout: 2500 });
+      return await input.evaluate((control) => {
+        return control instanceof HTMLInputElement && (control.files?.length ?? 0) > 0;
+      }).catch(() => false);
     }
 
-    await page.waitForTimeout(500);
     return attachResumeToExistingInputs(page, resumePath);
   } catch (_error) {
     return false;
+  } finally {
+    await page.locator(`[data-gradlaunch-upload-target="${marker}"]`).first().evaluate((control) => {
+      if (control instanceof HTMLElement) {
+        control.removeAttribute("data-gradlaunch-upload-target");
+      }
+    }).catch(() => undefined);
   }
 }
 

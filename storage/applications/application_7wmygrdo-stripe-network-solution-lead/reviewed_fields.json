@@ -64,6 +64,14 @@
     "value": "Software Engineer"
   },
   {
+    "label": "LinkedIn",
+    "value": "https://linkedin.com/in/jay-kumar-gupta-b53368250/"
+  },
+  {
+    "label": "Website",
+    "value": "https://github.com/JAYKUMARGUPTA73"
+  },
+  {
     "label": "Work authorization",
     "value": "Yes"
   },
@@ -86,6 +94,14 @@
   {
     "label": "Current salary",
     "value": "0 LPA"
+  },
+  {
+    "label": "Expected salary",
+    "value": "30 LPA"
+  },
+  {
+    "label": "Expected CTC",
+    "value": "30 LPA"
   },
   {
     "label": "Message to the Hiring Team",
