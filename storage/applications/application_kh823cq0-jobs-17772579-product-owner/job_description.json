@@ -1,0 +1,26 @@
+{
+  "id": "job_jjavgj30",
+  "title": "17772579 Product Owner",
+  "company": "Jobs",
+  "location": "banglore",
+  "workMode": "remote",
+  "minExperience": 0,
+  "maxExperience": 2,
+  "degreeRequirements": [
+    "B.Tech",
+    "B.E.",
+    "BCA"
+  ],
+  "skills": [
+    "JavaScript",
+    "React",
+    "Next.js",
+    "Node.js",
+    "Express",
+    "MongoDB"
+  ],
+  "description": "Saved from the exact URL provided by the student. GradLaunch will open this URL directly in Chrome for guided filling.",
+  "sourceType": "manual_url",
+  "sourceUrl": "https://jobs.natwestgroup.com/jobs/17772579-product-owner",
+  "createdAt": "Sat May 23 2026 14:45:22 GMT+0530 (India Standard Time)"
+}

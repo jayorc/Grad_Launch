@@ -62,7 +62,7 @@ gradlaunch/
 
     browser/                       # Browser workspace if no app workspace passed
     browser-profile/               # Managed GradLaunch Chrome profile
-    logged-browser-profile/        # Optional logged Chrome profile
+    logged-browser-profile/        # GradLaunch-controlled persistent login profile
 ```
 
 ## High-Level Dry Run
@@ -162,7 +162,9 @@ Checkbox/radio behavior is centralized in `fill.ts`. Country choice groups have 
 
 Resume upload is handled by `attachResume()` in `fill.ts`. It first checks if a file is already attached, then scores file inputs by labels like resume/CV/upload/pdf and avoids cover-letter/photo fields.
 
-Login panels are treated as protected checkpoints. The engine first tries to continue with an existing logged browser profile; if that does not clear the gate, it pauses and asks the user to complete login manually in the open browser.
+Login panels are treated as protected checkpoints before filling starts. GradLaunch opens the job URL in a controlled persistent Chrome profile, then fully pauses if a login/account gate is visible. The user completes Google/email/MFA in that same controlled Chrome window and GradLaunch resumes only after the user clicks `I am logged in, continue`. GradLaunch does not clone cookies or attach to an uncontrolled browser by default.
+
+GradLaunch cannot reuse the app website's own Google sign-in session for external job portals because those OAuth cookies are scoped to Google/the portal domains, not the GradLaunch domain. The safe reusable path is the controlled logged Chrome profile, which preserves Google cookies for third-party `Sign in with Google` flows.
 
 ## Runtime Artifacts To Check
 

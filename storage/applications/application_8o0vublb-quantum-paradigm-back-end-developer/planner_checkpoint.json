@@ -1,0 +1,138 @@
+{
+  "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
+  "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-23T10:37:01.593Z",
+  "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or review checkpoint.",
+  "status": "completed",
+  "summary": "Planner completed the form fill and paused at the review gate.",
+  "formMode": "single_stage",
+  "currentStep": "stage_1",
+  "currentStageLabel": "Section 1",
+  "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+  "retryCount": 0,
+  "handoffCount": 0,
+  "validationErrors": [],
+  "subgoals": [
+    {
+      "id": "open_job_page",
+      "label": "Open job page",
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-23T18:35:57.679Z",
+      "completedAt": "2026-05-23T18:35:57.679Z"
+    },
+    {
+      "id": "authenticate_if_needed",
+      "label": "Handle login if needed",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T10:37:01.593Z"
+    },
+    {
+      "id": "finish_current_section",
+      "label": "Finish active section",
+      "status": "running",
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-23T18:35:58.299Z"
+    },
+    {
+      "id": "recover_from_validation_errors",
+      "label": "Recover from validation errors",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T10:37:01.593Z"
+    },
+    {
+      "id": "retry_alternative_path",
+      "label": "Retry alternative path",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T10:37:01.593Z"
+    },
+    {
+      "id": "reach_submit_gate",
+      "label": "Reach submit/review gate",
+      "status": "completed",
+      "detail": "Reached the review/submit checkpoint safely.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T18:36:26.342Z",
+      "completedAt": "2026-05-23T18:36:26.342Z"
+    },
+    {
+      "id": "save_checkpoint",
+      "label": "Save checkpoint",
+      "status": "completed",
+      "detail": "Saved checkpoint while waiting for manual stage progress.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T18:36:26.675Z",
+      "completedAt": "2026-05-23T18:36:26.675Z"
+    }
+  ],
+  "lastDecision": {
+    "kind": "fill_fields",
+    "source": "llm",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+    "reason": "Dedicated and detail-oriented software engineer with a strong background in C/C++, Python, Java, and JavaScript. Proficient in backend development, machine learning, and data analysis. Seeking a challenging role at Quantum Paradigm to apply my skills and experience in building reliable backend systems.",
+    "fieldLabels": [
+      "Full Name",
+      "Email",
+      "Phone",
+      "Cover Letter"
+    ],
+    "createdAt": "2026-05-23T18:36:26.319Z"
+  },
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+      "visibleFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "requiredFieldLabels": [
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter",
+        "Upload CV/Resume",
+        "By using this form you agree with the storage and handling of your data by this website."
+      ],
+      "filledFieldLabels": [
+        "Resume upload",
+        "Full Name",
+        "Email",
+        "Phone",
+        "Cover Letter"
+      ],
+      "outcome": "review",
+      "decision": {
+        "kind": "fill_fields",
+        "source": "llm",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+        "reason": "Dedicated and detail-oriented software engineer with a strong background in C/C++, Python, Java, and JavaScript. Proficient in backend development, machine learning, and data analysis. Seeking a challenging role at Quantum Paradigm to apply my skills and experience in building reliable backend systems.",
+        "fieldLabels": [
+          "Full Name",
+          "Email",
+          "Phone",
+          "Cover Letter"
+        ],
+        "createdAt": "2026-05-23T18:36:26.319Z"
+      },
+      "lastUpdatedAt": "2026-05-23T18:36:26.342Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-23T18:36:26.675Z"
+}

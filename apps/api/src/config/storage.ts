@@ -44,6 +44,14 @@ export function getLoggedBrowserProfileDir() {
     return undefined;
   }
 
+  if (process.env.BROWSER_USE_SYSTEM_CHROME_PROFILE !== "true") {
+    return resolve(projectRoot, "storage", "logged-browser-profile");
+  }
+
+  return getSystemChromeUserDataDir();
+}
+
+function getSystemChromeUserDataDir() {
   if (process.platform === "darwin") {
     return resolve(homedir(), "Library", "Application Support", "Google", "Chrome");
   }

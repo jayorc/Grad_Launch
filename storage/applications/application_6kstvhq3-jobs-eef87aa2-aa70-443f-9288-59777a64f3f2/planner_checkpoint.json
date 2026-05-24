@@ -1,0 +1,159 @@
+{
+  "sessionId": "planner-job_u13nx3ht",
+  "resumeToken": "job_u13nx3ht:2026-05-23T10:42:16.648Z",
+  "goal": "Complete the Eef87aa2 Aa70 443f 9288 59777a64f3f2 application at Jobs autonomously until a protected or review checkpoint.",
+  "status": "needs_review",
+  "summary": "GradLaunch stopped because you clicked Quit in the live bot.",
+  "formMode": "multi_stage",
+  "currentStep": "stage_1",
+  "currentStageLabel": "Section 1",
+  "currentUrl": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+  "retryCount": 0,
+  "handoffCount": 14,
+  "validationErrors": [
+    "City",
+    "Resume upload",
+    "First name",
+    "Last name",
+    "Email",
+    "Confirm your email",
+    "Phone number"
+  ],
+  "subgoals": [
+    {
+      "id": "open_job_page",
+      "label": "Open job page",
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 14,
+      "lastUpdatedAt": "2026-05-23T18:40:36.431Z",
+      "completedAt": "2026-05-23T18:40:36.431Z"
+    },
+    {
+      "id": "authenticate_if_needed",
+      "label": "Handle login if needed",
+      "status": "running",
+      "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+      "attempts": 24,
+      "lastUpdatedAt": "2026-05-23T11:52:04.792Z"
+    },
+    {
+      "id": "finish_current_section",
+      "label": "Finish active section",
+      "status": "running",
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 22,
+      "lastUpdatedAt": "2026-05-23T18:40:37.323Z"
+    },
+    {
+      "id": "recover_from_validation_errors",
+      "label": "Recover from validation errors",
+      "status": "blocked",
+      "detail": "Validation or required-answer blockers were found: City.",
+      "attempts": 14,
+      "lastUpdatedAt": "2026-05-23T11:51:50.951Z"
+    },
+    {
+      "id": "retry_alternative_path",
+      "label": "Retry alternative path",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T10:42:16.648Z"
+    },
+    {
+      "id": "reach_submit_gate",
+      "label": "Reach submit/review gate",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T10:42:16.648Z"
+    },
+    {
+      "id": "save_checkpoint",
+      "label": "Save checkpoint",
+      "status": "completed",
+      "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T18:41:17.053Z",
+      "completedAt": "2026-05-23T18:41:17.053Z"
+    }
+  ],
+  "lastDecision": {
+    "kind": "upload_resume",
+    "source": "heuristic",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+    "reason": "Resume upload field detected on this screen.",
+    "fieldLabels": [
+      "Resume upload"
+    ],
+    "createdAt": "2026-05-23T18:40:37.763Z"
+  },
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+      "visibleFieldLabels": [
+        "Choose a file or drop it here",
+        "First name",
+        "Last name",
+        "Email",
+        "Confirm your email",
+        "LinkedIn",
+        "Facebook",
+        "X (fka Twitter)",
+        "Website",
+        "Let the company know about your interest working there",
+        "City",
+        "Phone number"
+      ],
+      "requiredFieldLabels": [
+        "First name",
+        "Last name",
+        "Email",
+        "Confirm your email",
+        "City",
+        "Phone number"
+      ],
+      "filledFieldLabels": [],
+      "outcome": "advanced",
+      "decision": {
+        "kind": "upload_resume",
+        "source": "heuristic",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://jobs.smartrecruiters.com/oneclick-ui/company/T-SystemsICTIndiaPvtLtd1/publication/eef87aa2-aa70-443f-9288-59777a64f3f2?dcr_ci=T-SystemsICTIndiaPvtLtd1&jobPipeline=LinkedIn",
+        "reason": "Resume upload field detected on this screen.",
+        "fieldLabels": [
+          "Resume upload"
+        ],
+        "createdAt": "2026-05-23T18:40:37.763Z"
+      },
+      "lastUpdatedAt": "2026-05-23T18:40:37.763Z"
+    },
+    {
+      "stageIndex": 1,
+      "label": "Section 2",
+      "url": "about:blank",
+      "visibleFieldLabels": [],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [],
+      "outcome": "handoff",
+      "decision": {
+        "kind": "navigate_next",
+        "source": "heuristic",
+        "stageIndex": 1,
+        "stageLabel": "Section 2",
+        "url": "about:blank",
+        "reason": "Page classified as empty; continuing to the next logical stage.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-23T12:10:46.620Z"
+      },
+      "lastUpdatedAt": "2026-05-23T12:10:46.620Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-23T18:41:17.053Z"
+}

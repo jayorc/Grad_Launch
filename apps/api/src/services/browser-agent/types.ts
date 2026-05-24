@@ -57,11 +57,16 @@ export type BrowserPageState =
   | "start"
   | "resume_upload"
   | "login"
+  | "captcha"
+  | "loading"
+  | "validation_error"
+  | "form_fill"
   | "questionnaire"
   | "consent"
   | "review"
   | "submit"
   | "account_gate"
+  | "blocked"
   | "empty"
   | "unknown";
 
@@ -116,6 +121,8 @@ export type BrowserAgentAction =
   | { kind: "ask_user"; fields: string[]; reason: string; source: PlannerDecisionSource }
   | { kind: "stop"; reason: string; source: PlannerDecisionSource };
 
+export type AutonomousActionKind = BrowserAgentAction["kind"] | "wait" | "explore";
+
 export type BrowserFillField = FilledField & {
   fieldId?: string;
   inputType?: string;
@@ -132,10 +139,55 @@ export type StageAnswerPlan = {
 };
 
 export type StageExecutionPlan = {
-  action: BrowserAgentAction["kind"];
+  action: AutonomousActionKind;
   confidence: number;
   reason: string;
   checklist: string[];
+  classification?: PageClassification;
+  rankedActions?: ActionScore[];
+};
+
+export type PageClassification = {
+  state: BrowserPageState;
+  confidence: number;
+  blocking: boolean;
+  reasons: string[];
+};
+
+export type ActionScore = {
+  action: AutonomousActionKind;
+  score: number;
+  reasons: string[];
+};
+
+export type RecoveryErrorKind =
+  | "missing_required"
+  | "format_error"
+  | "network_delay"
+  | "blocked_by_modal"
+  | "captcha"
+  | "login_gate"
+  | "duplicate_submission"
+  | "unknown_validation"
+  | "dynamic_field_not_loaded"
+  | "navigation_failed"
+  | "resume_upload_missing"
+  | "none";
+
+export type RecoveryPlan = {
+  kind: RecoveryErrorKind;
+  confidence: number;
+  reason: string;
+  actions: Array<
+    | "wait"
+    | "re-scan-fields"
+    | "retry-fill"
+    | "retry-upload"
+    | "resolve-known-choice"
+    | "inspect-validation"
+    | "explore-page"
+    | "ask-user"
+  >;
 };
 
 export type StageEvaluation = {

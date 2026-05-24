@@ -10,7 +10,7 @@ import type {
   ProtectedCheckpointDetection,
   VisibleField
 } from "./types";
-import { dedupeLabels, normalizeKey, safeHostname } from "./util";
+import { dedupeLabels, isTransientStatusMessage, normalizeKey, safeHostname } from "./util";
 
 export async function getActivePage(context: BrowserContext, fallbackPage: Page) {
   await fallbackPage.waitForTimeout(400).catch(() => undefined);
@@ -47,11 +47,47 @@ export async function clickSoftGate(page: Page) {
   const labels = ["Accept", "Accept all", "Continue", "I agree"];
 
   for (const label of labels) {
-    try {
-      await page.getByRole("button", { name: label, exact: false }).first().click({ timeout: 800 });
+    const clicked = await page.evaluate((label) => {
+      const wanted = normalize(label);
+      const controls = Array.from(document.querySelectorAll("button, [role='button'], input[type='button'], input[type='submit'], a")) as HTMLElement[];
+
+      for (const control of controls) {
+        if (control.closest("#gradlaunch-live-bot") || !isVisible(control) || isDisabled(control)) {
+          continue;
+        }
+
+        const text = normalize([
+          control.textContent,
+          control.getAttribute("aria-label"),
+          control instanceof HTMLInputElement ? control.value : ""
+        ].filter(Boolean).join(" "));
+
+        if (text.includes(wanted)) {
+          control.click();
+          return true;
+        }
+      }
+
+      return false;
+
+      function isVisible(element: HTMLElement) {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      }
+
+      function isDisabled(element: HTMLElement) {
+        return (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) && element.disabled
+          || element.getAttribute("aria-disabled") === "true";
+      }
+
+      function normalize(value: string) {
+        return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      }
+    }, label).catch(() => false);
+
+    if (clicked) {
       return;
-    } catch (_error) {
-      // Soft gates vary across sites.
     }
   }
 }
@@ -64,21 +100,54 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
       const searchRoots = getSearchRoots();
       const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
       const items: VisibleField[] = [];
+      const seenRadioGroups = new Set<string>();
 
       for (const [index, control] of controls.entries()) {
         if (control instanceof HTMLInputElement && ["hidden", "submit", "button", "image", "reset"].includes(control.type)) {
           continue;
         }
 
+        const isChoiceControl = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type);
         const rect = control.getBoundingClientRect();
 
-        if (rect.width <= 0 || rect.height <= 0 || ("disabled" in control && control.disabled)) {
+        if ("disabled" in control && control.disabled) {
+          continue;
+        }
+
+        if ((rect.width <= 0 || rect.height <= 0) && !(isChoiceControl && hasVisibleChoiceTarget(control))) {
           continue;
         }
 
         const label = findFieldLabel(control);
 
         if (!label.trim() || isNoiseField(control, label)) {
+          continue;
+        }
+
+        if (control instanceof HTMLInputElement && control.type === "radio") {
+          const radioGroup = findRadioGroup(control);
+          const groupLabel = findChoiceGroupLabel(control, radioGroup) || label;
+          const groupKey = radioGroupKey(control, groupLabel, index);
+
+          if (seenRadioGroups.has(groupKey)) {
+            continue;
+          }
+
+          seenRadioGroups.add(groupKey);
+
+          const idControl = radioGroup.find((item) => isVisibleControl(item)) ?? control;
+          const id = idControl.getAttribute("data-gradlaunch-field-id") || `gl-field-${index}-${normalize(groupLabel)}`;
+          idControl.setAttribute("data-gradlaunch-field-id", id);
+
+          items.push({
+            id,
+            label: clean(groupLabel),
+            required: radioGroup.some((item) => isRequired(item, groupLabel || findFieldLabel(item))),
+            tagName: control.tagName.toLowerCase(),
+            inputType: "radio",
+            options: dedupeText(radioGroup.map((item) => clean(findFieldLabel(item) || item.value)).filter(Boolean)).slice(0, 15),
+            context: clean(findChoiceGroupContext(control, groupLabel))
+          });
           continue;
         }
 
@@ -97,6 +166,8 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
               : "textarea",
           options: control instanceof HTMLSelectElement
             ? Array.from(control.options).map((option) => clean(option.textContent ?? option.value)).filter(Boolean).slice(0, 15)
+            : control instanceof HTMLInputElement && control.type === "checkbox"
+              ? [clean(label)].filter(Boolean)
             : [],
           context: clean([
             control.closest("fieldset")?.querySelector("legend")?.textContent,
@@ -124,11 +195,206 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
         return control.type || "text";
       }
 
+      function findRadioGroup(control: HTMLInputElement) {
+        const root = control.getRootNode();
+
+        if (control.name) {
+          const selector = `input[type='radio'][name="${CSS.escape(control.name)}"]`;
+          const namedControls = root instanceof Document || root instanceof ShadowRoot || root instanceof Element
+            ? Array.from(root.querySelectorAll(selector)) as HTMLInputElement[]
+            : [];
+
+          if (namedControls.length > 1) {
+            return namedControls.filter((item) => isVisibleControl(item) && !item.disabled);
+          }
+        }
+
+        const ancestorGroup = findChoiceControlsInBestAncestor(control, "radio");
+
+        if (ancestorGroup.length > 1) {
+          return ancestorGroup;
+        }
+
+        const container = control.closest("fieldset, [role='radiogroup'], [role='group'], section, article, [class*='question'], [class*='field'], [class*='input']")
+          ?? control.parentElement;
+        const grouped = container
+          ? Array.from(container.querySelectorAll("input[type='radio']")) as HTMLInputElement[]
+          : [control];
+
+        return grouped.filter((item) => isVisibleControl(item) && !item.disabled);
+      }
+
+      function findChoiceControlsInBestAncestor(control: HTMLInputElement, type: "radio" | "checkbox") {
+        let best: HTMLInputElement[] = [];
+        let bestScore = Number.NEGATIVE_INFINITY;
+        let ancestor: Element | null = control.parentElement;
+
+        for (let depth = 0; depth < 10 && ancestor; depth += 1) {
+          const controls = Array.from(ancestor.querySelectorAll(`input[type='${type}']`)) as HTMLInputElement[];
+          const usable = controls.filter((item) => isVisibleControl(item) && !item.disabled);
+
+          if (usable.length < 2 || usable.length > 12) {
+            ancestor = ancestor.parentElement;
+            continue;
+          }
+
+          const text = normalize(ancestor.textContent ?? "");
+          let score = 0;
+
+          if (/\b(yes|no|no thanks|continue to apply|decline)\b/.test(text)) {
+            score += 45;
+          }
+
+          if (/\b(talent network|career opportunities|upcoming events|keep you up to date|preferred name|past working experience|work experience)\b/.test(text)) {
+            score += 90;
+          }
+
+          if (/\b(this field is required|required)\b/.test(text)) {
+            score += 20;
+          }
+
+          score += Math.min(usable.length * 8, 30);
+          score -= Math.min(text.length / 260, 55);
+          score -= depth * 2;
+
+          if (score > bestScore) {
+            bestScore = score;
+            best = usable;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return bestScore >= 20 ? best : [];
+      }
+
+      function radioGroupKey(control: HTMLInputElement, groupLabel: string, index: number) {
+        return control.name
+          ? `name:${control.name}`
+          : `label:${normalize(groupLabel) || index}`;
+      }
+
+      function findChoiceGroupLabel(control: HTMLInputElement, group: HTMLInputElement[]) {
+        const fieldsetLegend = control.closest("fieldset")?.querySelector("legend")?.textContent;
+
+        if (fieldsetLegend?.trim()) {
+          return clean(fieldsetLegend);
+        }
+
+        const radiogroup = control.closest("[role='radiogroup'], [role='group']");
+        const labelledBy = radiogroup?.getAttribute("aria-labelledby");
+
+        if (labelledBy) {
+          const labelledText = labelledBy
+            .split(/\s+/)
+            .map((id) => getElementById(id)?.textContent ?? "")
+            .join(" ");
+
+          if (labelledText.trim()) {
+            return clean(labelledText);
+          }
+        }
+
+        const groupOptions = new Set(group.map((item) => normalize(findFieldLabel(item) || item.value)).filter(Boolean));
+        let ancestor: Element | null = control.parentElement;
+
+        for (let depth = 0; depth < 8 && ancestor; depth += 1) {
+          const heading = Array.from(ancestor.querySelectorAll("legend, h1, h2, h3, h4, [aria-level], p, label"))
+            .map((element) => clean(element.textContent))
+            .find((text) => {
+              const normalized = normalize(text);
+              return normalized
+                && !groupOptions.has(normalized)
+                && normalized.length > 4
+                && !/\b(this field is required|there are some errors|show details)\b/.test(normalized);
+            });
+
+          if (heading) {
+            return heading;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return "";
+      }
+
+      function findChoiceGroupContext(control: HTMLInputElement, groupLabel: string) {
+        const container = control.closest("fieldset, [role='radiogroup'], [role='group'], section, article, [class*='question'], [class*='field'], [class*='input']");
+
+        return [
+          groupLabel,
+          container?.textContent
+        ].filter(Boolean).join(" ");
+      }
+
+      function dedupeText(values: string[]) {
+        const seen = new Set<string>();
+        const unique: string[] = [];
+
+        for (const value of values) {
+          const key = normalize(value);
+
+          if (!key || seen.has(key)) {
+            continue;
+          }
+
+          seen.add(key);
+          unique.push(value);
+        }
+
+        return unique;
+      }
+
       function isRequired(control: Element, label: string) {
+        const choiceContainer = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)
+          ? control.closest("label, fieldset, [role='group'], [role='radiogroup'], section, article, [class*='question'], [class*='field'], [class*='input']")
+          : undefined;
+
         return (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).required
           || control.getAttribute("aria-required") === "true"
           || /\*/.test(label)
+          || Boolean(choiceContainer?.textContent && /\*/.test(choiceContainer.textContent))
           || Boolean(control.closest(".required, [class*='required'], [data-required='true']"));
+      }
+
+      function isVisibleControl(control: Element) {
+        const rect = control.getBoundingClientRect();
+        const style = window.getComputedStyle(control);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
+          || control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type) && hasVisibleChoiceTarget(control);
+      }
+
+      function hasVisibleChoiceTarget(control: HTMLInputElement) {
+        const target = getChoiceClickTarget(control);
+
+        if (!target) {
+          return false;
+        }
+
+        const rect = target.getBoundingClientRect();
+        const style = window.getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      }
+
+      function getChoiceClickTarget(control: HTMLInputElement) {
+        if (control.id) {
+          const label = queryFirst(`label[for="${CSS.escape(control.id)}"]`, control);
+
+          if (label instanceof HTMLElement) {
+            return label;
+          }
+        }
+
+        const closestLabel = control.closest("label");
+
+        if (closestLabel instanceof HTMLElement) {
+          return closestLabel;
+        }
+
+        const row = control.closest("button, [role='radio'], [role='checkbox'], [role='button'], [aria-checked], [tabindex], [class*='checkbox'], [class*='radio']");
+
+        return row instanceof HTMLElement ? row : undefined;
       }
 
       function isNoiseField(control: Element, label: string) {
@@ -303,6 +569,10 @@ export async function observeBrowserPage(page: Page, visibleFields: VisibleField
     const controls: ObservedControl[] = [];
 
     for (const [index, element] of candidates.entries()) {
+      if (element.closest("#gradlaunch-live-bot")) {
+        continue;
+      }
+
       const rect = element.getBoundingClientRect();
 
       if (rect.width <= 0 || rect.height <= 0) {
@@ -332,9 +602,14 @@ export async function observeBrowserPage(page: Page, visibleFields: VisibleField
       });
     }
 
+    const pageText = [
+      document.body?.innerText ?? "",
+      controls.map((control) => control.text).join(" ")
+    ].filter(Boolean).join(" ").replace(/\s+/g, " ").slice(0, 3500);
+
     return {
       title: document.title,
-      pageText: document.body?.innerText?.replace(/\s+/g, " ").slice(0, 3500) ?? "",
+      pageText,
       controls
     };
 
@@ -582,11 +857,27 @@ export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCh
       };
     }
 
+    if (/(user authentication is denied|authentication is denied|log on did not complete|logon did not complete|not permitted using the selected method|chosen identity is not permitted|csiac\d+)/.test(bodyText)) {
+      return {
+        blocked: true,
+        kind: "verification" as const,
+        reason: "The job portal rejected this login method or account. Try a permitted account/login option in the open browser, then continue only after the application form is visible."
+      };
+    }
+
+    if (/(security key|passkey|touch id|use a saved passkey|use a phone or tablet|usb security key|registered security device|registered device|follow the on-screen prompt|webauthn|authenticator device|issue verifying your login|use another method)/.test(bodyText)) {
+      return {
+        blocked: true,
+        kind: "verification" as const,
+        reason: "IBM security key/passkey verification is blocking login. If Touch ID/security key fails, click 'Use another method' in IBM, complete login manually, then click the GradLaunch continue button."
+      };
+    }
+
     if (/(^|\.)accounts\.google\.com$/.test(currentHost) && /\b(sign in|email or phone|choose an account|password|continue|verify|2-step verification)\b/.test(bodyText)) {
       return {
         blocked: true,
         kind: "login" as const,
-        reason: "Google sign-in is open. GradLaunch will choose the existing account when possible, otherwise it will enter the applicant email and wait if Google asks for password or verification."
+        reason: "Google sign-in is open. Complete login manually in this controlled Chrome window, then click the GradLaunch continue button."
       };
     }
 
@@ -602,7 +893,7 @@ export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCh
       return {
         blocked: true,
         kind: "login" as const,
-        reason: "Login panel detected. GradLaunch will try the existing browser profile first, then wait if the portal still needs input."
+        reason: "Login panel detected. GradLaunch is paused; choose Google/email manually in this controlled Chrome window, then click the GradLaunch continue button."
       };
     }
 
@@ -640,9 +931,10 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
           continue;
         }
 
+        const isChoiceControl = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type);
         const rect = control.getBoundingClientRect();
 
-        if (rect.width <= 0 || rect.height <= 0) {
+        if ((rect.width <= 0 || rect.height <= 0) && !(isChoiceControl && hasVisibleChoiceTarget(control))) {
           continue;
         }
 
@@ -677,16 +969,50 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
         groups.set(key, existing);
       }
 
+      for (const inferred of inferRequiredLabelControls(searchRoots)) {
+        const key = `inferred:${normalize(inferred.label)}`;
+        const existing = groups.get(key) ?? {
+          label: inferred.label,
+          satisfied: false,
+          required: true
+        };
+
+        existing.required = true;
+        existing.satisfied = existing.satisfied || inferred.satisfied;
+        groups.set(key, existing);
+      }
+
+      for (const errorLabel of findRequiredErrorLabels(searchRoots)) {
+        const key = `validation:${normalize(errorLabel)}`;
+        const existing = groups.get(key) ?? {
+          label: errorLabel,
+          satisfied: false,
+          required: true
+        };
+
+        existing.required = true;
+        existing.satisfied = existing.satisfied || false;
+        groups.set(key, existing);
+      }
+
       return Array.from(groups.values())
         .filter((group) => group.required && !group.satisfied)
         .map((group) => group.label);
 
       function isRequired(control: Element) {
         const label = findFieldLabel(control);
+        const choiceContainer = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)
+          ? control.closest("label, fieldset, [role='group'], [role='radiogroup'], section, article, [class*='question'], [class*='field'], [class*='input']")
+          : undefined;
+
         return (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).required
           || control.getAttribute("aria-required") === "true"
+          || control.getAttribute("aria-invalid") === "true"
           || /\*/.test(label)
-          || Boolean(control.closest(".required, [class*='required'], [data-required='true']"));
+          || Boolean(choiceContainer?.textContent && /\*/.test(choiceContainer.textContent))
+          || Boolean(control.closest(".required, [class*='required'], [data-required='true']"))
+          || hasNearbyRequiredError(control)
+          || isLikelyRequiredApplicationField(control, label);
       }
 
       function isSatisfied(
@@ -694,13 +1020,18 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
         roots: Array<Document | ShadowRoot>
       ) {
         if (control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)) {
-          const group = control.name
-            ? roots.flatMap((root) => Array.from(root.querySelectorAll(`input[name="${CSS.escape(control.name)}"]`))) as HTMLInputElement[]
-            : [control];
-          return group.some((item) => item.checked);
+          const group = getChoiceGroupControls(control, roots);
+          return group.some((item) => item.checked || item.getAttribute("aria-checked") === "true");
         }
 
-        if (control.value.trim()) {
+        if (control instanceof HTMLSelectElement) {
+          const selected = control.selectedOptions[0];
+          const selectedText = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`);
+
+          if (isEmptySelectText(selectedText)) {
+            return false;
+          }
+
           return true;
         }
 
@@ -708,7 +1039,13 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
           return false;
         }
 
-        if (isCustomSelectLike(control)) {
+        if (control instanceof HTMLInputElement && isCustomSelectLike(control)) {
+          const actual = normalize(control.value);
+
+          if (actual && !isEmptySelectText(actual)) {
+            return true;
+          }
+
           const container = control.closest("[role='combobox'], [aria-haspopup='listbox'], [data-radix-select-trigger], [data-headlessui-state], [class*='select'], [class*='combobox']")
             ?? control.parentElement;
           const selectedText = normalize([
@@ -719,12 +1056,336 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
             container?.textContent
           ].filter(Boolean).join(" "));
 
-          if (selectedText && !/select|choose|search|type to search/.test(selectedText)) {
+          if (selectedText && !isEmptySelectText(selectedText)) {
             return true;
           }
+
+          return false;
+        }
+
+        if (control.value.trim()) {
+          return true;
         }
 
         return false;
+      }
+
+      function isLikelyRequiredApplicationField(control: Element, label: string) {
+        const descriptor = normalize([
+          label,
+          control.getAttribute("aria-label"),
+          control.getAttribute("placeholder"),
+          control.getAttribute("name"),
+          control.getAttribute("id"),
+          control.closest("label, fieldset, [role='group'], [class*='field'], [class*='input'], section, article, div")?.textContent
+        ].filter(Boolean).join(" "));
+
+        if (!descriptor || /\b(address line 2|address 2|middle name|preferred middle|apt|suite|optional)\b/.test(descriptor)) {
+          return false;
+        }
+
+        return /\b(legal first name|first name|given name|legal last name|last name|surname|family name|address line 1|street address|country|state|province|region|city|zip|postal|postcode|pin code|pincode|home email|email|phone|mobile|contact number|degree name|type of degree|degree type|education level|university|college|institution|start date|end date|graduation date|work experience|past working experience|authorized|authorization|sponsorship|visa)\b/.test(descriptor);
+      }
+
+      function isEmptySelectText(value: string) {
+        return !value
+          || /^(select|select an option|choose|choose an option|please select|none selected)$/.test(value)
+          || /\b(options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
+      }
+
+      function hasNearbyRequiredError(control: Element) {
+        const text = normalize(control.closest("label, fieldset, [role='group'], [class*='field'], [class*='input'], section, article, div")?.textContent ?? "");
+        return /\b(this field is required|required field|required|please select|please enter|cannot be blank|select an option)\b/.test(text)
+          && (control.getAttribute("aria-invalid") === "true" || /\b(this field is required|cannot be blank|required field)\b/.test(text));
+      }
+
+      function findRequiredErrorLabels(roots: Array<Document | ShadowRoot>) {
+        const labels: string[] = [];
+        const errorElements = roots.flatMap((root) => Array.from(root.querySelectorAll("[role='alert'], .error, .field-error, .validation-error, [aria-live='assertive'], [class*='error'], [class*='invalid']"))) as HTMLElement[];
+
+        for (const element of errorElements) {
+          const rect = element.getBoundingClientRect();
+          const text = normalize(element.innerText || element.textContent || "");
+
+          if (rect.width <= 0 || rect.height <= 0 || !/\b(this field is required|required|cannot be blank|please select|please enter)\b/.test(text)) {
+            continue;
+          }
+
+          if (isNearbyChoiceGroupSatisfied(element, roots)) {
+            continue;
+          }
+
+          const control = findNearestControl(element);
+          const label = control ? findFieldLabel(control) : inferLabelFromErrorElement(element);
+
+          if (label) {
+            labels.push(label);
+          }
+        }
+
+        for (const control of roots.flatMap((root) => Array.from(root.querySelectorAll("[aria-invalid='true']")))) {
+          if (!(control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement)) {
+            continue;
+          }
+
+          if (!isSatisfied(control, roots)) {
+            const label = findFieldLabel(control);
+
+            if (label) {
+              labels.push(label);
+            }
+          }
+        }
+
+        return labels;
+      }
+
+      function inferRequiredLabelControls(roots: Array<Document | ShadowRoot>) {
+        const inferred: Array<{ label: string; satisfied: boolean }> = [];
+        const labelElements = roots.flatMap((root) => Array.from(root.querySelectorAll("label, legend, [class*='label'], [class*='Label'], [aria-required='true']"))) as HTMLElement[];
+
+        for (const element of labelElements) {
+          if (!isVisibleElement(element)) {
+            continue;
+          }
+
+          const rawText = element.innerText || element.textContent || element.getAttribute("aria-label") || "";
+          const label = clean(rawText);
+          const text = normalize(rawText);
+
+          if (!label || label.length > 140 || !/(\*|\brequired\b)/i.test(rawText)) {
+            continue;
+          }
+
+          if (/\b(this field is required|there are some errors|please correct|show details|select an option|required field)\b/.test(text)) {
+            continue;
+          }
+
+          const control = findControlForLabelElement(element, roots);
+
+          if (!control || isNoiseField(control, label)) {
+            continue;
+          }
+
+          inferred.push({
+            label,
+            satisfied: isSatisfied(control, roots)
+          });
+        }
+
+        return inferred;
+      }
+
+      function findControlForLabelElement(element: HTMLElement, roots: Array<Document | ShadowRoot>) {
+        if (element instanceof HTMLLabelElement && element.htmlFor) {
+          const direct = getElementById(element.htmlFor);
+
+          if (isVisibleFillControl(direct)) {
+            return direct;
+          }
+        }
+
+        const nested = Array.from(element.querySelectorAll("input, textarea, select")).find(isVisibleFillControl);
+
+        if (nested) {
+          return nested;
+        }
+
+        let ancestor: Element | null = element;
+
+        for (let depth = 0; depth < 5 && ancestor; depth += 1) {
+          const controls = Array.from(ancestor.querySelectorAll("input, textarea, select")).filter(isVisibleFillControl);
+
+          if (controls.length === 1) {
+            return controls[0];
+          }
+
+          const afterLabel = controls.find((control) => {
+            const labelRect = element.getBoundingClientRect();
+            const controlRect = control.getBoundingClientRect();
+            return controlRect.top >= labelRect.top - 8
+              && controlRect.left >= labelRect.left - 80
+              && controlRect.top - labelRect.bottom < 140;
+          });
+
+          if (afterLabel) {
+            return afterLabel;
+          }
+
+          const nextControl = Array.from(ancestor.nextElementSibling?.querySelectorAll("input, textarea, select") ?? []).find(isVisibleFillControl);
+
+          if (nextControl) {
+            return nextControl;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        for (const root of roots) {
+          const labelledByControl = Array.from(root.querySelectorAll("input[aria-labelledby], textarea[aria-labelledby], select[aria-labelledby]")).find((control) => {
+            const ids = control.getAttribute("aria-labelledby")?.split(/\s+/) ?? [];
+            return element.id && ids.includes(element.id) && isVisibleFillControl(control);
+          });
+
+          if (labelledByControl && isVisibleFillControl(labelledByControl)) {
+            return labelledByControl;
+          }
+        }
+
+        return undefined;
+      }
+
+      function isVisibleFillControl(element: Element | null | undefined): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+        if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) {
+          return false;
+        }
+
+        if (element instanceof HTMLInputElement && ["hidden", "file", "submit", "button", "image", "reset"].includes(element.type)) {
+          return false;
+        }
+
+        if ("disabled" in element && element.disabled) {
+          return false;
+        }
+
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      }
+
+      function isVisibleElement(element: HTMLElement) {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      }
+
+      function isNearbyChoiceGroupSatisfied(element: HTMLElement, roots: Array<Document | ShadowRoot>) {
+        let ancestor: Element | null = element.parentElement;
+
+        for (let depth = 0; depth < 8 && ancestor; depth += 1) {
+          const controls = Array.from(ancestor.querySelectorAll("input[type='radio'], input[type='checkbox']")) as HTMLInputElement[];
+          const visibleControls = controls.filter((control) => isChoiceControlVisible(control));
+
+          if (visibleControls.length >= 2 && visibleControls.some((control) => getChoiceGroupControls(control, roots).some((item) => item.checked || item.getAttribute("aria-checked") === "true"))) {
+            return true;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return false;
+      }
+
+      function getChoiceGroupControls(control: HTMLInputElement, roots: Array<Document | ShadowRoot>) {
+        const namedControls = control.name
+          ? roots.flatMap((root) => Array.from(root.querySelectorAll(`input[name="${CSS.escape(control.name)}"]`))) as HTMLInputElement[]
+          : [];
+        const ancestorControls = findChoiceControlsInBestAncestor(control);
+        const merged = [...namedControls, ...ancestorControls, control];
+        const seen = new Set<HTMLInputElement>();
+        const unique: HTMLInputElement[] = [];
+
+        for (const item of merged) {
+          if (seen.has(item) || item.disabled || !isChoiceControlVisible(item)) {
+            continue;
+          }
+
+          seen.add(item);
+          unique.push(item);
+        }
+
+        return unique.length > 0 ? unique : [control];
+      }
+
+      function findChoiceControlsInBestAncestor(control: HTMLInputElement) {
+        let best: HTMLInputElement[] = [];
+        let bestScore = Number.NEGATIVE_INFINITY;
+        let ancestor: Element | null = control.parentElement;
+        const type = control.type;
+
+        for (let depth = 0; depth < 9 && ancestor; depth += 1) {
+          const controls = Array.from(ancestor.querySelectorAll(`input[type='${type}']`)) as HTMLInputElement[];
+          const visibleControls = controls.filter((item) => isChoiceControlVisible(item) && !item.disabled);
+
+          if (visibleControls.length < 2 || visibleControls.length > 16) {
+            ancestor = ancestor.parentElement;
+            continue;
+          }
+
+          const text = normalize(ancestor.textContent ?? "");
+          let score = 0;
+
+          if (/\b(yes|no|no thanks|continue|decline|agree|accept)\b/.test(text)) {
+            score += 35;
+          }
+
+          if (/\b(this field is required|required|please select|please correct|question|select one)\b/.test(text)) {
+            score += 35;
+          }
+
+          if (ancestor.matches("fieldset, [role='radiogroup'], [role='group'], section, article, [class*='question'], [class*='field'], [class*='input']")) {
+            score += 30;
+          }
+
+          score += Math.min(visibleControls.length * 6, 30);
+          score -= Math.min(text.length / 250, 60);
+          score -= depth * 2;
+
+          if (score > bestScore) {
+            bestScore = score;
+            best = visibleControls;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return bestScore >= 20 ? best : [];
+      }
+
+      function isChoiceControlVisible(control: HTMLInputElement) {
+        const rect = control.getBoundingClientRect();
+
+        if (rect.width > 0 && rect.height > 0) {
+          return true;
+        }
+
+        return hasVisibleChoiceTarget(control);
+      }
+
+      function findNearestControl(element: HTMLElement) {
+        let ancestor: Element | null = element.parentElement;
+
+        for (let depth = 0; depth < 6 && ancestor; depth += 1) {
+          const controls = Array.from(ancestor.querySelectorAll("input, textarea, select")) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
+          const visibleEmpty = controls.find((control) => {
+            const rect = control.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0 && !isSatisfied(control, searchRoots);
+          });
+
+          if (visibleEmpty) {
+            return visibleEmpty;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return undefined;
+      }
+
+      function inferLabelFromErrorElement(element: HTMLElement) {
+        let ancestor: Element | null = element.parentElement;
+
+        for (let depth = 0; depth < 5 && ancestor; depth += 1) {
+          const label = ancestor.querySelector("label, legend, h1, h2, h3, h4")?.textContent;
+
+          if (label?.trim()) {
+            return clean(label);
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return "";
       }
 
       function findFieldLabel(control: Element) {
@@ -882,6 +1543,63 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
         return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       }
 
+      function hasVisibleChoiceTarget(control: HTMLInputElement) {
+        const target = getChoiceClickTarget(control);
+
+        if (!target) {
+          return false;
+        }
+
+        const rect = target.getBoundingClientRect();
+        const style = window.getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      }
+
+      function getChoiceClickTarget(control: HTMLInputElement) {
+        if (control.id) {
+          const root = control.getRootNode();
+          const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
+            ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`)
+            : null)
+            ?? searchRoots.map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(control.id)}"]`)).find(Boolean)
+            ?? null;
+
+          if (label instanceof HTMLElement) {
+            return label;
+          }
+        }
+
+        const closestLabel = control.closest("label");
+
+        if (closestLabel instanceof HTMLElement) {
+          return closestLabel;
+        }
+
+        const row = control.closest("button, [role='radio'], [role='checkbox'], [role='button'], [aria-checked], [tabindex], [class*='checkbox'], [class*='radio']");
+
+        return row instanceof HTMLElement ? row : undefined;
+      }
+
+      function getElementById(id: string) {
+        for (const searchRoot of searchRoots) {
+          if ("getElementById" in searchRoot && typeof searchRoot.getElementById === "function") {
+            const match = searchRoot.getElementById(id);
+
+            if (match) {
+              return match;
+            }
+          } else {
+            const match = searchRoot.querySelector(`#${CSS.escape(id)}`);
+
+            if (match) {
+              return match;
+            }
+          }
+        }
+
+        return null;
+      }
+
       function getSearchRoots() {
         const roots: Array<Document | ShadowRoot> = [document];
 
@@ -915,9 +1633,7 @@ export async function autoResolveConsentControls(page: Page) {
       let count = 0;
 
       for (const control of controls) {
-        const rect = control.getBoundingClientRect();
-
-        if (rect.width <= 0 || rect.height <= 0 || control.disabled || control.checked) {
+        if (control.disabled || control.checked || !isUsableChoice(control)) {
           continue;
         }
 
@@ -926,20 +1642,18 @@ export async function autoResolveConsentControls(page: Page) {
           control.getAttribute("aria-label"),
           control.getAttribute("name"),
           control.id,
-          control.closest("label, fieldset, [role='group']")?.textContent
+          control.closest("label, fieldset, [role='group'], [role='radiogroup'], section, article, [class*='question'], [class*='field'], [class*='input']")?.textContent
         ].filter(Boolean).join(" "));
 
         if (!/\b(terms|privacy|consent|agree|acknowledge|accept|declaration|eeo|voluntary self identification|data processing)\b/.test(descriptor)) {
           continue;
         }
 
-        if (/\b(country|countries|location|locations|remote|relocat|work permit|sponsor|sponsorship|whatsapp|sms|text messages)\b/.test(descriptor)) {
+        if (/\b(country|countries|location|locations|remote|relocat|work permit|sponsor|sponsorship|whatsapp|sms|text messages|talent network|career opportunities|job alerts|marketing)\b/.test(descriptor)) {
           continue;
         }
 
-        control.click();
-        control.dispatchEvent(new Event("input", { bubbles: true }));
-        control.dispatchEvent(new Event("change", { bubbles: true }));
+        clickChoiceControl(control);
         count += 1;
       }
 
@@ -962,6 +1676,88 @@ export async function autoResolveConsentControls(page: Page) {
         return control.closest("label")?.textContent?.trim()
           || control.parentElement?.textContent?.trim()
           || "";
+      }
+
+      function isUsableChoice(control: HTMLInputElement) {
+        const target = getChoiceClickTarget(control);
+
+        if (!target) {
+          return false;
+        }
+
+        const rect = target.getBoundingClientRect();
+        const style = window.getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      }
+
+      function clickChoiceControl(control: HTMLInputElement) {
+        const target = getChoiceClickTarget(control) ?? control;
+
+        target.scrollIntoView?.({ block: "center", inline: "center" });
+        control.focus();
+
+        try {
+          target.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, view: window }));
+          target.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, view: window }));
+        } catch (_error) {
+          target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+          target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+        }
+
+        target.click();
+
+        if (!control.checked) {
+          setNativeChecked(control, true);
+        }
+
+        dispatch(control);
+
+        control.blur();
+      }
+
+      function getChoiceClickTarget(control: HTMLInputElement) {
+        if (control.id) {
+          const root = control.getRootNode();
+          const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
+            ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`)
+            : null)
+            ?? getSearchRoots().map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(control.id)}"]`)).find(Boolean)
+            ?? null;
+
+          if (label instanceof HTMLElement) {
+            return label;
+          }
+        }
+
+        const closestLabel = control.closest("label");
+
+        if (closestLabel instanceof HTMLElement) {
+          return closestLabel;
+        }
+
+        const row = control.closest("button, [role='radio'], [role='checkbox'], [role='button'], [aria-checked], [tabindex], [class*='checkbox'], [class*='radio']");
+
+        return row instanceof HTMLElement ? row : undefined;
+      }
+
+      function dispatch(element: Element) {
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+        element.dispatchEvent(new Event("blur", { bubbles: true }));
+
+        if (element instanceof HTMLInputElement && element.form) {
+          element.form.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      }
+
+      function setNativeChecked(input: HTMLInputElement, checked: boolean) {
+        const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked");
+
+        if (descriptor?.set) {
+          descriptor.set.call(input, checked);
+        } else {
+          input.checked = checked;
+        }
       }
 
       function normalize(value: string) {
@@ -1013,6 +1809,11 @@ export async function getVisibleValidationMessages(page: Page) {
 
         for (const element of elements) {
           const htmlElement = element as HTMLElement;
+
+          if (htmlElement.closest("#gradlaunch-live-bot")) {
+            continue;
+          }
+
           const rect = htmlElement.getBoundingClientRect();
           const text = element.textContent?.replace(/\s+/g, " ").trim();
 
@@ -1024,38 +1825,83 @@ export async function getVisibleValidationMessages(page: Page) {
         }
       }
 
+      const invalidControls = Array.from(document.querySelectorAll("input[aria-invalid='true'], textarea[aria-invalid='true'], select[aria-invalid='true']")) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
+
+      for (const control of invalidControls) {
+        if (control.closest("#gradlaunch-live-bot")) {
+          continue;
+        }
+
+        const rect = control.getBoundingClientRect();
+
+        if (rect.width <= 0 || rect.height <= 0) {
+          continue;
+        }
+
+        const label = findFieldLabel(control);
+        const containerText = control.closest("label, fieldset, [role='group'], [class*='field'], [class*='input'], section, article, div")?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+        const message = /\b(this field is required|required|cannot be blank|please select|please enter|invalid)\b/i.test(containerText)
+          ? `${label || "Field"}: ${containerText}`
+          : `${label || "Field"} is invalid or incomplete.`;
+
+        values.add(message.length > 160 ? `${message.slice(0, 157)}...` : message);
+      }
+
       return Array.from(values).slice(0, 6);
+
+      function findFieldLabel(control: Element) {
+        if (control.id) {
+          const label = document.querySelector(`label[for="${CSS.escape(control.id)}"]`);
+
+          if (label?.textContent?.trim()) {
+            return label.textContent.trim().replace(/\*/g, "").replace(/\s+/g, " ").trim();
+          }
+        }
+
+        return (
+          control.closest("label")?.textContent
+          || control.closest("fieldset")?.querySelector("legend")?.textContent
+          || control.getAttribute("aria-label")
+          || control.getAttribute("placeholder")
+          || control.getAttribute("name")
+          || ""
+        ).replace(/\*/g, "").replace(/\s+/g, " ").trim();
+      }
     }).catch(() => []);
 
     messages.push(...frameMessages);
   }
 
-  return dedupeLabels(messages);
+  return dedupeLabels(messages).filter((message) => !isTransientStatusMessage(message));
 }
 
 export async function hasFileUpload(page: Page) {
   for (const frame of page.frames()) {
     const found = await frame.evaluate(() => {
-    const controls = getSearchRoots().flatMap((root) => Array.from(root.querySelectorAll("input[type='file']"))) as HTMLInputElement[];
-    if (controls.some((control) => !control.disabled)) {
-      return true;
-    }
+      const searchRoots = getSearchRoots();
+      const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input[type='file']"))) as HTMLInputElement[];
+      if (controls.some((control) => !control.disabled)) {
+        return true;
+      }
 
-    const uploadSelectors = [
-      "button",
-      "[role='button']",
-      "label",
-      "a",
-      "div",
-      "span"
-    ];
+      const uploadSelectors = [
+        "button",
+        "[role='button']",
+        "label",
+        "a",
+        "div",
+        "span"
+      ];
+      const uploadElements = searchRoots.flatMap((root) => {
+        return uploadSelectors.flatMap((selector) => Array.from(root.querySelectorAll(selector)));
+      }).filter((element): element is HTMLElement => element instanceof HTMLElement && !element.closest("#gradlaunch-live-bot"));
+      const pageText = normalize([
+        document.body?.innerText ?? "",
+        document.body?.textContent ?? "",
+        ...uploadElements.map((element) => element.innerText || element.textContent || "")
+      ].join(" "));
 
-    return uploadSelectors.some((selector) => {
-      return Array.from(document.querySelectorAll(selector)).some((element) => {
-        if (!(element instanceof HTMLElement)) {
-          return false;
-        }
-
+      return uploadElements.some((element) => {
         const rect = element.getBoundingClientRect();
 
         if (rect.width <= 0 || rect.height <= 0) {
@@ -1066,14 +1912,14 @@ export async function hasFileUpload(page: Page) {
         const nearbyText = normalize(findNearbyUploadLabel(element));
         const sectionText = normalize(findUploadSectionText(element));
 
-        return /\b(upload resume|attach resume|drag and drop your resume|browse file|choose file|select file)\b/.test(ownText)
+        return /\b(upload resume|attach resume|drag and drop your resume|browse file|choose(?: a)? file|select file|drop (?:it|file|resume|cv) here|drag and drop)\b/.test(ownText)
+          || (looksLikeResumeMethodChoice(`${sectionText} ${pageText}`) && /\b(from device|upload from device|upload from computer|from computer|from my device|select from device)\b/.test(ownText) && !/\b(without resume|without cv|copy paste|copy and paste|paste|manual)\b/.test(ownText))
           || (
-            /\b(attach|upload|browse|choose file|select file)\b/.test(ownText)
+            /\b(attach|upload|browse|choose(?: a)? file|select file|drop (?:it|file|resume|cv) here|drag and drop)\b/.test(ownText)
             && (/\b(resume|cv|curriculum vitae|resume cv)\b/.test(nearbyText) || /\b(resume|cv|curriculum vitae|resume cv)\b/.test(sectionText))
             && !(/\bcover letter\b/.test(nearbyText) && !/\b(resume|cv|curriculum vitae)\b/.test(nearbyText))
           );
       });
-    });
 
     function findUploadSectionText(element: HTMLElement) {
       let ancestor: Element | null = element;
@@ -1160,7 +2006,12 @@ export async function hasFileUpload(page: Page) {
     }
 
     function normalize(value: string) {
-      return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return value.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    }
+
+    function looksLikeResumeMethodChoice(value: string) {
+      return /\b(choose an option to apply|application method|application methods|how would you like to apply|apply with)\b/.test(value)
+        && /\b(without resume|without cv|copy paste|copy and paste|from device|from computer|upload from device|upload resume|resume)\b/.test(value);
     }
 
     function getSearchRoots() {
@@ -1281,7 +2132,7 @@ export async function detectNavigationCandidates(
         strategy: "dom_control" as const
       };
     })
-    .filter((candidate) => candidate.score > 0)
+    .filter((candidate) => candidate.score >= 65)
     .sort((left, right) => right.score - left.score)
     .slice(0, 8);
 }
@@ -1493,16 +2344,26 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
   const text = normalizeKey([
     input.title,
     input.pageText,
+    ...input.controls.map((control) => `${control.text} ${control.label}`),
     ...input.validationMessages
   ].join(" "));
   const hasVisibleFields = input.visibleFields.length > 0;
   const hasPasswordField = input.visibleFields.some((field) => field.inputType === "password" || /\bpassword\b/i.test(field.label));
   const visibleFieldText = normalizeKey(input.visibleFields.map((field) => `${field.label} ${field.context}`).join(" "));
+  const hasResumeMethodChoice = /\b(choose an option to apply|application method|application methods|how would you like to apply|apply with)\b/.test(text)
+    && /\b(without resume|without cv|copy paste|copy and paste|from device|from computer|upload from device|upload resume|resume)\b/.test(text);
   const hasResumeUploadField = input.visibleFields.some((field) => field.inputType === "file")
-    || input.controls.some((control) => /upload resume|upload cv|attach resume|choose file|select resume|autofill with resume/.test(normalizeKey(`${control.text} ${control.label}`)));
+    || input.controls.some((control) => /upload resume|upload cv|attach resume|choose(?: a)? file|select resume|autofill with resume/.test(normalizeKey(`${control.text} ${control.label}`)))
+    || (hasResumeMethodChoice && input.controls.some((control) => {
+      const controlText = normalizeKey(`${control.text} ${control.label}`);
+      return /\b(from device|upload from device|from computer|upload from computer|from my device|select from device)\b/.test(controlText)
+        && !/\b(without resume|without cv|copy paste|copy and paste|paste|manual)\b/.test(controlText);
+    }));
   const hasConsentLanguage = /\b(privacy|terms|consent|agree|acknowledge|declaration|data processing|equal opportunity|eeo|voluntary self identification)\b/.test(text);
   const hasReviewLanguage = /\b(review your application|review application|application review|preview)\b/.test(text);
   const hasSubmitLanguage = /\b(submit application|submit my application|send application|complete application)\b/.test(text);
+  const hasCaptchaLanguage = /\b(captcha|verify you are human|human verification|security check|i am not a robot|cloudflare challenge)\b/.test(text);
+  const hasLoadingLanguage = /\b(active loading indicator|loading|please wait|processing|uploading|saving|submitting|one moment)\b/.test(text);
   const hasApplyStart = input.controls.some((control) => isApplyStartText(`${control.text} ${control.label}`));
   const hasQuestionnaireHints = input.groupedFields.length > 0
     || input.visibleFields.some((field) => field.options.length > 0 || field.inputType === "radio" || field.inputType === "checkbox")
@@ -1515,6 +2376,18 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
 
   if (looksLikeLogin) {
     return "login";
+  }
+
+  if (hasCaptchaLanguage) {
+    return "captcha";
+  }
+
+  if (input.validationMessages.length > 0) {
+    return "validation_error";
+  }
+
+  if (hasLoadingLanguage && !hasVisibleFields && !hasResumeUploadField) {
+    return "loading";
   }
 
   if (hasResumeUploadField && !hasVisibleFields) {
@@ -1542,7 +2415,7 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
   }
 
   if (hasVisibleFields) {
-    return "account_gate";
+    return "form_fill";
   }
 
   if (!text && input.controls.length === 0) {

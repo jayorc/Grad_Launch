@@ -807,8 +807,17 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
     ?? inferCountryFromLocationLabel(preferredLocation)
     ?? "India";
   const roleTarget = getPreferredRoleTarget(student, job);
-  const linkedInUrl = extractUrl(resume?.extractedText, /linkedin\.com\/[^\s)>,]+/i) ?? process.env.DEFAULT_STUDENT_LINKEDIN;
-  const websiteUrl = extractUrl(resume?.extractedText, /(github\.com|portfolio|https?:\/\/(?!.*linkedin)[^\s)>,]+)/i) ?? process.env.DEFAULT_STUDENT_WEBSITE;
+  const linkedInUrl = normalizeApplicationProfileUrl(student.completeProfile?.linkedInUrl, "linkedin")
+    ?? normalizeApplicationProfileUrl(extractUrl(resume?.extractedText, /linkedin\.com\/[^\s)>,]+/i), "linkedin")
+    ?? normalizeApplicationProfileUrl(process.env.DEFAULT_STUDENT_LINKEDIN, "linkedin");
+  const githubUrl = normalizeApplicationProfileUrl(student.completeProfile?.githubUrl, "github")
+    ?? normalizeApplicationProfileUrl(extractUrl(resume?.extractedText, /github\.com\/[^\s)>,]+/i), "github");
+  const portfolioUrl = normalizeApplicationProfileUrl(student.completeProfile?.portfolioUrl, "generic");
+  const websiteUrl = normalizeApplicationProfileUrl(student.completeProfile?.websiteUrl, "generic")
+    ?? portfolioUrl
+    ?? githubUrl
+    ?? normalizeApplicationProfileUrl(extractUrl(resume?.extractedText, /https?:\/\/(?!.*linkedin)[^\s)>,]+/i), "generic")
+    ?? normalizeApplicationProfileUrl(process.env.DEFAULT_STUDENT_WEBSITE, "generic");
   const currentCtc = extractCompensation(resume?.extractedText, /current\s+(?:ctc|salary|compensation)[:\s-]*([^\n,;]+)/i) ?? process.env.DEFAULT_CURRENT_CTC ?? "0 LPA";
   const expectedCtc = student.expectedSalaryLpa ? `${student.expectedSalaryLpa} LPA` : process.env.DEFAULT_EXPECTED_CTC;
   const hiringMessage = artifacts?.coverLetterExcerpt
@@ -831,6 +840,8 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
     { label: "Preferred location", value: preferredLocation },
     { label: "Target role", value: roleTarget },
     { label: "LinkedIn", value: linkedInUrl ?? "" },
+    { label: "GitHub", value: githubUrl ?? "" },
+    { label: "Portfolio", value: portfolioUrl ?? "" },
     { label: "Website", value: websiteUrl ?? "" },
     { label: "Work authorization", value: student.visaRequired ? "No" : "Yes" },
     { label: "Legally authorized to work", value: student.visaRequired ? "No" : "Yes" },
@@ -868,6 +879,79 @@ function extractUrl(text: string | undefined, pattern: RegExp) {
   }
 
   return match.startsWith("http") ? match : `https://${match}`;
+}
+
+function normalizeApplicationProfileUrl(value: string | undefined, kind: "generic" | "github" | "linkedin") {
+  const url = parseApplicationUrl(value);
+
+  if (!url) {
+    return undefined;
+  }
+
+  if (kind === "linkedin" && !isLinkedInProfileUrl(url)) {
+    return undefined;
+  }
+
+  if (kind === "github" && !isGitHubProfileUrl(url)) {
+    return undefined;
+  }
+
+  if (kind === "generic" && !hasMeaningfulProfileUrlTarget(url)) {
+    return undefined;
+  }
+
+  const path = url.pathname.replace(/\/+$/g, "");
+  return `${url.protocol}//${url.host}${path}${url.search}${url.hash}`;
+}
+
+function parseApplicationUrl(value: string | undefined) {
+  const cleanValue = value?.trim().replace(/[),.;]+$/g, "");
+
+  if (!cleanValue || !/[a-z0-9.-]+\.[a-z]{2,}/i.test(cleanValue)) {
+    return undefined;
+  }
+
+  try {
+    return new URL(/^https?:\/\//i.test(cleanValue) ? cleanValue : `https://${cleanValue}`);
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function hasMeaningfulProfileUrlTarget(url: URL) {
+  const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+  const pathParts = getUrlPathParts(url);
+
+  if (host === "github.com") {
+    return isGitHubProfileUrl(url);
+  }
+
+  if (host === "linkedin.com") {
+    return isLinkedInProfileUrl(url);
+  }
+
+  return Boolean(pathParts.length > 0 || url.hostname.split(".").length > 2);
+}
+
+function isLinkedInProfileUrl(url: URL) {
+  const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+  const pathParts = getUrlPathParts(url);
+
+  return host === "linkedin.com"
+    && ((pathParts[0] === "in" || pathParts[0] === "pub") ? Boolean(pathParts[1]) : pathParts.length > 1);
+}
+
+function isGitHubProfileUrl(url: URL) {
+  const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+  const pathParts = getUrlPathParts(url);
+
+  return host === "github.com"
+    && Boolean(pathParts[0])
+    && !["about", "blog", "collections", "enterprise", "events", "explore", "features", "login", "marketplace", "new", "pricing", "search", "signup", "topics"].includes(pathParts[0]);
+}
+
+function getUrlPathParts(url: URL) {
+  return url.pathname.split("/").map((part) => part.trim()).filter(Boolean);
 }
 
 function extractCompensation(text: string | undefined, pattern: RegExp) {

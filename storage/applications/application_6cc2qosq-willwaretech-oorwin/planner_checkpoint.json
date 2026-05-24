@@ -1,0 +1,137 @@
+{
+  "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
+  "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-23T10:38:02.132Z",
+  "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or review checkpoint.",
+  "status": "completed",
+  "summary": "Planner completed the form fill and paused at the review gate.",
+  "formMode": "single_stage",
+  "currentStep": "stage_1",
+  "currentStageLabel": "Section 1",
+  "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+  "retryCount": 0,
+  "handoffCount": 0,
+  "validationErrors": [],
+  "subgoals": [
+    {
+      "id": "open_job_page",
+      "label": "Open job page",
+      "status": "completed",
+      "detail": "Job page opened successfully in a visible Chrome session.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-23T18:36:46.102Z",
+      "completedAt": "2026-05-23T18:36:46.102Z"
+    },
+    {
+      "id": "authenticate_if_needed",
+      "label": "Handle login if needed",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T10:38:02.132Z"
+    },
+    {
+      "id": "finish_current_section",
+      "label": "Finish active section",
+      "status": "running",
+      "detail": "Reading Section 1 and planning the next safe action.",
+      "attempts": 2,
+      "lastUpdatedAt": "2026-05-23T18:36:47.023Z"
+    },
+    {
+      "id": "recover_from_validation_errors",
+      "label": "Recover from validation errors",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T10:38:02.132Z"
+    },
+    {
+      "id": "retry_alternative_path",
+      "label": "Retry alternative path",
+      "status": "pending",
+      "detail": "Waiting to start.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T10:38:02.132Z"
+    },
+    {
+      "id": "reach_submit_gate",
+      "label": "Reach submit/review gate",
+      "status": "completed",
+      "detail": "Reached the review/submit checkpoint safely.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T18:37:17.457Z",
+      "completedAt": "2026-05-23T18:37:17.457Z"
+    },
+    {
+      "id": "save_checkpoint",
+      "label": "Save checkpoint",
+      "status": "completed",
+      "detail": "Saved checkpoint while waiting for manual stage progress.",
+      "attempts": 0,
+      "lastUpdatedAt": "2026-05-23T18:37:17.628Z",
+      "completedAt": "2026-05-23T18:37:17.628Z"
+    }
+  ],
+  "lastDecision": {
+    "kind": "fill_fields",
+    "source": "llm",
+    "stageIndex": 0,
+    "stageLabel": "Section 1",
+    "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+    "reason": "Software developer with a strong background in programming and machine learning, seeking a role at Willwaretech.",
+    "fieldLabels": [
+      "Last Name",
+      "First Name",
+      "Email",
+      "+1",
+      "Years of Experience",
+      "City",
+      "Current CTC"
+    ],
+    "createdAt": "2026-05-23T18:37:16.392Z"
+  },
+  "stageHistory": [
+    {
+      "stageIndex": 0,
+      "label": "Section 1",
+      "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+      "visibleFieldLabels": [
+        "document_file",
+        "add_docs"
+      ],
+      "requiredFieldLabels": [],
+      "filledFieldLabels": [
+        "Resume upload",
+        "Last Name",
+        "First Name",
+        "Email",
+        "mat-input-3",
+        "Years of Experience",
+        "Current CTC",
+        "+1",
+        "City"
+      ],
+      "outcome": "review",
+      "decision": {
+        "kind": "fill_fields",
+        "source": "llm",
+        "stageIndex": 0,
+        "stageLabel": "Section 1",
+        "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
+        "reason": "Software developer with a strong background in programming and machine learning, seeking a role at Willwaretech.",
+        "fieldLabels": [
+          "Last Name",
+          "First Name",
+          "Email",
+          "+1",
+          "Years of Experience",
+          "City",
+          "Current CTC"
+        ],
+        "createdAt": "2026-05-23T18:37:16.392Z"
+      },
+      "lastUpdatedAt": "2026-05-23T18:37:17.457Z"
+    }
+  ],
+  "lastUpdatedAt": "2026-05-23T18:37:17.628Z"
+}

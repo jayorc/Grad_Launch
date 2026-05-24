@@ -1,13 +1,14 @@
 import { request as httpRequest } from "node:http";
-import { lstat, mkdir, readFile, readlink, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { cp, lstat, mkdir, readFile, readlink, rm } from "node:fs/promises";
+import { basename, join, relative, sep } from "node:path";
 import type { AgentHandoffKind, BrowserApplyReceipt } from "@gradlaunch/shared";
-import { chromium, type Browser, type BrowserContext, type Dialog, type Frame, type Page } from "playwright-core";
+import { chromium, type Browser, type BrowserContext, type Dialog, type Page } from "playwright-core";
 import { getBrowserWorkspaceStorageDir, getLoggedBrowserProfileDir, getManagedBrowserProfileDir } from "../../config/storage";
 import { nowIso } from "../../lib/time";
+import { runAutonomousStageFill } from "./autonomous-fill";
 import { buildStageAnswerPlan } from "./answer";
 import { evaluateStageReadiness } from "./eval";
-import { attachResume, fillFormField } from "./fill";
+import { attachResume, continueAfterResumeUploadIfReady, fillFormField, resolveKnownRequiredChoice } from "./fill";
 import { buildStageExecutionPlan } from "./plan";
 import {
   bumpPlannerRetries,
@@ -24,6 +25,7 @@ import {
   setPlannerStatus
 } from "./planner";
 import { reflectOnStageAnswers } from "./reflect";
+import { classifyRecovery, probeAndReobservePage } from "./strategy";
 import {
   autoResolveConsentControls,
   clickFinalSubmit,
@@ -41,14 +43,14 @@ import {
   hasFinalSubmitControl,
   observeBrowserPage
 } from "./observe";
-import type { BrowserApplyInput, BrowserAvailability, HandoffRequest } from "./types";
+import type { BrowserAgentObservation, BrowserApplyInput, BrowserAvailability, BrowserFillField, HandoffRequest } from "./types";
 import { BrowserExecutionSessionService } from "./session";
-import { clearUserStopRequest, didUserRequestStop, updateLiveBot } from "./ui";
-import { pathExists, writeBrowserDebug } from "./util";
+import { clearUserContinueRequest, clearUserStopRequest, consumeUserContinueConfirmation, didUserRequestStop, isLiveBotMounted, updateLiveBot } from "./ui";
+import { dedupeLabels, normalizeKey, pathExists, writeBrowserDebug } from "./util";
 
 const defaultChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
-type BrowserLaunchMode = "logged_cdp" | "logged_profile" | "managed_cdp" | "managed_profile" | "ephemeral";
+type BrowserLaunchMode = "logged_cdp" | "logged_profile" | "logged_profile_clone" | "managed_cdp" | "managed_profile" | "ephemeral";
 type BrowserLaunchResult = {
   browser: Browser | undefined;
   context: BrowserContext;
@@ -85,7 +87,31 @@ export class BrowserAgentEngine {
     if (chromeExists && loggedProfileDir && await pathExists(loggedProfileDir)) {
       const loggedProfileLocked = await isBrowserProfileLocked(loggedProfileDir, { clearStaleGradLaunchLock: true });
 
-      if (loggedProfileLocked && shouldRequireLoggedBrowser()) {
+      if (loggedProfileLocked) {
+        if (shouldUseLoggedProfileCloneOnLock()) {
+          return {
+            available: true,
+            chromePath,
+            message: `The controlled logged Chrome profile at ${loggedProfileDir} is locked, and profile cloning was explicitly enabled, so GradLaunch will open a controlled runtime copy.`
+          };
+        }
+
+        if (shouldRequireLoggedBrowser()) {
+          return {
+            available: false,
+            chromePath,
+            message: buildLockedLoggedProfileMessage(loggedProfileDir)
+          };
+        }
+
+        if (shouldAllowManagedFallbackOnLockedLoggedProfile()) {
+          return {
+            available: true,
+            chromePath,
+            message: `The controlled logged Chrome profile at ${loggedProfileDir} is already open without remote debugging, so GradLaunch will use the managed persistent profile and pause for login confirmation if needed.`
+          };
+        }
+
         return {
           available: false,
           chromePath,
@@ -93,18 +119,18 @@ export class BrowserAgentEngine {
         };
       }
 
-      if (loggedProfileLocked) {
-        return {
-          available: true,
-          chromePath,
-          message: `The logged Chrome profile at ${loggedProfileDir} is already open without remote debugging, so GradLaunch will skip it and use the managed browser profile.`
-        };
-      }
-
       return {
         available: true,
         chromePath,
-        message: `Browser worker will try the logged Chrome profile at ${loggedProfileDir} before the managed GradLaunch profile.`
+        message: `Browser worker will open the controlled logged Chrome profile at ${loggedProfileDir}; login cookies from this GradLaunch-owned profile will persist across runs.`
+      };
+    }
+
+    if (shouldPreferLoggedBrowser() && shouldRequireLoggedBrowser()) {
+      return {
+        available: false,
+        chromePath,
+        message: `GradLaunch is configured to require a logged Chrome profile, but ${loggedProfileDir ?? "no logged profile directory"} is not available. Run npm run browser:prepare-logged-profile after logging into Chrome.`
       };
     }
 
@@ -166,7 +192,7 @@ export class BrowserAgentEngine {
     let attachedToExistingBrowser = false;
     let launchMode: BrowserLaunchMode = "ephemeral";
     let executionSessionId = input.executionSessionId;
-    const resumeUrl = sanitizeBrowserResumeUrl(input.planner?.currentUrl);
+    const resumeUrl = sanitizeBrowserResumeUrl(input.planner?.currentUrl, input.job.sourceUrl);
 
     try {
       ({ browser, context, keepContextOpen, attachedToExistingBrowser, launchMode } = await launchContext(availability.chromePath));
@@ -182,6 +208,7 @@ export class BrowserAgentEngine {
       });
       const page = await openOrResumePage(context, input.job.sourceUrl, resumeUrl);
       await clearUserStopRequest(page);
+      await clearUserContinueRequest(page);
       if (input.studentId && input.applicationId && input.runId) {
         const session = await this.executionSessions.createOrReuse({
           sessionId: executionSessionId,
@@ -234,17 +261,65 @@ export class BrowserAgentEngine {
       let initialCheckpoint = await detectProtectedCheckpoint(activePage);
 
       if (initialCheckpoint.blocked && initialCheckpoint.kind === "login") {
-        const loginRecovery = await tryResolveLoginWithExistingProfile({
+        await updateExecutionSession(this.executionSessions, executionSessionId, {
+          status: "waiting",
+          latestMessage: initialCheckpoint.reason ?? "The browser session is waiting for login in the controlled Chrome window.",
+          planner,
+          currentUrl: activePage.url(),
+          currentStageIndex: 0,
+          currentStageLabel: "Login required",
+          workspacePath,
+          lastStageSignature: await getStageSignature(activePage),
+          pendingHandoff: {
+            kind: "login",
+            title: "Login required",
+            detail: "Complete login in this Chrome window, then click the GradLaunch continue button.",
+            requestedAt: nowIso()
+          }
+        });
+        const loginHandoff = await waitForLoginConfirmation({
           context,
           page: activePage,
-          sourceUrl: input.job.sourceUrl,
-          studentEmail: resolveApplicantEmail(input),
-          workspacePath,
           stageIndex: 0,
-          reason: initialCheckpoint.reason
+          workspacePath,
+          screenshots,
+          planner,
+          reason: initialCheckpoint.reason ?? "Please sign in in this controlled Chrome window. When the job form is visible, click I am logged in, continue.",
+          handoffKind: "login",
+          sourceUrl: input.job.sourceUrl
         });
-        activePage = loginRecovery.activePage;
+        activePage = loginHandoff.activePage;
         initialCheckpoint = await detectProtectedCheckpoint(activePage);
+
+        if (!loginHandoff.resolved) {
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "waiting",
+            latestMessage: "The browser session is waiting for login confirmation before filling starts.",
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: 0,
+            currentStageLabel: "Login required",
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            pendingHandoff: {
+              kind: "login",
+              title: "Login required",
+              detail: "Login still needs to be completed or confirmed before GradLaunch can fill the form.",
+              requestedAt: nowIso()
+            }
+          });
+          return {
+            status: "handoff_required",
+            sourceUrl: input.job.sourceUrl,
+            openedAt,
+            completedAt: nowIso(),
+            filledLabels: [],
+            skippedLabels: input.fields.map((field) => field.label),
+            screenshots,
+            message: "GradLaunch opened the job URL in Chrome and is waiting for you to finish login, click the in-browser continue button, and expose the application form.",
+            planner
+          };
+        }
       }
 
       if (initialCheckpoint.blocked) {
@@ -317,6 +392,8 @@ export class BrowserAgentEngine {
       let resumeUploaded = false;
       let lastFingerprint = "";
       let sameScreenAttempts = 0;
+      const seenStageVisitKeys = new Set<string>();
+      const resumeUploadAttemptsByStage = new Map<string, number>();
 
       for (let stageIndex = 0; stageIndex < maxStages; stageIndex += 1) {
         if (!hasOpenPage(context)) {
@@ -366,17 +443,53 @@ export class BrowserAgentEngine {
         let protectedCheckpoint = await detectProtectedCheckpoint(activePage);
 
         if (protectedCheckpoint.blocked && protectedCheckpoint.kind === "login") {
-          const loginRecovery = await tryResolveLoginWithExistingProfile({
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "waiting",
+            latestMessage: protectedCheckpoint.reason ?? `Stage ${stageIndex + 1} is waiting for login in the controlled Chrome window.`,
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length,
+            pendingHandoff: {
+              kind: "login",
+              title: "Login required",
+              detail: "Complete login in this Chrome window, then click the GradLaunch continue button.",
+              requestedAt: nowIso()
+            }
+          });
+          const loginHandoff = await waitForLoginConfirmation({
             context,
             page: activePage,
-            sourceUrl: input.job.sourceUrl,
-            studentEmail: resolveApplicantEmail(input),
-            workspacePath,
             stageIndex,
-            reason: protectedCheckpoint.reason
+            workspacePath,
+            screenshots,
+            planner,
+            reason: protectedCheckpoint.reason ?? "Please sign in in this controlled Chrome window. When the job form is visible, click I am logged in, continue.",
+            handoffKind: "login",
+            sourceUrl: input.job.sourceUrl
           });
-          activePage = loginRecovery.activePage;
+          activePage = loginHandoff.activePage;
           protectedCheckpoint = await detectProtectedCheckpoint(activePage);
+
+          if (!loginHandoff.resolved) {
+            return {
+              status: "handoff_required",
+              sourceUrl: input.job.sourceUrl,
+              openedAt,
+              completedAt: nowIso(),
+              filledLabels,
+              skippedLabels,
+              screenshots,
+              message: "The job portal still needs login confirmation before GradLaunch can continue filling.",
+              planner
+            };
+          }
+
+          continue;
         }
 
         if (protectedCheckpoint.blocked) {
@@ -427,8 +540,8 @@ export class BrowserAgentEngine {
           continue;
         }
 
-        const visibleFields = await discoverVisibleFields(activePage);
-        const observation = await observeBrowserPage(activePage, visibleFields);
+        let stageVisibleFields = await discoverVisibleFields(activePage);
+        let observation = await observeBrowserPage(activePage, stageVisibleFields);
         const stageSignature = await getStageSignature(activePage, observation);
         const stagePlan = buildStageExecutionPlan({
           observation,
@@ -436,16 +549,17 @@ export class BrowserAgentEngine {
           submitRequested: input.submit,
           allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
         });
-        const requiredLabels = visibleFields.filter((field) => field.required).map((field) => field.label);
+        const requiredLabels = stageVisibleFields.filter((field) => field.required).map((field) => field.label);
         recordPlannerObservation({
           planner,
           page: activePage,
           stageIndex,
-          visibleFieldLabels: visibleFields.map((field) => field.label),
+          visibleFieldLabels: stageVisibleFields.map((field) => field.label),
           requiredFieldLabels: requiredLabels
         });
 
         const fingerprint = await getPageFingerprint(activePage);
+        seenStageVisitKeys.add(stageVisitKey(stageSignature));
 
         if (fingerprint === lastFingerprint) {
           sameScreenAttempts += 1;
@@ -460,7 +574,9 @@ export class BrowserAgentEngine {
           action: stagePlan.action,
           confidence: stagePlan.confidence,
           reason: stagePlan.reason,
-          checklist: stagePlan.checklist
+          checklist: stagePlan.checklist,
+          classification: stagePlan.classification,
+          rankedActions: stagePlan.rankedActions
         });
         await updateLiveBot(activePage, {
           step: `Stage ${stageIndex + 1}`,
@@ -480,37 +596,24 @@ export class BrowserAgentEngine {
           manualCount: skippedLabels.length
         });
 
-        if (stagePlan.action === "ask_user" && (observation.pageState === "login" || observation.pageState === "account_gate")) {
-          const loginRecovery = await tryResolveLoginWithExistingProfile({
+        let stageAction = stagePlan.action;
+        let activeClassification = stagePlan.classification;
+
+        if (stageAction === "ask_user" && (observation.pageState === "login" || stagePlan.classification?.state === "login" || observation.pageState === "account_gate")) {
+          const loginHandoff = await waitForLoginConfirmation({
             context,
             page: activePage,
-            sourceUrl: input.job.sourceUrl,
-            studentEmail: resolveApplicantEmail(input),
-            workspacePath,
-            stageIndex,
-            reason: stagePlan.reason
-          });
-
-          if (loginRecovery.resolved) {
-            activePage = loginRecovery.activePage;
-            markPlannerTask(planner, "authenticate_if_needed", "running", "Login gate cleared using the existing browser profile. Resuming autonomous execution.");
-            setPlannerStatus(planner, "running", "Login gate cleared using the existing browser profile.");
-            continue;
-          }
-
-          const handoff = await waitForHumanIntervention({
-            context,
-            page: loginRecovery.activePage,
             stageIndex,
             workspacePath,
             screenshots,
             planner,
-            reason: "Sign in is still required. Use Google/email in the open browser if the existing profile does not complete it automatically.",
-            handoffKind: "login"
+            reason: "Sign in is required. Use Google/email in this controlled Chrome window, then click I am logged in, continue when the job form is visible.",
+            handoffKind: "login",
+            sourceUrl: input.job.sourceUrl
           });
-          activePage = handoff.activePage;
+          activePage = loginHandoff.activePage;
 
-          if (!handoff.resolved) {
+          if (!loginHandoff.resolved) {
             return {
               status: "handoff_required",
               sourceUrl: input.job.sourceUrl,
@@ -524,10 +627,137 @@ export class BrowserAgentEngine {
             };
           }
 
+          markPlannerTask(planner, "authenticate_if_needed", "running", "Login gate cleared after user confirmation. Resuming autonomous execution.");
+          setPlannerStatus(planner, "running", "Login gate cleared after user confirmation.");
           continue;
         }
 
-        if (sameScreenAttempts > loopThreshold) {
+        if (stageAction === "ask_user") {
+          const handoff = await waitForHumanIntervention({
+            context,
+            page: activePage,
+            stageIndex,
+            workspacePath,
+            screenshots,
+            planner,
+            reason: stagePlan.reason,
+            handoffKind: stagePlan.classification?.state === "captcha" ? "captcha" : "review"
+          });
+          activePage = handoff.activePage;
+
+          if (!handoff.resolved) {
+            return {
+              status: "handoff_required",
+              sourceUrl: input.job.sourceUrl,
+              openedAt,
+              completedAt: nowIso(),
+              filledLabels,
+              skippedLabels,
+              screenshots,
+              message: stagePlan.reason,
+              planner
+            };
+          }
+
+          continue;
+        }
+
+        if (stageAction === "wait") {
+          await updateLiveBot(activePage, {
+            step: `Stage ${stageIndex + 1}`,
+            mood: "thinking",
+            message: "The portal still looks busy, so I am waiting and re-reading instead of treating the loader as a validation error."
+          });
+          await activePage.waitForTimeout(Number(process.env.BROWSER_DYNAMIC_WAIT_MS ?? 1400)).catch(() => undefined);
+          continue;
+        }
+
+        if (stageAction === "explore") {
+          const probe = await probeAndReobservePage({
+            page: activePage,
+            workspacePath,
+            stageIndex
+          });
+          activePage = await getActivePage(context, activePage);
+
+          if (probe.protectedCheckpoint.blocked) {
+            const handoff = await waitForHumanIntervention({
+              context,
+              page: activePage,
+              stageIndex,
+              workspacePath,
+              screenshots,
+              planner,
+              reason: probe.protectedCheckpoint.reason ?? "Manual attention is required before GradLaunch can continue.",
+              handoffKind: mapCheckpointToHandoff(probe.protectedCheckpoint.kind)
+            });
+            activePage = handoff.activePage;
+
+            if (!handoff.resolved) {
+              return {
+                status: "handoff_required",
+                sourceUrl: input.job.sourceUrl,
+                openedAt,
+                completedAt: nowIso(),
+                filledLabels,
+                skippedLabels,
+                screenshots,
+                message: probe.protectedCheckpoint.reason ?? "The page still needs manual attention.",
+                planner
+              };
+            }
+
+            continue;
+          }
+
+          stageVisibleFields = probe.visibleFields;
+          observation = probe.observation;
+          activeClassification = probe.classification;
+
+          if (probe.uploadVisible && input.resume?.storagePath && await pathExists(input.resume.storagePath)) {
+            stageAction = "upload_resume";
+          } else if (stageVisibleFields.length > 0) {
+            stageAction = "fill";
+          } else if (["review", "submit"].includes(probe.classification.state)) {
+            stageAction = "stop";
+          } else if (probe.classification.state === "start") {
+            stageAction = "click_next";
+          } else {
+            await updateLiveBot(activePage, {
+              step: `Stage ${stageIndex + 1}`,
+              mood: "waiting",
+              message: "I safely probed the page but still could not identify a confident form action."
+            });
+            setPlannerStatus(planner, "needs_review", "Safe exploration did not reveal a confident form action.");
+            return {
+              status: "needs_manual_review",
+              sourceUrl: input.job.sourceUrl,
+              openedAt,
+              completedAt: nowIso(),
+              filledLabels,
+              skippedLabels,
+              screenshots,
+              message: "GradLaunch safely explored the page but could not confidently decide the next form action.",
+              planner
+            };
+          }
+        }
+
+        const shouldPauseForSameScreenLoop = sameScreenAttempts > loopThreshold
+          && stageAction !== "fill"
+          && stageVisibleFields.length === 0;
+
+        if (sameScreenAttempts > loopThreshold && !shouldPauseForSameScreenLoop) {
+          await writeBrowserDebug(workspacePath, "same-screen-loop-guard-deferred", {
+            stageIndex,
+            sameScreenAttempts,
+            stageAction,
+            visibleFieldCount: stageVisibleFields.length,
+            reason: "The same page is still fillable, so GradLaunch will continue field repair instead of pausing as a navigation loop."
+          });
+        }
+
+        if (shouldPauseForSameScreenLoop) {
           const message = `The agent saw the same screen repeatedly after ${sameScreenAttempts + 1} attempts and paused to avoid looping.`;
           bumpPlannerRetries(planner, "retry_alternative_path", message, activePage, stageIndex);
           setPlannerStatus(planner, "needs_review", message);
@@ -556,7 +786,60 @@ export class BrowserAgentEngine {
           };
         }
 
-        if (!resumeUploaded && input.resume?.storagePath && await pathExists(input.resume.storagePath) && await hasFileUpload(activePage)) {
+        if (stageAction === "stop") {
+          await updateLiveBot(activePage, {
+            step: "Review Ready",
+            mood: "done",
+            message: "This page looks like a review or submit checkpoint, so I am pausing instead of navigating away."
+          });
+          markPlannerTask(planner, "reach_submit_gate", "completed", "Reached a review/submit checkpoint safely.");
+          markPlannerTask(planner, "save_checkpoint", "completed", "Saved planner state at the review checkpoint.");
+          setPlannerStatus(planner, "completed", "Planner paused at the review/submit checkpoint.");
+          recordPlannerStageOutcome({
+            planner,
+            page: activePage,
+            stageIndex,
+            outcome: "review",
+            filledFieldLabels: filledLabels
+          });
+          keepContextOpen = shouldKeepBrowserOpenForReview();
+          await maybeKeepBrowserOpen(context);
+          await saveScreenshot(activePage, workspacePath, screenshots, "browser-filled.png");
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "review_ready",
+            latestMessage: "The form is ready for review in the open browser.",
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: await getStageSignature(activePage),
+            browserStatus: "filled",
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length,
+            pendingHandoff: undefined
+          });
+          return {
+            status: "filled",
+            sourceUrl: input.job.sourceUrl,
+            openedAt,
+            completedAt: nowIso(),
+            filledLabels,
+            skippedLabels,
+            screenshots,
+            message: "The form is filled and paused at a review or submit checkpoint.",
+            planner
+          };
+        }
+
+        const resumeAvailableOnDisk = Boolean(input.resume?.storagePath && await pathExists(input.resume.storagePath));
+        const shouldAttemptResumeUpload = Boolean(
+          !resumeUploaded
+          && resumeAvailableOnDisk
+          && (stageAction === "upload_resume" || await hasFileUpload(activePage))
+        );
+
+        if (shouldAttemptResumeUpload && input.resume?.storagePath) {
           if (await didUserRequestStop(activePage)) {
             return await handleGracefulStop({
               reason: "GradLaunch stopped because you clicked Quit in the live bot.",
@@ -584,18 +867,94 @@ export class BrowserAgentEngine {
             stageIndex,
             kind: "upload_resume",
             source: "heuristic",
-            reason: "Resume upload field detected on this screen.",
+            reason: stageAction === "upload_resume"
+              ? "The page was classified as a resume upload stage."
+              : "Resume upload field detected on this screen.",
             fieldLabels: ["Resume upload"]
           });
           await writeBrowserDebug(workspacePath, "resume-upload-attempt", {
             stageIndex,
-            resumePath: input.resume.storagePath
+            resumePath: input.resume.storagePath,
+            requiresTransition: isResumeMethodChoiceObservation(observation)
           });
           resumeUploaded = await attachResume(activePage, input.resume.storagePath);
           await writeBrowserDebug(workspacePath, "resume-upload-result", {
             stageIndex,
             uploaded: resumeUploaded
           });
+
+          if (resumeUploaded && isResumeMethodChoiceObservation(observation)) {
+            const stageKey = `${stageSignature.url}:${stageSignature.progressText ?? ""}:${stageSignature.controlLabels.join("|")}`;
+            const attempts = (resumeUploadAttemptsByStage.get(stageKey) ?? 0) + 1;
+            resumeUploadAttemptsByStage.set(stageKey, attempts);
+            await updateLiveBot(activePage, {
+              step: `Stage ${stageIndex + 1}`,
+              mood: "thinking",
+              message: "Resume selected. Waiting for the portal to process it and open the next application step."
+            });
+            const completion = await waitForResumeUploadCompletion({
+              context,
+              page: activePage,
+              stageIndex,
+              planner,
+              workspacePath,
+              resumePath: input.resume.storagePath,
+              baselineSignature: stageSignature
+            });
+            activePage = completion.activePage;
+            await writeBrowserDebug(workspacePath, "resume-upload-completion", {
+              stageIndex,
+              completed: completion.completed,
+              reason: completion.reason,
+              attempts
+            });
+
+            if (completion.completed) {
+              if (!seenFilled.has("resume upload")) {
+                seenFilled.add("resume upload");
+                filledLabels.push("Resume upload");
+              }
+
+              continue;
+            }
+
+            resumeUploaded = false;
+
+            if (attempts < 2) {
+              await updateLiveBot(activePage, {
+                step: `Stage ${stageIndex + 1}`,
+                mood: "acting",
+                message: "The portal did not move after the first upload attempt, so I am retrying the From Device upload path once."
+              });
+              continue;
+            }
+
+            const message = `GradLaunch selected the resume upload path, but the portal stayed on the same application-method screen: ${completion.reason}`;
+            setPlannerStatus(planner, "needs_review", message);
+            await updateExecutionSession(this.executionSessions, executionSessionId, {
+              status: "resumable",
+              latestMessage: message,
+              planner,
+              currentUrl: activePage.url(),
+              currentStageIndex: stageIndex,
+              currentStageLabel: `Stage ${stageIndex + 1}`,
+              workspacePath,
+              lastStageSignature: await getStageSignature(activePage),
+              filledCount: filledLabels.length,
+              manualCount: skippedLabels.length
+            });
+            return {
+              status: "needs_manual_review",
+              sourceUrl: input.job.sourceUrl,
+              openedAt,
+              completedAt: nowIso(),
+              filledLabels,
+              skippedLabels,
+              screenshots,
+              message,
+              planner
+            };
+          }
 
           if (resumeUploaded && !seenFilled.has("resume upload")) {
             seenFilled.add("resume upload");
@@ -604,69 +963,96 @@ export class BrowserAgentEngine {
         }
 
         let answerPlan: Awaited<ReturnType<typeof buildStageAnswerPlan>> | undefined;
+        let failedRequiredAfterRetries: BrowserFillField[] = [];
 
-        if (stagePlan.action === "fill" && visibleFields.length > 0) {
-          answerPlan = await buildStageAnswerPlan({
-            job: input.job,
-            visibleFields,
+        if (stageAction === "fill" && stageVisibleFields.length > 0) {
+          const autonomousFill = await runAutonomousStageFill({
+            page: activePage,
+            stageIndex,
+            visibleFields: stageVisibleFields,
             baseFields: input.fields,
+            job: input.job,
             student: input.student,
             memory: input.memory,
             resumeText: input.resume?.extractedText,
-            workspacePath
-          });
-          recordPlannerDecision({
-            planner,
-            page: activePage,
-            stageIndex,
-            kind: plannerActionFromBrowserAction("fill"),
-            source: answerPlan.usedLlm ? "llm" : "heuristic",
-            reason: answerPlan.summary ?? "Visible fields detected, so the agent is filling the current stage.",
-            fieldLabels: answerPlan.answers.map((field) => field.label)
-          });
-          await updateLiveBot(activePage, {
-            step: `Stage ${stageIndex + 1}`,
-            mood: "acting",
-            message: answerPlan.summary ?? `Filling ${answerPlan.answers.length} mapped answers on this stage.`
+            workspacePath,
+            shouldStop: () => didUserRequestStop(activePage)
           });
 
-          for (const field of answerPlan.answers) {
-            if (await didUserRequestStop(activePage)) {
-              return await handleGracefulStop({
-                reason: "GradLaunch stopped because you clicked Quit in the live bot.",
-                input,
-                openedAt,
-                screenshots,
-                planner,
-                workspacePath,
-                executionSessions: this.executionSessions,
-                executionSessionId,
-                activePage,
-                filledLabels,
-                skippedLabels,
-                stageIndex
-              });
-            }
+          if (autonomousFill.stopped) {
+            return await handleGracefulStop({
+              reason: "GradLaunch stopped because you clicked Quit in the live bot.",
+              input,
+              openedAt,
+              screenshots,
+              planner,
+              workspacePath,
+              executionSessions: this.executionSessions,
+              executionSessionId,
+              activePage,
+              filledLabels,
+              skippedLabels,
+              stageIndex
+            });
+          }
 
-            const filled = await fillFormField(activePage, field);
-            const key = field.label.toLowerCase().trim();
-            await writeBrowserDebug(workspacePath, filled ? "filled-field" : "failed-to-fill-field", {
+          answerPlan = autonomousFill.answerPlan;
+          failedRequiredAfterRetries = autonomousFill.failedFields;
+          stageVisibleFields = autonomousFill.visibleFields;
+
+          if (!answerPlan) {
+            await writeBrowserDebug(workspacePath, "autonomous-fill-no-plan", {
               stageIndex,
-              fieldId: field.fieldId,
-              label: field.label,
-              inputType: field.inputType,
-              valuePreview: field.value.length > 80 ? `${field.value.slice(0, 77)}...` : field.value
+              visibleFieldCount: autonomousFill.visibleFields.length
+            });
+          } else {
+            recordPlannerDecision({
+              planner,
+              page: activePage,
+              stageIndex,
+              kind: plannerActionFromBrowserAction("fill"),
+              source: answerPlan.usedLlm ? "llm" : "heuristic",
+              reason: answerPlan.summary ?? "The autonomous form solver mapped and filled the current stage.",
+              fieldLabels: answerPlan.answers.map((field) => field.label)
+            });
+            await updateLiveBot(activePage, {
+              step: `Stage ${stageIndex + 1}`,
+              mood: "acting",
+              message: answerPlan.summary ?? `Autonomous fill verified ${autonomousFill.attempts.filter((attempt) => attempt.verified).length} field answer(s) on this stage.`
+            });
+          }
+
+          for (const attempt of autonomousFill.attempts) {
+            const key = attempt.field.label.toLowerCase().trim();
+            const verified = attempt.verified;
+            await writeBrowserDebug(workspacePath, verified ? "filled-field" : "failed-to-fill-field", {
+              stageIndex,
+              round: attempt.round,
+              fieldId: attempt.field.fieldId,
+              label: attempt.field.label,
+              inputType: attempt.field.inputType,
+              alreadySatisfied: attempt.alreadySatisfied,
+              valuePreview: attempt.field.value.length > 80 ? `${attempt.field.value.slice(0, 77)}...` : attempt.field.value
             });
 
-            if (filled) {
+            if (verified) {
               if (!seenFilled.has(key)) {
                 seenFilled.add(key);
-                filledLabels.push(field.label);
+                filledLabels.push(attempt.field.label);
               }
             } else if (!seenSkipped.has(key)) {
               seenSkipped.add(key);
-              skippedLabels.push(field.label);
+              skippedLabels.push(attempt.field.label);
             }
+          }
+
+          if (autonomousFill.outstandingRequired.length > 0 || autonomousFill.validationMessages.length > 0) {
+            await writeBrowserDebug(workspacePath, "autonomous-fill-blockers", {
+              stageIndex,
+              outstandingRequired: autonomousFill.outstandingRequired,
+              validationMessages: autonomousFill.validationMessages,
+              failedLabels: failedRequiredAfterRetries.map((field) => field.label)
+            });
           }
 
           await autoResolveConsentControls(activePage);
@@ -675,25 +1061,256 @@ export class BrowserAgentEngine {
         const submitVisible = await hasFinalSubmitControl(activePage);
         let outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
         let validationMessages = await getVisibleValidationMessages(activePage);
-        const uploadStillPending = Boolean(
+        let uploadStillPending = Boolean(
           input.resume?.storagePath
           && await pathExists(input.resume.storagePath)
           && await hasFileUpload(activePage)
           && !resumeUploaded
         );
 
+        if (uploadStillPending && input.resume?.storagePath) {
+          await writeBrowserDebug(workspacePath, "resume-upload-retry-before-evaluation", {
+            stageIndex,
+            resumePath: input.resume.storagePath
+          });
+          resumeUploaded = await attachResume(activePage, input.resume.storagePath);
+          await writeBrowserDebug(workspacePath, "resume-upload-retry-result", {
+            stageIndex,
+            uploaded: resumeUploaded
+          });
+          uploadStillPending = Boolean(
+            input.resume?.storagePath
+            && await pathExists(input.resume.storagePath)
+            && await hasFileUpload(activePage)
+            && !resumeUploaded
+          );
+
+          if (resumeUploaded && !seenFilled.has("resume upload")) {
+            seenFilled.add("resume upload");
+            filledLabels.push("Resume upload");
+          }
+
+          if (resumeUploaded) {
+            outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
+            validationMessages = await getVisibleValidationMessages(activePage);
+          }
+        }
+
         if (uploadStillPending && !outstandingRequired.some((label) => label.toLowerCase().includes("resume upload"))) {
           outstandingRequired = [...outstandingRequired, "Resume upload"];
         }
 
+        let completionGuardLabels: string[] = [];
+        const guardedReadiness = await applyCurrentPageCompletionGuard({
+          page: activePage,
+          failedFields: failedRequiredAfterRetries,
+          outstandingRequired,
+          workspacePath,
+          stageIndex
+        });
+        outstandingRequired = guardedReadiness.outstandingRequired;
+        completionGuardLabels = guardedReadiness.guardLabels;
+
         let evaluation = evaluateStageReadiness({
-          visibleFields,
+          visibleFields: stageVisibleFields,
           outstandingRequired,
           validationMessages,
           submitVisible,
           submitRequested: input.submit,
           allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
         });
+        let recoveryPlan = classifyRecovery({
+          classification: activeClassification,
+          outstandingRequired,
+          validationMessages,
+          uploadStillPending,
+          failedFieldCount: failedRequiredAfterRetries.length
+        });
+        await writeBrowserDebug(workspacePath, "recovery-plan", {
+          stageIndex,
+          kind: recoveryPlan.kind,
+          confidence: recoveryPlan.confidence,
+          reason: recoveryPlan.reason,
+          actions: recoveryPlan.actions
+        });
+
+        if (recoveryPlan.kind === "network_delay") {
+          await updateLiveBot(activePage, {
+            step: `Stage ${stageIndex + 1}`,
+            mood: "thinking",
+            message: "The page appears to be processing changes, so I am waiting and re-scanning before deciding."
+          });
+          await activePage.waitForTimeout(Number(process.env.BROWSER_DYNAMIC_WAIT_MS ?? 1400)).catch(() => undefined);
+          continue;
+        }
+
+        if (evaluation.status === "needs_user" || evaluation.status === "needs_retry") {
+          const repairedKnownChoice = await resolveKnownRequiredChoice(activePage, [
+            ...evaluation.missingRequiredLabels,
+            ...evaluation.validationMessages
+          ]);
+
+          if (repairedKnownChoice) {
+            await writeBrowserDebug(workspacePath, "known-choice-required-repair-result", {
+              stageIndex,
+              repaired: true,
+              blockers: [
+                ...evaluation.missingRequiredLabels,
+                ...evaluation.validationMessages
+              ]
+            });
+            outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
+            validationMessages = await getVisibleValidationMessages(activePage);
+            evaluation = evaluateStageReadiness({
+              visibleFields: stageVisibleFields,
+              outstandingRequired,
+              validationMessages,
+              submitVisible: await hasFinalSubmitControl(activePage),
+              submitRequested: input.submit,
+              allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
+            });
+            recoveryPlan = classifyRecovery({
+              classification: activeClassification,
+              outstandingRequired,
+              validationMessages,
+              uploadStillPending,
+              failedFieldCount: failedRequiredAfterRetries.length
+            });
+          }
+        }
+
+        if (answerPlan && evaluation.status === "needs_user") {
+          const autocompleteRepairs = answerPlan.answers.filter((field) => {
+            const label = field.label.toLowerCase();
+            const missing = evaluation.missingRequiredLabels.some((missingLabel) => {
+              const normalizedMissing = missingLabel.toLowerCase();
+              return normalizedMissing.includes(label) || label.includes(normalizedMissing);
+            });
+
+            return missing && (
+              field.inputType === "combobox"
+              || /\b(city|location|place|residence|school|university|college)\b/i.test(`${field.label} ${field.value}`)
+            );
+          });
+
+          if (autocompleteRepairs.length > 0) {
+            await writeBrowserDebug(workspacePath, "autocomplete-required-repair-start", {
+              stageIndex,
+              missingRequiredLabels: evaluation.missingRequiredLabels,
+              fieldLabels: autocompleteRepairs.map((field) => field.label)
+            });
+
+            for (const field of autocompleteRepairs) {
+              await fillFormField(activePage, field);
+              await activePage.waitForTimeout(450).catch(() => undefined);
+            }
+
+            outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
+            validationMessages = await getVisibleValidationMessages(activePage);
+            evaluation = evaluateStageReadiness({
+              visibleFields: stageVisibleFields,
+              outstandingRequired,
+              validationMessages,
+              submitVisible,
+              submitRequested: input.submit,
+              allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
+            });
+            await writeBrowserDebug(workspacePath, "autocomplete-required-repair-result", {
+              stageIndex,
+              status: evaluation.status,
+              missingRequiredLabels: evaluation.missingRequiredLabels,
+              validationMessages: evaluation.validationMessages
+            });
+          }
+        }
+
+        if (answerPlan && (evaluation.status === "needs_user" || evaluation.status === "needs_retry")) {
+          const choiceRepairs = answerPlan.answers.filter((field) => {
+            if (field.inputType !== "radio" && field.inputType !== "checkbox") {
+              return false;
+            }
+
+            const fieldLabel = field.label.toLowerCase();
+            const blockerText = [...evaluation.missingRequiredLabels, ...evaluation.validationMessages].join(" ").toLowerCase();
+
+            return blockerText.includes(fieldLabel)
+              || fieldLabel.includes(blockerText)
+              || /\b(this field is required|there are some errors|please correct)\b/i.test(blockerText);
+          });
+
+          if (choiceRepairs.length > 0) {
+            await writeBrowserDebug(workspacePath, "choice-required-repair-start", {
+              stageIndex,
+              missingRequiredLabels: evaluation.missingRequiredLabels,
+              validationMessages: evaluation.validationMessages,
+              fieldLabels: choiceRepairs.map((field) => field.label)
+            });
+
+            for (const field of choiceRepairs) {
+              await fillFormField(activePage, field);
+              await activePage.waitForTimeout(500).catch(() => undefined);
+            }
+
+            outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
+            validationMessages = await getVisibleValidationMessages(activePage);
+
+            if (outstandingRequired.length === 0 && isStaleChoiceValidation(validationMessages, choiceRepairs)) {
+              validationMessages = [];
+            }
+
+            evaluation = evaluateStageReadiness({
+              visibleFields: stageVisibleFields,
+              outstandingRequired,
+              validationMessages,
+              submitVisible,
+              submitRequested: input.submit,
+              allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
+            });
+            await writeBrowserDebug(workspacePath, "choice-required-repair-result", {
+              stageIndex,
+              status: evaluation.status,
+              missingRequiredLabels: evaluation.missingRequiredLabels,
+              validationMessages: evaluation.validationMessages
+            });
+          }
+        }
+
+        if (answerPlan && evaluation.status === "needs_retry" && outstandingRequired.length === 0 && isStaleChoiceValidation(validationMessages, answerPlan.answers)) {
+          validationMessages = [];
+          evaluation = evaluateStageReadiness({
+            visibleFields: stageVisibleFields,
+            outstandingRequired,
+            validationMessages,
+            submitVisible,
+            submitRequested: input.submit,
+            allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
+          });
+          await writeBrowserDebug(workspacePath, "stale-choice-validation-ignored", {
+            stageIndex,
+            reason: "A required radio/checkbox answer is selected, and only a stale generic validation banner remains."
+          });
+        }
+
+        const finalGuardedReadiness = await applyCurrentPageCompletionGuard({
+          page: activePage,
+          failedFields: failedRequiredAfterRetries,
+          outstandingRequired,
+          workspacePath,
+          stageIndex
+        });
+
+        if (finalGuardedReadiness.guardLabels.length > 0 || finalGuardedReadiness.outstandingRequired.length !== outstandingRequired.length) {
+          outstandingRequired = finalGuardedReadiness.outstandingRequired;
+          completionGuardLabels = finalGuardedReadiness.guardLabels;
+          evaluation = evaluateStageReadiness({
+            visibleFields: stageVisibleFields,
+            outstandingRequired,
+            validationMessages,
+            submitVisible: await hasFinalSubmitControl(activePage),
+            submitRequested: input.submit,
+            allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
+          });
+        }
 
         await writeBrowserDebug(workspacePath, "stage-evaluation", {
           stageIndex,
@@ -701,7 +1318,8 @@ export class BrowserAgentEngine {
           confidence: evaluation.confidence,
           reason: evaluation.reason,
           missingRequiredLabels: evaluation.missingRequiredLabels,
-          validationMessages: evaluation.validationMessages
+          validationMessages: evaluation.validationMessages,
+          completionGuardLabels
         });
         await updateLiveBot(activePage, {
           step: `Stage ${stageIndex + 1}`,
@@ -709,12 +1327,12 @@ export class BrowserAgentEngine {
           message: evaluation.reason
         });
 
-        if (stagePlan.action === "fill" && evaluation.status === "needs_retry") {
+        if (stageAction === "fill" && evaluation.status === "needs_retry") {
           const reflection = await reflectOnStageAnswers({
             job: input.job,
             student: input.student,
             memory: input.memory,
-            visibleFields,
+            visibleFields: stageVisibleFields,
             attemptedAnswers: answerPlan?.answers ?? [],
             missingRequiredLabels: evaluation.missingRequiredLabels,
             validationMessages: evaluation.validationMessages,
@@ -761,7 +1379,7 @@ export class BrowserAgentEngine {
             outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
             validationMessages = await getVisibleValidationMessages(activePage);
             evaluation = evaluateStageReadiness({
-              visibleFields,
+              visibleFields: stageVisibleFields,
               outstandingRequired,
               validationMessages,
               submitVisible: await hasFinalSubmitControl(activePage),
@@ -1049,7 +1667,8 @@ export class BrowserAgentEngine {
             stageIndex
           });
         }
-        const navigation = await clickNextStageControl(context, activePage, { allowApplyStart: true });
+        const allowApplyStart = observation.pageState === "start" && stageVisibleFields.length === 0;
+        const navigation = await clickNextStageControl(context, activePage, { allowApplyStart });
 
         if (!navigation.clicked) {
           const manualAdvance = await waitForManualProgress({
@@ -1099,6 +1718,41 @@ export class BrowserAgentEngine {
         }
 
         activePage = await getActivePage(context, navigation.page);
+        const nextStageSignature = await getStageSignature(activePage);
+
+        if (seenStageVisitKeys.has(stageVisitKey(nextStageSignature))) {
+          const message = "The next action returned to a previously seen application screen, so GradLaunch paused to avoid a back/forward loop.";
+          bumpPlannerRetries(planner, "retry_alternative_path", message, activePage, stageIndex);
+          await updateLiveBot(activePage, {
+            step: `Stage ${stageIndex + 1}`,
+            mood: "waiting",
+            message
+          });
+          await updateExecutionSession(this.executionSessions, executionSessionId, {
+            status: "resumable",
+            latestMessage: message,
+            planner,
+            currentUrl: activePage.url(),
+            currentStageIndex: stageIndex,
+            currentStageLabel: `Stage ${stageIndex + 1}`,
+            workspacePath,
+            lastStageSignature: nextStageSignature,
+            filledCount: filledLabels.length,
+            manualCount: skippedLabels.length
+          });
+          return {
+            status: "needs_manual_review",
+            sourceUrl: input.job.sourceUrl,
+            openedAt,
+            completedAt: nowIso(),
+            filledLabels,
+            skippedLabels,
+            screenshots,
+            message,
+            planner
+          };
+        }
+
         completePlannerStage(planner, activePage, stageIndex);
       }
 
@@ -1182,6 +1836,10 @@ async function openOrResumePage(context: BrowserContext, sourceUrl: string, resu
 async function navigateToJobPage(page: Page, targetUrl: string, workspacePath: string) {
   let gotoError: string | undefined;
 
+  if (!isHttpUrl(targetUrl)) {
+    throw new Error(`GradLaunch refused to navigate to a non-job browser URL: ${targetUrl}`);
+  }
+
   await page.bringToFront().catch(() => undefined);
   await writeBrowserDebug(workspacePath, "job-navigation-start", {
     fromUrl: page.url(),
@@ -1259,560 +1917,51 @@ function isBlankBrowserUrl(value: string) {
   return value === "about:blank" || value === "chrome://newtab/" || value.startsWith("chrome://new-tab-page");
 }
 
-function sanitizeBrowserResumeUrl(value: string | undefined) {
-  if (!value || value === "about:blank" || value.startsWith("chrome://newtab")) {
+function isHttpUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function stageVisitKey(signature: Awaited<ReturnType<typeof getStageSignature>>) {
+  return [
+    signature.url,
+    signature.progressText ?? "",
+    signature.fingerprint
+  ].join("|");
+}
+
+function sanitizeBrowserResumeUrl(value: string | undefined, sourceUrl: string) {
+  if (!value) {
     return undefined;
   }
 
-  if (looksLikeLoginUrl(value)) {
+  let parsed: URL;
+  let source: URL;
+
+  try {
+    parsed = new URL(value);
+    source = new URL(sourceUrl);
+  } catch (_error) {
     return undefined;
   }
 
-  return value;
-}
-
-async function tryResolveLoginWithExistingProfile(input: {
-  context: BrowserContext;
-  page: Page;
-  sourceUrl: string;
-  studentEmail?: string;
-  workspacePath: string;
-  stageIndex: number;
-  reason?: string;
-}) {
-  if (process.env.BROWSER_LOGIN_PROFILE_RECOVERY === "false") {
-    return {
-      resolved: false,
-      activePage: input.page
-    };
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return undefined;
   }
 
-  let activePage = input.page;
-  await writeBrowserDebug(input.workspacePath, "login-profile-recovery-start", {
-    stageIndex: input.stageIndex,
-    url: activePage.url(),
-    sourceUrl: input.sourceUrl,
-    reason: input.reason,
-    hasStudentEmail: Boolean(input.studentEmail)
-  });
-
-  await updateLiveBot(activePage, {
-    step: `Stage ${input.stageIndex + 1}`,
-    mood: "acting",
-    message: "Trying the existing logged-in browser profile before asking you to sign in manually."
-  });
-
-  activePage = await tryLoginButtonsInCurrentProfile({
-    context: input.context,
-    page: activePage,
-    studentEmail: input.studentEmail,
-    workspacePath: input.workspacePath,
-    stageIndex: input.stageIndex
-  });
-
-  if (await loginGateCleared(activePage)) {
-    await writeBrowserDebug(input.workspacePath, "login-profile-recovery-resolved", {
-      stageIndex: input.stageIndex,
-      strategy: "current-tab-login-button",
-      url: activePage.url()
-    });
-    return {
-      resolved: true,
-      activePage
-    };
+  if (looksLikeLoginUrl(value) || looksLikePersonalBrowsingUrl(value)) {
+    return undefined;
   }
 
-  const freshPage = await input.context.newPage();
-  activePage = freshPage;
-  await activePage.bringToFront().catch(() => undefined);
-  await writeBrowserDebug(input.workspacePath, "login-profile-recovery-fresh-tab", {
-    stageIndex: input.stageIndex,
-    sourceUrl: input.sourceUrl
-  });
-  await updateLiveBot(activePage, {
-    step: `Stage ${input.stageIndex + 1}`,
-    mood: "acting",
-    message: "Opening the original job in a fresh tab inside the logged browser profile."
-  });
-  await activePage.goto(input.sourceUrl, {
-    waitUntil: "domcontentloaded",
-    timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000)
-  }).catch(() => undefined);
-  await activePage.waitForTimeout(1000).catch(() => undefined);
-  await clickSoftGate(activePage);
-
-  if (await loginGateCleared(activePage)) {
-    await writeBrowserDebug(input.workspacePath, "login-profile-recovery-resolved", {
-      stageIndex: input.stageIndex,
-      strategy: "fresh-job-tab",
-      url: activePage.url()
-    });
-    return {
-      resolved: true,
-      activePage
-    };
+  if (!isSameSiteOrSubdomain(parsed.hostname, source.hostname)) {
+    return undefined;
   }
 
-  activePage = await tryLoginButtonsInCurrentProfile({
-    context: input.context,
-    page: activePage,
-    studentEmail: input.studentEmail,
-    workspacePath: input.workspacePath,
-    stageIndex: input.stageIndex
-  });
-
-  const resolved = await loginGateCleared(activePage);
-  await writeBrowserDebug(input.workspacePath, resolved ? "login-profile-recovery-resolved" : "login-profile-recovery-unresolved", {
-    stageIndex: input.stageIndex,
-    strategy: "fresh-tab-login-button",
-    url: activePage.url()
-  });
-
-  return {
-    resolved,
-    activePage
-  };
-}
-
-async function tryLoginButtonsInCurrentProfile(input: {
-  context: BrowserContext;
-  page: Page;
-  studentEmail?: string;
-  workspacePath: string;
-  stageIndex: number;
-}) {
-  let activePage = input.page;
-
-  activePage = await clickLoginEntryPoint({
-    context: input.context,
-    page: activePage,
-    mode: "google",
-    workspacePath: input.workspacePath,
-    stageIndex: input.stageIndex
-  });
-  activePage = await maybeClickGoogleAccount(activePage, input.studentEmail);
-  await maybeContinueGoogleOAuthConsent(activePage);
-
-  if (await loginGateCleared(activePage)) {
-    return activePage;
-  }
-
-  if (input.studentEmail) {
-    activePage = await clickLoginEntryPoint({
-      context: input.context,
-      page: activePage,
-      mode: "email",
-      workspacePath: input.workspacePath,
-      stageIndex: input.stageIndex
-    });
-    await fillLoginEmailOnly(activePage, input.studentEmail);
-  }
-
-  return await getActivePage(input.context, activePage);
-}
-
-async function clickLoginEntryPoint(input: {
-  context: BrowserContext;
-  page: Page;
-  mode: "google" | "email";
-  workspacePath: string;
-  stageIndex: number;
-}) {
-  if (input.mode === "google" && isGoogleAuthUrl(input.page.url())) {
-    return input.page;
-  }
-
-  const popupPromise = input.context.waitForEvent("page", { timeout: 2500 }).catch(() => undefined);
-  const clicked = await clickLoginControl(input.page, input.mode);
-  const popup = clicked ? await popupPromise : undefined;
-
-  await writeBrowserDebug(input.workspacePath, clicked ? "login-entry-clicked" : "login-entry-not-found", {
-    stageIndex: input.stageIndex,
-    mode: input.mode,
-    url: input.page.url(),
-    popupOpened: Boolean(popup)
-  });
-
-  const activePage = popup ?? await getActivePage(input.context, input.page);
-  await activePage.bringToFront().catch(() => undefined);
-  await activePage.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
-  await activePage.waitForTimeout(1200).catch(() => undefined);
-  return activePage;
-}
-
-async function clickLoginControl(page: Page, mode: "google" | "email") {
-  for (const frame of page.frames()) {
-    const marker = `gl-login-${mode}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const found = await frame.evaluate(({ marker, mode }) => {
-      const candidates = Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit'], div, span")) as HTMLElement[];
-      let best: HTMLElement | undefined;
-      let bestScore = 0;
-
-      for (const candidate of candidates) {
-        if (!isVisible(candidate)) {
-          continue;
-        }
-
-        const text = normalize([
-          candidate.innerText,
-          candidate.textContent,
-          candidate.getAttribute("aria-label"),
-          candidate.getAttribute("title"),
-          candidate instanceof HTMLInputElement ? candidate.value : ""
-        ].filter(Boolean).join(" "));
-
-        if (!text || text.length > 120) {
-          continue;
-        }
-
-        const score = scoreCandidate(text, candidate, mode);
-
-        if (score > bestScore) {
-          bestScore = score;
-          best = candidate;
-        }
-      }
-
-      if (!best || bestScore < 70) {
-        return false;
-      }
-
-      best.setAttribute("data-gradlaunch-login-target", marker);
-      return true;
-
-      function scoreCandidate(text: string, element: HTMLElement, targetMode: "google" | "email") {
-        let score = 0;
-
-        if (targetMode === "google") {
-          if (/\b(google|gmail)\b/.test(text)) {
-            score += 80;
-          }
-
-          if (/\b(sign in|signin|log in|login|continue|use|connect)\b/.test(text)) {
-            score += 25;
-          }
-        } else {
-          if (/\b(email|e mail|mail)\b/.test(text)) {
-            score += 80;
-          }
-
-          if (/\b(sign in|signin|log in|login|continue|use|magic link|one time)\b/.test(text)) {
-            score += 25;
-          }
-        }
-
-        if (element.matches("button, a, [role='button'], input[type='button'], input[type='submit']")) {
-          score += 20;
-        }
-
-        if (/\b(password|forgot|create account|register|sign up)\b/.test(text)) {
-          score -= 30;
-        }
-
-        return score;
-      }
-
-      function isVisible(element: HTMLElement) {
-        const style = window.getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
-        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity || "1") > 0 && rect.width > 0 && rect.height > 0;
-      }
-
-      function normalize(value: string) {
-        return value.toLowerCase().replace(/[^a-z0-9@._+-]+/g, " ").trim();
-      }
-    }, { marker, mode }).catch(() => false);
-
-    if (!found) {
-      continue;
-    }
-
-    const target = frame.locator(`[data-gradlaunch-login-target="${marker}"]`).first();
-
-    try {
-      await target.click({ force: true, timeout: 1200 });
-      return true;
-    } catch (_error) {
-      const box = await target.boundingBox().catch(() => undefined);
-
-      if (!box) {
-        return false;
-      }
-
-      await frame.page().mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => undefined);
-      return true;
-    } finally {
-      await target.evaluate((element) => {
-        if (element instanceof HTMLElement) {
-          element.removeAttribute("data-gradlaunch-login-target");
-        }
-      }).catch(() => undefined);
-    }
-  }
-
-  return false;
-}
-
-async function maybeClickGoogleAccount(page: Page, studentEmail: string | undefined) {
-  if (!studentEmail || !isGoogleAuthUrl(page.url())) {
-    return page;
-  }
-
-  for (const frame of page.frames()) {
-    const account = frame.locator(`text=${studentEmail}`).first();
-
-    if (await account.isVisible({ timeout: 600 }).catch(() => false)) {
-      await account.click({ force: true, timeout: 1200 }).catch(() => undefined);
-      await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
-      await page.waitForTimeout(1200).catch(() => undefined);
-      return page;
-    }
-
-    const clicked = await frame.evaluate((emailSource) => {
-      const pattern = new RegExp(emailSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      const candidates = Array.from(document.querySelectorAll("button, a, [role='button'], div")) as HTMLElement[];
-
-      for (const candidate of candidates) {
-        const text = candidate.innerText || candidate.textContent || "";
-
-        if (pattern.test(text) && isVisible(candidate)) {
-          candidate.click();
-          return true;
-        }
-      }
-
-      return false;
-
-      function isVisible(element: HTMLElement) {
-        const style = window.getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
-        return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
-      }
-    }, studentEmail).catch(() => false);
-
-    if (clicked) {
-      await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
-      await page.waitForTimeout(1200).catch(() => undefined);
-      return page;
-    }
-  }
-
-  await fillLoginEmailOnly(page, studentEmail);
-  return page;
-}
-
-async function maybeContinueGoogleOAuthConsent(page: Page) {
-  if (!isGoogleAuthUrl(page.url())) {
-    return false;
-  }
-
-  for (const frame of page.frames()) {
-    const clicked = await frame.evaluate(() => {
-      const hasVisiblePassword = Array.from(document.querySelectorAll("input[type='password']")).some((control) => isVisible(control));
-      const hasVisibleIdentifier = Array.from(document.querySelectorAll("input")).some((control) => {
-        if (!(control instanceof HTMLInputElement) || !isVisible(control)) {
-          return false;
-        }
-
-        const descriptor = normalize([
-          control.type,
-          control.autocomplete,
-          control.name,
-          control.id,
-          control.placeholder,
-          control.getAttribute("aria-label")
-        ].filter(Boolean).join(" "));
-        return /\b(email|phone|identifier|username)\b/.test(descriptor);
-      });
-
-      if (hasVisiblePassword || hasVisibleIdentifier) {
-        return false;
-      }
-
-      const candidates = Array.from(document.querySelectorAll("button, [role='button'], input[type='button'], input[type='submit']")) as HTMLElement[];
-
-      for (const candidate of candidates) {
-        if (!isVisible(candidate)) {
-          continue;
-        }
-
-        const text = normalize([
-          candidate.innerText,
-          candidate.textContent,
-          candidate.getAttribute("aria-label"),
-          candidate.getAttribute("title"),
-          candidate instanceof HTMLInputElement ? candidate.value : ""
-        ].filter(Boolean).join(" "));
-
-        if (/\b(continue|allow|next)\b/.test(text) && !/\b(create|forgot|cancel|back|privacy|terms)\b/.test(text)) {
-          candidate.click();
-          return true;
-        }
-      }
-
-      return false;
-
-      function isVisible(element: Element | null) {
-        if (!(element instanceof HTMLElement)) {
-          return false;
-        }
-
-        const style = window.getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
-        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity || "1") > 0 && rect.width > 0 && rect.height > 0;
-      }
-
-      function normalize(value: string) {
-        return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      }
-    }).catch(() => false);
-
-    if (!clicked) {
-      continue;
-    }
-
-    await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
-    await page.waitForTimeout(1200).catch(() => undefined);
-    return true;
-  }
-
-  return false;
-}
-
-async function fillLoginEmailOnly(page: Page, email: string) {
-  for (const frame of page.frames()) {
-    const filled = await frame.evaluate((emailValue) => {
-      const controls = Array.from(document.querySelectorAll("input")) as HTMLInputElement[];
-      const target = controls.find((control) => {
-        if (control.disabled || !isVisible(control)) {
-          return false;
-        }
-
-        const descriptor = normalize([
-          control.type,
-          control.autocomplete,
-          control.name,
-          control.id,
-          control.placeholder,
-          control.getAttribute("aria-label")
-        ].filter(Boolean).join(" "));
-
-        return /\b(email|username|user name|login)\b/.test(descriptor) && !/\b(password|otp|code)\b/.test(descriptor);
-      });
-
-      if (!target) {
-        return false;
-      }
-
-      target.focus();
-      setNativeValue(target, emailValue);
-      target.dispatchEvent(new Event("input", { bubbles: true }));
-      target.dispatchEvent(new Event("change", { bubbles: true }));
-      return true;
-
-      function setNativeValue(control: HTMLInputElement, value: string) {
-        const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
-
-        if (descriptor?.set) {
-          descriptor.set.call(control, value);
-        } else {
-          control.value = value;
-        }
-      }
-
-      function isVisible(element: HTMLElement) {
-        const style = window.getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
-        return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
-      }
-
-      function normalize(value: string) {
-        return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      }
-    }, email).catch(() => false);
-
-    if (!filled) {
-      continue;
-    }
-
-    const nextClicked = await clickLoginContinue(frame);
-
-    if (!nextClicked) {
-      await frame.page().keyboard.press("Enter").catch(() => undefined);
-    }
-
-    await page.waitForLoadState("domcontentloaded", { timeout: 6000 }).catch(() => undefined);
-    await page.waitForTimeout(1200).catch(() => undefined);
-    return true;
-  }
-
-  return false;
-}
-
-async function clickLoginContinue(frame: Frame) {
-  const marker = `gl-login-continue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const found = await frame.evaluate((targetMarker) => {
-    const candidates = Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit']")) as HTMLElement[];
-    let best: HTMLElement | undefined;
-    let bestScore = 0;
-
-    for (const candidate of candidates) {
-      if (!isVisible(candidate)) {
-        continue;
-      }
-
-      const text = normalize([
-        candidate.innerText,
-        candidate.textContent,
-        candidate.getAttribute("aria-label"),
-        candidate instanceof HTMLInputElement ? candidate.value : ""
-      ].filter(Boolean).join(" "));
-      let score = 0;
-
-      if (/\b(continue|next|sign in|log in|submit)\b/.test(text)) {
-        score += 100;
-      }
-
-      if (/\b(google|facebook|github|sso|forgot|create account|sign up)\b/.test(text)) {
-        score -= 70;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        best = candidate;
-      }
-    }
-
-    if (!best || bestScore < 70) {
-      return false;
-    }
-
-    best.setAttribute("data-gradlaunch-login-continue-target", targetMarker);
-    return true;
-
-    function isVisible(element: HTMLElement) {
-      const style = window.getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
-    }
-
-    function normalize(value: string) {
-      return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    }
-  }, marker).catch(() => false);
-
-  if (!found) {
-    return false;
-  }
-
-  const target = frame.locator(`[data-gradlaunch-login-continue-target="${marker}"]`).first();
-  await target.click({ force: true, timeout: 1200 }).catch(() => undefined);
-  await target.evaluate((element) => {
-    if (element instanceof HTMLElement) {
-      element.removeAttribute("data-gradlaunch-login-continue-target");
-    }
-  }).catch(() => undefined);
-  return true;
+  return parsed.toString();
 }
 
 async function loginGateCleared(page: Page) {
@@ -1835,11 +1984,6 @@ async function loginGateCleared(page: Page) {
   return Boolean(observation && observation.pageState !== "login" && observation.pageState !== "account_gate");
 }
 
-function resolveApplicantEmail(input: BrowserApplyInput) {
-  return [input.student?.email, ...input.fields.filter((field) => /email/i.test(field.label)).map((field) => field.value)]
-    .find((value): value is string => typeof value === "string" && isLikelyEmail(value));
-}
-
 function looksLikeLoginUrl(value: string) {
   try {
     const parsed = new URL(value);
@@ -1847,6 +1991,21 @@ function looksLikeLoginUrl(value: string) {
     return /\b(login|signin|sign-in|sign_in|auth|oauth|sso|account)\b/.test(haystack);
   } catch (_error) {
     return false;
+  }
+}
+
+function looksLikePersonalBrowsingUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    const host = parsed.hostname.toLowerCase();
+    return /(^|\.)youtube\.com$/.test(host)
+      || /(^|\.)youtu\.be$/.test(host)
+      || /(^|\.)gmail\.com$/.test(host)
+      || /(^|\.)googlemail\.com$/.test(host)
+      || /(^|\.)workspace\.google\.com$/.test(host)
+      || /(^|\.)mail\.google\.com$/.test(host);
+  } catch (_error) {
+    return true;
   }
 }
 
@@ -1859,8 +2018,35 @@ function isGoogleAuthUrl(value: string) {
   }
 }
 
-function isLikelyEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+function sameHostname(left: string, right: string) {
+  try {
+    return new URL(left).hostname === new URL(right).hostname;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isSameSiteOrSubdomain(leftHost: string, rightHost: string) {
+  const left = leftHost.toLowerCase();
+  const right = rightHost.toLowerCase();
+
+  if (left === right || left.endsWith(`.${right}`) || right.endsWith(`.${left}`)) {
+    return true;
+  }
+
+  const leftSite = approximateSiteDomain(left);
+  const rightSite = approximateSiteDomain(right);
+  return Boolean(leftSite && rightSite && leftSite === rightSite);
+}
+
+function approximateSiteDomain(hostname: string) {
+  const parts = hostname.split(".").filter(Boolean);
+
+  if (parts.length < 2) {
+    return hostname;
+  }
+
+  return parts.slice(-2).join(".");
 }
 
 async function updateExecutionSession(
@@ -1944,6 +2130,589 @@ async function handleGracefulStop(input: {
   };
 }
 
+async function waitForResumeUploadCompletion(input: {
+  context: BrowserContext;
+  page: Page;
+  stageIndex: number;
+  planner: ReturnType<typeof createPlannerCheckpoint>;
+  workspacePath: string;
+  resumePath: string;
+  baselineSignature: Awaited<ReturnType<typeof getStageSignature>>;
+}) {
+  const timeoutMs = Number(process.env.BROWSER_RESUME_UPLOAD_TIMEOUT_MS ?? 30000);
+  const pollMs = Number(process.env.BROWSER_RESUME_UPLOAD_POLL_MS ?? 1000);
+  const startedAt = Date.now();
+  let activePage = input.page;
+  let lastReason = "Waiting for the upload widget to finish processing.";
+
+  while (Date.now() - startedAt < timeoutMs) {
+    await activePage.waitForLoadState("domcontentloaded", { timeout: pollMs }).catch(() => undefined);
+    await activePage.waitForTimeout(pollMs).catch(() => undefined);
+    activePage = await getActivePage(input.context, activePage);
+
+    const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
+
+    if (protectedCheckpoint.blocked) {
+      return {
+        completed: false,
+        activePage,
+        reason: protectedCheckpoint.reason ?? "A protected checkpoint appeared after selecting the resume file."
+      };
+    }
+
+    const visibleFields = await discoverVisibleFields(activePage).catch(() => []);
+    const observation = await observeBrowserPage(activePage, visibleFields).catch(() => undefined);
+
+    if (!observation) {
+      lastReason = "The page is still loading or temporarily unreadable after selecting the resume.";
+      continue;
+    }
+
+    const validationMessages = await getVisibleValidationMessages(activePage).catch(() => []);
+    const isLoading = validationMessages.some((message) => /loading|please wait|processing|uploading/i.test(message))
+      || /loading|please wait|processing|uploading/i.test(observation.pageText);
+    const methodChoiceStillVisible = isResumeMethodChoiceObservation(observation);
+
+    if (isLoading || isTransientBlankObservation(observation)) {
+      lastReason = "The portal is still processing the selected resume.";
+      continue;
+    }
+
+    if (methodChoiceStillVisible) {
+      if (await continueAfterResumeUploadIfReady(activePage, input.resumePath)) {
+        lastReason = "Clicked the resume upload Continue button and waiting for the next application step.";
+        continue;
+      }
+
+      lastReason = "The application-method choices are still visible after selecting the resume.";
+      continue;
+    }
+
+    if (visibleFields.length > 0 || isActionablePostUploadState(observation)) {
+      recordPlannerStageOutcome({
+        planner: input.planner,
+        page: activePage,
+        stageIndex: input.stageIndex,
+        outcome: "advanced",
+        filledFieldLabels: ["Resume upload"]
+      });
+      return {
+        completed: true,
+        activePage,
+        reason: `Resume upload moved the application flow to ${observation.pageState}.`
+      };
+    }
+
+    const signatureAfter = await getStageSignature(activePage, observation);
+
+    if (
+      signatureAfter.url !== input.baselineSignature.url
+      || signatureAfter.progressText !== input.baselineSignature.progressText
+      || signatureAfter.fingerprint !== input.baselineSignature.fingerprint
+    ) {
+      return {
+        completed: true,
+        activePage,
+        reason: "Resume upload changed the application stage signature."
+      };
+    }
+
+    lastReason = `Current page state is still ${observation.pageState}.`;
+  }
+
+  return {
+    completed: false,
+    activePage,
+    reason: lastReason
+  };
+}
+
+function isResumeMethodChoiceObservation(observation: BrowserAgentObservation) {
+  const text = normalizeAgentText([
+    observation.title,
+    observation.pageText,
+    ...observation.controls.map((control) => `${control.text} ${control.label}`)
+  ].join(" "));
+
+  return /\b(choose an option to apply|application method|application methods|how would you like to apply|apply with)\b/.test(text)
+    && /\b(from device|from computer|upload from device|upload from computer|select from device)\b/.test(text)
+    && /\b(without resume|without cv|copy paste|copy and paste)\b/.test(text);
+}
+
+function isTransientBlankObservation(observation: BrowserAgentObservation) {
+  return observation.visibleFields.length === 0
+    && observation.controls.length === 0
+    && normalizeAgentText(observation.pageText).length < 25;
+}
+
+function isActionablePostUploadState(observation: BrowserAgentObservation) {
+  return observation.pageState === "questionnaire"
+    || observation.pageState === "consent"
+    || observation.pageState === "form_fill"
+    || observation.pageState === "review"
+    || observation.pageState === "submit"
+    || observation.pageState === "account_gate"
+    || observation.pageState === "login";
+}
+
+async function applyCurrentPageCompletionGuard(input: {
+  page: Page;
+  failedFields: BrowserFillField[];
+  outstandingRequired: string[];
+  workspacePath: string;
+  stageIndex: number;
+}) {
+  const pageRequiredLabels = await getVisibleRequiredEmptyLabels(input.page);
+  const stillEmptyAttemptedLabels = input.failedFields.length > 0
+    ? await getStillEmptyAttemptedRequiredLabels(input.page, input.failedFields)
+    : [];
+  const unverifiedCriticalLabels = input.failedFields
+    .filter((field) => field.required || isLikelyRequiredAttemptedLabel(field.label))
+    .filter((field) => !/\b(address line 2|address 2|middle name|preferred name|apt|suite)\b/i.test(field.label))
+    .map((field) => field.label);
+  const guardLabels = dedupeLabels([...stillEmptyAttemptedLabels, ...unverifiedCriticalLabels]);
+  const outstandingRequired = dedupeLabels([...input.outstandingRequired, ...pageRequiredLabels, ...guardLabels]);
+
+  const newlyGuardedLabels = dedupeLabels([...pageRequiredLabels, ...guardLabels])
+    .filter((label) => !input.outstandingRequired.some((existing) => normalizeKey(existing) === normalizeKey(label)));
+
+  if (newlyGuardedLabels.length > 0) {
+    await writeBrowserDebug(input.workspacePath, "stage-completion-guard", {
+      stageIndex: input.stageIndex,
+      guardLabels: newlyGuardedLabels,
+      reason: "Visible required or application-critical fields are still empty, so navigation is blocked for this stage."
+    });
+  }
+
+  return {
+    outstandingRequired,
+    guardLabels: dedupeLabels([...pageRequiredLabels, ...guardLabels])
+  };
+}
+
+async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: BrowserFillField[]) {
+  const requiredFields = failedFields.filter((field) => {
+    if (!field.required && !isLikelyRequiredAttemptedLabel(field.label)) {
+      return false;
+    }
+
+    return !/\b(address line 2|address 2|middle name|preferred name|apt|suite)\b/i.test(field.label);
+  });
+
+  if (requiredFields.length === 0) {
+    return [];
+  }
+
+  const missingLabels: string[] = [];
+
+  for (const frame of page.frames()) {
+    const frameMissing = await frame.evaluate((fields) => {
+      const searchRoots = getSearchRoots();
+      const missing: string[] = [];
+
+      for (const field of fields) {
+        const control = findBestControl(field);
+
+        if (control && isEmptyControl(control)) {
+          missing.push(field.label);
+        }
+      }
+
+      return missing;
+
+      function findBestControl(field: { label: string; inputType?: string; fieldId?: string }) {
+        const labelKey = normalize(field.label);
+        const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
+        let best: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | undefined;
+        let bestScore = 0;
+
+        for (const control of controls) {
+          if (!isUsableControl(control, field.inputType)) {
+            continue;
+          }
+
+          const descriptor = normalize([
+            control.getAttribute("aria-label"),
+            control.getAttribute("placeholder"),
+            control.getAttribute("name"),
+            control.id,
+            labelledByText(control),
+            findLabelText(control),
+            findNearbyLabelText(control),
+            compactContainerText(control)
+          ].filter(Boolean).join(" "));
+          const idMatches = Boolean(field.fieldId && control.getAttribute("data-gradlaunch-field-id") === field.fieldId);
+          const score = scoreDescriptor(descriptor, labelKey, field.inputType, control) + (idMatches ? 140 : 0);
+
+          if (score > bestScore) {
+            best = control;
+            bestScore = score;
+          }
+        }
+
+        return bestScore >= 58 ? best : undefined;
+      }
+
+      function isUsableControl(
+        control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+        wantedType: string | undefined
+      ) {
+        if (control.disabled) {
+          return false;
+        }
+
+        if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button", "checkbox", "radio"].includes(control.type)) {
+          return false;
+        }
+
+        if (wantedType === "select" && !(control instanceof HTMLSelectElement) && !(control instanceof HTMLInputElement && isCustomSelectLike(control))) {
+          return false;
+        }
+
+        if (wantedType && wantedType !== "select" && control instanceof HTMLSelectElement) {
+          return false;
+        }
+
+        const rect = control.getBoundingClientRect();
+        const style = window.getComputedStyle(control);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      }
+
+      function isEmptyControl(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
+        if (control instanceof HTMLSelectElement) {
+          const selected = control.selectedOptions[0];
+          const selectedText = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`);
+          return isEmptySelectText(selectedText);
+        }
+
+        if (control instanceof HTMLInputElement && isCustomSelectLike(control)) {
+          const actual = normalize(control.value);
+
+          if (actual && !isEmptySelectText(actual)) {
+            return false;
+          }
+
+          const container = control.closest("[role='combobox'], [aria-haspopup='listbox'], [data-radix-select-trigger], [data-headlessui-state], [class*='select'], [class*='combobox']")
+            ?? control.parentElement;
+          const selectedText = normalize([
+            control.getAttribute("data-value"),
+            control.getAttribute("aria-valuetext"),
+            container?.getAttribute("data-value"),
+            container?.getAttribute("aria-valuetext"),
+            container?.textContent
+          ].filter(Boolean).join(" "));
+
+          return isEmptySelectText(selectedText);
+        }
+
+        return !control.value.trim();
+      }
+
+      function isEmptySelectText(value: string) {
+        return !value
+          || /^(select|select an option|choose|choose an option|please select|none selected)$/.test(value)
+          || /\b(options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
+      }
+
+      function isCustomSelectLike(control: HTMLInputElement) {
+        const popup = control.getAttribute("aria-haspopup") ?? "";
+        const role = control.getAttribute("role") ?? "";
+        const expanded = control.getAttribute("aria-expanded");
+
+        if (role === "combobox" || /^(listbox|menu|dialog|tree|true)$/i.test(popup) || expanded !== null) {
+          return true;
+        }
+
+        let ancestor = control.parentElement;
+
+        for (let depth = 0; depth < 3 && ancestor; depth += 1) {
+          const ancestorRole = ancestor.getAttribute("role") ?? "";
+          const ancestorPopup = ancestor.getAttribute("aria-haspopup") ?? "";
+          const ancestorExpanded = ancestor.getAttribute("aria-expanded");
+          const className = String(ancestor.getAttribute("class") ?? "");
+
+          if (
+            ancestorRole === "combobox"
+            || /^(listbox|menu|dialog|tree|true)$/i.test(ancestorPopup)
+            || ancestorExpanded !== null
+            || ancestor.hasAttribute("data-radix-select-trigger")
+            || ancestor.hasAttribute("data-headlessui-state")
+            || /\b(combobox|select__control|select-control|select-trigger|select-input)\b/i.test(className)
+          ) {
+            return true;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return false;
+      }
+
+      function scoreDescriptor(
+        descriptor: string,
+        wantedLabel: string,
+        wantedType: string | undefined,
+        control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      ) {
+        if (!descriptor || !wantedLabel) {
+          return 0;
+        }
+
+        let score = 0;
+
+        if (descriptor === wantedLabel) {
+          score += 150;
+        } else if (descriptor.includes(wantedLabel)) {
+          score += 118;
+        } else if (wantedLabel.includes(descriptor) && descriptor.length > 3) {
+          score += 92;
+        }
+
+        const tokens = wantedLabel
+          .split(" ")
+          .filter((token) => token.length > 1 && !/^(select|option|your|please|field|number)$/.test(token));
+        score += tokens.reduce((sum, token) => sum + (descriptor.includes(token) ? 20 : 0), 0);
+
+        if (/\b(home email|email|e mail)\b/.test(wantedLabel) && /\b(email|e mail)\b/.test(descriptor)) {
+          score = Math.max(score, 88);
+        }
+
+        if (/\b(phone|mobile|contact)\b/.test(wantedLabel) && /\b(phone|mobile|contact|telephone)\b/.test(descriptor)) {
+          score = Math.max(score, 88);
+        }
+
+        if (/\b(address line 1|street address|address)\b/.test(wantedLabel) && /\b(address|street)\b/.test(descriptor)) {
+          score = Math.max(score, 86);
+        }
+
+        if (/\bcity\b/.test(wantedLabel) && /\b(city|town|locality)\b/.test(descriptor)) {
+          score = Math.max(score, 86);
+        }
+
+        if (/\b(state|province|region)\b/.test(wantedLabel) && /\b(state|province|region)\b/.test(descriptor)) {
+          score = Math.max(score, 86);
+        }
+
+        if (/\bcountry\b/.test(wantedLabel) && /\bcountry\b/.test(descriptor)) {
+          score = Math.max(score, 86);
+        }
+
+        if (/\b(degree name|major|field of study)\b/.test(wantedLabel) && /\b(degree|major|field of study|course)\b/.test(descriptor)) {
+          score = Math.max(score, 84);
+        }
+
+        if (/\b(type of degree|degree type|education level)\b/.test(wantedLabel) && /\b(degree|education|level)\b/.test(descriptor)) {
+          score = Math.max(score, 84);
+        }
+
+        if (/\b(university|college|school|institution)\b/.test(wantedLabel) && /\b(university|college|school|institution|institute)\b/.test(descriptor)) {
+          score = Math.max(score, 86);
+        }
+
+        if (/\b(start date|from date)\b/.test(wantedLabel) && /\b(start|from|date)\b/.test(descriptor)) {
+          score = Math.max(score, 84);
+        }
+
+        if (/\b(end date|to date|completion date|graduation date)\b/.test(wantedLabel) && /\b(end|to|completion|graduation|date)\b/.test(descriptor)) {
+          score = Math.max(score, 84);
+        }
+
+        if (/\b(work experience|past working experience|professional experience)\b/.test(wantedLabel) && /\b(work|working|professional|experience)\b/.test(descriptor)) {
+          score = Math.max(score, 86);
+        }
+
+        if (wantedType === "select" && control instanceof HTMLSelectElement) {
+          score += 18;
+        }
+
+        if (wantedType && control instanceof HTMLInputElement && normalize(control.type) === normalize(wantedType)) {
+          score += 12;
+        }
+
+        return score;
+      }
+
+      function labelledByText(control: Element) {
+        const labelledBy = control.getAttribute("aria-labelledby");
+
+        if (!labelledBy) {
+          return "";
+        }
+
+        return labelledBy
+          .split(/\s+/)
+          .map((id) => getElementById(id)?.textContent ?? "")
+          .join(" ");
+      }
+
+      function findLabelText(control: Element) {
+        if (control.id) {
+          const label = queryFirst(`label[for="${CSS.escape(control.id)}"]`, control);
+
+          if (label?.textContent?.trim()) {
+            return label.textContent.trim();
+          }
+        }
+
+        return control.closest("label")?.textContent?.trim()
+          || control.closest("fieldset")?.querySelector("legend")?.textContent?.trim()
+          || "";
+      }
+
+      function findNearbyLabelText(control: Element) {
+        let ancestor: Element | null = control.parentElement;
+
+        for (let depth = 0; depth < 4 && ancestor; depth += 1) {
+          const label = Array.from(ancestor.querySelectorAll("label, legend, h1, h2, h3, h4, [class*='label'], [class*='Label']"))
+            .map((item) => clean(item.textContent ?? ""))
+            .find((text) => text && text.length <= 140);
+
+          if (label) {
+            return label;
+          }
+
+          const previous = ancestor.previousElementSibling?.textContent?.trim();
+
+          if (previous) {
+            return previous;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return "";
+      }
+
+      function compactContainerText(control: Element) {
+        const container = control.closest("label, fieldset, [role='group'], [class*='field'], [class*='input'], [class*='form'], section, article, div");
+        const text = clean(container?.textContent ?? "");
+
+        return text.length <= 220 ? text : "";
+      }
+
+      function clean(value: string | null | undefined) {
+        return (value ?? "").replace(/\s+/g, " ").replace(/\*/g, " ").trim();
+      }
+
+      function normalize(value: string | null | undefined) {
+        return clean(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      }
+
+      function queryFirst(selector: string, control: Element) {
+        const root = control.getRootNode();
+
+        if (root instanceof Document || root instanceof ShadowRoot || root instanceof Element) {
+          const match = root.querySelector(selector);
+
+          if (match) {
+            return match;
+          }
+        }
+
+        for (const searchRoot of searchRoots) {
+          const match = searchRoot.querySelector(selector);
+
+          if (match) {
+            return match;
+          }
+        }
+
+        return null;
+      }
+
+      function getElementById(id: string) {
+        for (const searchRoot of searchRoots) {
+          if ("getElementById" in searchRoot && typeof searchRoot.getElementById === "function") {
+            const match = searchRoot.getElementById(id);
+
+            if (match) {
+              return match;
+            }
+          } else {
+            const match = searchRoot.querySelector(`#${CSS.escape(id)}`);
+
+            if (match) {
+              return match;
+            }
+          }
+        }
+
+        return null;
+      }
+
+      function getSearchRoots() {
+        const roots: Array<Document | ShadowRoot> = [document];
+
+        for (let index = 0; index < roots.length; index += 1) {
+          const root = roots[index];
+          const elements = Array.from(root.querySelectorAll("*")) as HTMLElement[];
+
+          for (const element of elements) {
+            if (element.shadowRoot) {
+              roots.push(element.shadowRoot);
+            }
+          }
+        }
+
+        return roots;
+      }
+    }, requiredFields.map((field) => ({
+      label: field.label,
+      inputType: field.inputType,
+      fieldId: field.fieldId
+    }))).catch(() => []);
+
+    missingLabels.push(...frameMissing);
+  }
+
+  return dedupeLabels(missingLabels);
+}
+
+function isLikelyRequiredAttemptedLabel(label: string) {
+  const normalized = normalizeBrowserAgentLabel(label);
+
+  return /\b(address line 1|street address|country|state|province|city|zip|postal|email|phone|mobile|degree name|type of degree|degree type|university|college|school|institution|start date|end date|graduation date|work experience|past working experience)\b/.test(normalized)
+    && !/\b(address line 2|middle name|preferred first|preferred last|preferred name)\b/.test(normalized);
+}
+
+function isStaleChoiceValidation(
+  validationMessages: string[],
+  answers: Array<{ label: string; value: string; inputType?: string }>
+) {
+  if (validationMessages.length === 0) {
+    return false;
+  }
+
+  const choiceAnswers = answers.filter((answer) => answer.inputType === "radio" || answer.inputType === "checkbox");
+
+  if (choiceAnswers.length === 0) {
+    return false;
+  }
+
+  const validationText = normalizeAgentText(validationMessages.join(" "));
+
+  if (!/\b(there are some errors|please correct|this field is required|required)\b/.test(validationText)) {
+    return false;
+  }
+
+  if (/\b(invalid|email|phone|resume|cv|upload|file|location|city|country|format|characters|max|min)\b/.test(validationText)) {
+    return false;
+  }
+
+  const choiceText = normalizeAgentText(choiceAnswers.map((answer) => `${answer.label} ${answer.value}`).join(" "));
+
+  return validationMessages.length <= 2
+    || choiceText.split(" ").some((token) => token.length > 5 && validationText.includes(token));
+}
+
+function normalizeAgentText(value: string) {
+  return value.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function normalizeBrowserAgentLabel(label: string) {
+  return normalizeKey(label.replace(/\bselect an option\b/gi, " ").replace(/\*/g, " "));
+}
+
 async function waitForManualProgress(input: {
   context: BrowserContext;
   page: Page;
@@ -1988,10 +2757,41 @@ async function waitForManualProgress(input: {
       continue;
     }
 
+    const visibleFields = await discoverVisibleFields(activePage).catch(() => []);
+    const observation = await observeBrowserPage(activePage, visibleFields).catch(() => undefined);
+    const validationMessages = await getVisibleValidationMessages(activePage).catch(() => []);
+    const looksTransient = !observation
+      || isTransientBlankObservation(observation)
+      || validationMessages.some((message) => /loading|please wait|processing|uploading/i.test(message))
+      || /loading|please wait|processing|uploading/i.test(observation.pageText);
+
+    if (looksTransient) {
+      await writeBrowserDebug(input.workspacePath, "manual-stage-progress-transient", {
+        stageIndex: input.stageIndex,
+        url: activePage.url(),
+        validationMessages
+      });
+      continue;
+    }
+
     const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
 
     if (protectedCheckpoint.blocked) {
-      continue;
+      await writeBrowserDebug(input.workspacePath, "manual-stage-protected-checkpoint", {
+        stageIndex: input.stageIndex,
+        url: activePage.url(),
+        kind: protectedCheckpoint.kind,
+        reason: protectedCheckpoint.reason
+      });
+      await updateLiveBot(activePage, {
+        step: `Stage ${input.stageIndex + 1}`,
+        mood: "waiting",
+        message: protectedCheckpoint.reason ?? "A protected login or verification step is active. Complete it manually, then use the GradLaunch continue control."
+      });
+      return {
+        resumed: false,
+        activePage
+      };
     }
 
     const nextSignature = await getStageSignature(activePage);
@@ -2045,11 +2845,62 @@ async function launchContext(chromePath: string | undefined): Promise<BrowserLau
       if (await isBrowserProfileLocked(loggedProfileDir, { clearStaleGradLaunchLock: true })) {
         const message = buildLockedLoggedProfileMessage(loggedProfileDir);
 
+        if (shouldUseLoggedProfileCloneOnLock()) {
+          const clone = await prepareLoggedRuntimeProfile(loggedProfileDir);
+          const cloneLocked = await isBrowserProfileLocked(clone.profileDir, { clearStaleGradLaunchLock: true });
+
+          if (cloneLocked) {
+            const cloneMessage = `The controlled runtime copy of the logged Chrome profile at ${clone.profileDir} is already open but cannot be attached on ${resolveLoggedChromeCdpHint()}. Close the old GradLaunch Chrome window and retry.`;
+
+            if (shouldRequireLoggedBrowser()) {
+              throw new Error(cloneMessage);
+            }
+
+            console.warn(`[GradLaunch][Browser] ${cloneMessage} Falling back to managed profile.`);
+          } else {
+            try {
+              const context = await chromium.launchPersistentContext(clone.profileDir, {
+                ...launchOptions,
+                args: [
+                  ...launchOptions.args,
+                  `--profile-directory=${clone.profileName}`,
+                  `--remote-debugging-port=${resolveLoggedChromeDebugPort()}`
+                ],
+                viewport: { width: 1280, height: 900 }
+              });
+
+              return {
+                browser: undefined,
+                context,
+                keepContextOpen: true,
+                attachedToExistingBrowser: false,
+                launchMode: "logged_profile_clone" satisfies BrowserLaunchMode
+              };
+            } catch (error) {
+              const cloneMessage = error instanceof Error ? error.message : String(error);
+
+              if (shouldRequireLoggedBrowser()) {
+                throw new Error(
+                  `GradLaunch could not launch the controlled runtime copy of the logged profile at ${clone.profileDir}. ${cloneMessage}`
+                );
+              }
+
+              console.warn(
+                `[GradLaunch][Browser] Could not launch logged runtime profile at ${clone.profileDir}; falling back to managed profile. ${cloneMessage}`
+              );
+            }
+          }
+        }
+
         if (shouldRequireLoggedBrowser()) {
           throw new Error(message);
         }
 
-        console.warn(`[GradLaunch][Browser] ${message} Falling back to managed profile.`);
+        if (!shouldAllowManagedFallbackOnLockedLoggedProfile()) {
+          throw new Error(message);
+        }
+
+        console.warn(`[GradLaunch][Browser] ${message} Falling back to managed persistent profile because BROWSER_ALLOW_MANAGED_FALLBACK_ON_LOCK=true.`);
       } else {
         try {
           const loggedProfileName = await resolveLoggedChromeProfileName(loggedProfileDir);
@@ -2066,18 +2917,12 @@ async function launchContext(chromePath: string | undefined): Promise<BrowserLau
           return {
             browser: undefined,
             context,
-            keepContextOpen: false,
+            keepContextOpen: true,
             attachedToExistingBrowser: false,
             launchMode: "logged_profile" satisfies BrowserLaunchMode
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-
-          if (shouldRequireLoggedBrowser()) {
-            throw new Error(
-              `GradLaunch could not use the logged Chrome profile at ${loggedProfileDir}. ${message}. Start your normal Chrome with remote debugging on port ${resolveLoggedChromeDebugPort()}, or close Chrome so GradLaunch can launch that logged profile.`
-            );
-          }
 
           console.warn(
             `[GradLaunch][Browser] Could not use logged Chrome profile at ${loggedProfileDir}; falling back to managed profile. ${message}`
@@ -2085,6 +2930,10 @@ async function launchContext(chromePath: string | undefined): Promise<BrowserLau
         }
       }
     }
+  }
+
+  if (shouldPreferLoggedBrowser() && shouldRequireLoggedBrowser()) {
+    throw new Error("GradLaunch is configured to require a logged Chrome profile, but no usable logged profile could be opened or attached. Run npm run browser:prepare-logged-profile after logging into Chrome, then retry.");
   }
 
   const cdpUrl = await resolveManagedChromeCdpUrl();
@@ -2208,11 +3057,374 @@ async function handleDialogSafely(dialog: Dialog, page: Page, workspacePath: str
   }
 }
 
+async function waitForLoginConfirmation(input: HandoffRequest & { sourceUrl: string }) {
+  const timeoutMs = Number(process.env.BROWSER_LOGIN_HANDOFF_TIMEOUT_MS ?? process.env.BROWSER_HANDOFF_TIMEOUT_MS ?? 1800000);
+  const pollMs = Number(process.env.BROWSER_HANDOFF_POLL_MS ?? 1200);
+  const startedAt = Date.now();
+  let activePage = input.page;
+  let lastBotStateKey = "";
+  const pausedLoginMessage = `${input.reason} GradLaunch is fully paused and will not resume until you click this button.`;
+
+  await maybeKeepBrowserOpen(input.context);
+  await clearUserContinueRequest(activePage);
+  await showLoginHandoffBot(activePage, input.stageIndex, pausedLoginMessage, "I am logged in, continue");
+  lastBotStateKey = buildLoginHandoffBotStateKey(activePage, pausedLoginMessage, "I am logged in, continue");
+  await saveScreenshot(activePage, input.workspacePath, input.screenshots, "browser-login-needed.png");
+  notePlannerHandoff(input.planner, input.reason, activePage, input.stageIndex, "login");
+  await writeBrowserDebug(input.workspacePath, "login-confirmation-wait-start", {
+    stageIndex: input.stageIndex,
+    currentUrl: activePage.url(),
+    sourceUrl: input.sourceUrl
+  });
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!hasOpenPage(input.context)) {
+      return {
+        resolved: false,
+        activePage
+      };
+    }
+
+    await activePage.waitForTimeout(pollMs).catch(() => undefined);
+    activePage = await getLoginHandoffPage(input.context, activePage, input.sourceUrl);
+
+    if (await didUserRequestStop(activePage)) {
+      return {
+        resolved: false,
+        activePage
+      };
+    }
+
+    const confirmed = await consumeUserContinueConfirmation(activePage);
+
+    let readiness = await readApplicationReadiness(activePage).catch(() => undefined);
+    const readyMessage = readiness?.ready
+      ? "Login looks complete and the application form is visible. Click Continue filling and I will resume from this exact page."
+      : pausedLoginMessage;
+    const readyLabel = readiness?.ready ? "Continue filling" : "I am logged in, continue";
+    const botStateKey = buildLoginHandoffBotStateKey(activePage, readyMessage, readyLabel);
+    const botMounted = await isLiveBotMounted(activePage);
+
+    if (!botMounted || botStateKey !== lastBotStateKey) {
+      await showLoginHandoffBot(activePage, input.stageIndex, readyMessage, readyLabel);
+      lastBotStateKey = botStateKey;
+      await writeBrowserDebug(input.workspacePath, botMounted ? "login-handoff-bot-updated" : "login-handoff-bot-reattached", {
+        stageIndex: input.stageIndex,
+        currentUrl: activePage.url(),
+        pageState: readiness?.pageState,
+        visibleFieldCount: readiness?.visibleFieldCount
+      });
+    }
+
+    if (!confirmed) {
+      continue;
+    }
+
+    const continuationReadiness = await verifyLoginContinuationReady({
+      context: input.context,
+      page: activePage,
+      sourceUrl: input.sourceUrl,
+      workspacePath: input.workspacePath
+    });
+    activePage = continuationReadiness.activePage;
+    await writeBrowserDebug(input.workspacePath, continuationReadiness.ready ? "login-confirmation-verified" : "login-confirmation-not-ready", {
+      stageIndex: input.stageIndex,
+      currentUrl: activePage.url(),
+      reason: continuationReadiness.reason,
+      pageState: continuationReadiness.pageState,
+      visibleFieldCount: continuationReadiness.visibleFieldCount
+    });
+
+    if (!continuationReadiness.ready) {
+      await showLoginHandoffBot(activePage, input.stageIndex, continuationReadiness.reason, "Check again");
+      lastBotStateKey = buildLoginHandoffBotStateKey(activePage, continuationReadiness.reason, "Check again");
+      continue;
+    }
+
+    markPlannerTask(input.planner, "authenticate_if_needed", "running", "Login confirmed and the application page is visible. Resuming autonomous execution.");
+    setPlannerStatus(input.planner, "running", "Login confirmed; GradLaunch is resuming from the current page.");
+    await updateLiveBot(activePage, {
+      step: `Stage ${input.stageIndex + 1}`,
+      mood: "thinking",
+      message: "Login confirmed. I can see the application flow now, so I am re-planning before filling."
+    });
+    return {
+      resolved: true,
+      activePage
+    };
+  }
+
+  setPlannerStatus(input.planner, "handoff_required", "Planner paused because login still needs user confirmation.");
+  await writeBrowserDebug(input.workspacePath, "login-confirmation-timeout", {
+    stageIndex: input.stageIndex,
+    currentUrl: activePage.url(),
+    timeoutMs
+  });
+  return {
+    resolved: false,
+    activePage
+  };
+}
+
+async function verifyLoginContinuationReady(input: {
+  context: BrowserContext;
+  page: Page;
+  sourceUrl: string;
+  workspacePath: string;
+}) {
+  let activePage = input.page;
+  const readyPage = await findReadyApplicationPage(input.context);
+
+  if (readyPage) {
+    return readyPage;
+  }
+
+  let readiness = await readApplicationReadiness(activePage);
+
+  if (readiness.ready || readiness.blocked) {
+    return {
+      ...readiness,
+      activePage
+    };
+  }
+
+  await writeBrowserDebug(input.workspacePath, "login-confirmation-reopen-source-url", {
+    currentUrl: activePage.url(),
+    sourceUrl: input.sourceUrl,
+    reason: readiness.reason
+  });
+  await navigateToJobPage(activePage, input.sourceUrl, input.workspacePath).catch((error) => {
+    void writeBrowserDebug(input.workspacePath, "login-confirmation-reopen-source-url-failed", {
+      currentUrl: activePage.url(),
+      sourceUrl: input.sourceUrl,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
+  readiness = await readApplicationReadiness(activePage);
+
+  return {
+    ...readiness,
+    activePage
+  };
+}
+
+async function showLoginHandoffBot(page: Page, stageIndex: number, message: string, label: string) {
+  await updateLiveBot(page, {
+    step: `Stage ${stageIndex + 1}`,
+    mood: "waiting",
+    message,
+    action: {
+      kind: "confirm_continue",
+      label
+    }
+  });
+}
+
+function buildLoginHandoffBotStateKey(page: Page, message: string, label: string) {
+  return `${page.url()}::${page.isClosed() ? "closed" : "open"}::${message}::${label}`;
+}
+
+async function getLoginHandoffPage(context: BrowserContext, fallbackPage: Page, sourceUrl: string) {
+  const readyApplicationPage = await findReadyApplicationPage(context).catch(() => undefined);
+
+  if (readyApplicationPage?.activePage) {
+    return readyApplicationPage.activePage;
+  }
+
+  const pages = context.pages().filter((page) => !page.isClosed());
+  const candidates = pages.length > 0 ? pages : [fallbackPage];
+  const scored = candidates.map((page, index) => ({
+    page,
+    score: scoreLoginHandoffPage(page.url(), sourceUrl, page === fallbackPage, index)
+  }));
+  const best = scored.sort((left, right) => right.score - left.score)[0]?.page ?? fallbackPage;
+
+  best.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
+  await best.bringToFront().catch(() => undefined);
+  return best;
+}
+
+function scoreLoginHandoffPage(url: string, sourceUrl: string, isFallback: boolean, index: number) {
+  let score = index;
+
+  if (isGoogleAuthUrl(url)) {
+    score += 1000;
+  }
+
+  if (looksLikeLoginUrl(url)) {
+    score += 850;
+  }
+
+  if (sameHostname(url, sourceUrl)) {
+    score += 500;
+  }
+
+  if (!isBlankBrowserUrl(url)) {
+    score += 100;
+  }
+
+  if (isFallback) {
+    score += 25;
+  }
+
+  return score;
+}
+
+async function findReadyApplicationPage(context: BrowserContext) {
+  const pages = context.pages().filter((page) => !page.isClosed()).reverse();
+
+  for (const page of pages) {
+    const readiness = await readApplicationReadiness(page).catch(() => undefined);
+
+    if (readiness?.ready) {
+      await page.bringToFront().catch(() => undefined);
+      return {
+        ...readiness,
+        activePage: page
+      };
+    }
+  }
+
+  return undefined;
+}
+
+async function readApplicationReadiness(page: Page) {
+  await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => undefined);
+  await page.waitForTimeout(700).catch(() => undefined);
+
+  if (isBlankBrowserUrl(page.url())) {
+    return {
+      ready: false,
+      blocked: false,
+      reason: "The tab is still blank. Open or reload the job page, finish login, then click Check again.",
+      visibleFieldCount: 0
+    };
+  }
+
+  if (isGoogleAuthUrl(page.url())) {
+    return {
+      ready: false,
+      blocked: true,
+      reason: "Google login is still open. Finish choosing the account/password step, then click Check again.",
+      pageState: "login",
+      visibleFieldCount: 0
+    };
+  }
+
+  const checkpoint = await detectProtectedCheckpoint(page);
+
+  if (checkpoint.blocked) {
+    return {
+      ready: false,
+      blocked: true,
+      reason: checkpoint.reason ?? "The page still looks like a protected login or verification gate. Complete it, then click Check again.",
+      pageState: checkpoint.kind ?? "login",
+      visibleFieldCount: 0
+    };
+  }
+
+  const visibleFields = await discoverVisibleFields(page).catch(() => []);
+  const observation = await observeBrowserPage(page, visibleFields).catch(() => undefined);
+  const pageState = observation?.pageState;
+
+  if (!observation) {
+    return {
+      ready: false,
+      blocked: false,
+      reason: "Login may be complete, but GradLaunch cannot read the application page yet. Keep the job page open and click Check again.",
+      visibleFieldCount: visibleFields.length
+    };
+  }
+
+  if (pageState === "login" || pageState === "account_gate") {
+    return {
+      ready: false,
+      blocked: true,
+      reason: "The portal still looks like a login/account page. Finish login in this same window, then click Check again.",
+      pageState,
+      visibleFieldCount: visibleFields.length
+    };
+  }
+
+  if (visibleFields.length > 0) {
+    return {
+      ready: true,
+      blocked: false,
+      reason: "Visible application fields were found.",
+      pageState,
+      visibleFieldCount: visibleFields.length
+    };
+  }
+
+  if (pageState === "resume_upload" && await hasFileUpload(page)) {
+    return {
+      ready: true,
+      blocked: false,
+      reason: "A resume upload step is visible.",
+      pageState,
+      visibleFieldCount: visibleFields.length
+    };
+  }
+
+  if (pageState === "review" || pageState === "submit" || pageState === "questionnaire" || pageState === "consent") {
+    return {
+      ready: true,
+      blocked: false,
+      reason: `The application flow is visible at the ${pageState} stage.`,
+      pageState,
+      visibleFieldCount: visibleFields.length
+    };
+  }
+
+  if (await hasFinalSubmitControl(page)) {
+    return {
+      ready: true,
+      blocked: false,
+      reason: "A final submit/review control is visible.",
+      pageState,
+      visibleFieldCount: visibleFields.length
+    };
+  }
+
+  if (observation.controls.some((control) => isApplicationProgressControl(control.text || control.label))) {
+    return {
+      ready: true,
+      blocked: false,
+      reason: "An application continue/apply control is visible.",
+      pageState,
+      visibleFieldCount: visibleFields.length
+    };
+  }
+
+  return {
+    ready: false,
+    blocked: false,
+    reason: "Login no longer appears blocked, but the job application form is not visible yet. Reopen the job posting in this window, then click Check again.",
+    pageState,
+    visibleFieldCount: visibleFields.length
+  };
+}
+
+function isApplicationProgressControl(value: string | undefined) {
+  const normalized = (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (/\b(sign in|signin|log in|login|google|email|password|forgot|create account|register|sign up)\b/.test(normalized)) {
+    return false;
+  }
+
+  return /\b(apply|start application|continue application|continue|next|proceed|review application|save and continue)\b/.test(normalized);
+}
+
 async function waitForHumanIntervention(input: HandoffRequest) {
   const timeoutMs = Number(process.env.BROWSER_HANDOFF_TIMEOUT_MS ?? 180000);
   const pollMs = Number(process.env.BROWSER_HANDOFF_POLL_MS ?? 1200);
   const startedAt = Date.now();
   let activePage = input.page;
+  let lastBotTarget = "";
 
   await maybeKeepBrowserOpen(input.context);
   await updateLiveBot(activePage, {
@@ -2220,6 +3432,7 @@ async function waitForHumanIntervention(input: HandoffRequest) {
     mood: "waiting",
     message: input.reason
   });
+  lastBotTarget = buildHandoffBotTarget(activePage, input.reason);
   await saveScreenshot(activePage, input.workspacePath, input.screenshots, "browser-handoff-needed.png");
   notePlannerHandoff(input.planner, input.reason, activePage, input.stageIndex, input.handoffKind ?? "review");
 
@@ -2233,6 +3446,17 @@ async function waitForHumanIntervention(input: HandoffRequest) {
 
     await activePage.waitForTimeout(pollMs).catch(() => undefined);
     activePage = await getActivePage(input.context, activePage);
+    const botTarget = buildHandoffBotTarget(activePage, input.reason);
+
+    if (botTarget !== lastBotTarget || !await isLiveBotMounted(activePage)) {
+      await updateLiveBot(activePage, {
+        step: `Stage ${input.stageIndex + 1}`,
+        mood: "waiting",
+        message: input.reason
+      });
+      lastBotTarget = botTarget;
+    }
+
     if (await didUserRequestStop(activePage)) {
       return {
         resolved: false,
@@ -2250,6 +3474,16 @@ async function waitForHumanIntervention(input: HandoffRequest) {
       const watchSet = new Set(input.watchFields.map((label) => label.toLowerCase().trim()));
 
       if (outstanding.some((label) => watchSet.has(label.toLowerCase().trim()))) {
+        continue;
+      }
+
+      const stillEmptyWatchedFields = await getStillEmptyAttemptedRequiredLabels(activePage, input.watchFields.map((label) => ({
+        label,
+        value: "",
+        required: true
+      })));
+
+      if (stillEmptyWatchedFields.length > 0) {
         continue;
       }
     }
@@ -2272,6 +3506,10 @@ async function waitForHumanIntervention(input: HandoffRequest) {
     resolved: false,
     activePage
   };
+}
+
+function buildHandoffBotTarget(page: Page, message: string) {
+  return `${page.url()}::${page.isClosed() ? "closed" : "open"}::${message}`;
 }
 
 async function saveScreenshot(page: Page, workspacePath: string, screenshots: string[], filename: string) {
@@ -2331,6 +3569,79 @@ function shouldPreferLoggedBrowser() {
 
 function shouldRequireLoggedBrowser() {
   return process.env.BROWSER_REQUIRE_LOGGED_PROFILE === "true";
+}
+
+function shouldUseLoggedProfileCloneOnLock() {
+  return process.env.BROWSER_ALLOW_LOGGED_PROFILE_CLONE_ON_LOCK === "true";
+}
+
+function shouldAllowManagedFallbackOnLockedLoggedProfile() {
+  return process.env.BROWSER_ALLOW_MANAGED_FALLBACK_ON_LOCK === "true";
+}
+
+async function prepareLoggedRuntimeProfile(sourceProfileDir: string) {
+  const profileName = await resolveLoggedChromeProfileName(sourceProfileDir);
+  const runtimeProfileDir = join(getBrowserWorkspaceStorageDir(), "logged-runtime-profile");
+  const runtimeProfileExists = await pathExists(join(runtimeProfileDir, "Local State"))
+    && await pathExists(join(runtimeProfileDir, profileName));
+  const refreshRequested = process.env.BROWSER_REFRESH_LOGGED_RUNTIME_PROFILE === "true";
+
+  if (!runtimeProfileExists || refreshRequested) {
+    await rm(runtimeProfileDir, { recursive: true, force: true });
+    await mkdir(runtimeProfileDir, { recursive: true });
+    await copyIfPresent(join(sourceProfileDir, "Local State"), join(runtimeProfileDir, "Local State"));
+    await copyIfPresent(join(sourceProfileDir, "First Run"), join(runtimeProfileDir, "First Run"));
+    await cp(join(sourceProfileDir, profileName), join(runtimeProfileDir, profileName), {
+      recursive: true,
+      force: true,
+      filter: shouldCopyChromeProfilePath(join(sourceProfileDir, profileName))
+    });
+  }
+
+  await clearBrowserProfileSingletonFiles(runtimeProfileDir);
+  return {
+    profileDir: runtimeProfileDir,
+    profileName
+  };
+}
+
+async function copyIfPresent(source: string, dest: string) {
+  try {
+    await cp(source, dest, { recursive: true, force: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+function shouldCopyChromeProfilePath(sourceProfileDir: string) {
+  const ignoredNames = new Set([
+    "Cache",
+    "Code Cache",
+    "Crashpad",
+    "DawnGraphiteCache",
+    "DawnWebGPUCache",
+    "GPUCache",
+    "GrShaderCache",
+    "GraphiteDawnCache",
+    "ShaderCache"
+  ]);
+
+  return (source: string) => {
+    const name = basename(source);
+
+    if (name.startsWith("Singleton")) {
+      return false;
+    }
+
+    if (ignoredNames.has(name)) {
+      return false;
+    }
+
+    const parts = relative(sourceProfileDir, source).split(sep);
+    return !parts.some((part) => ignoredNames.has(part));
+  };
 }
 
 async function isBrowserProfileLocked(profileDir: string, options: { clearStaleGradLaunchLock?: boolean } = {}) {
@@ -2413,7 +3724,7 @@ async function clearBrowserProfileSingletonFiles(profileDir: string) {
 }
 
 function buildLockedLoggedProfileMessage(profileDir: string) {
-  return `The logged Chrome profile at ${profileDir} is already open, but GradLaunch cannot attach because remote debugging is not available on ${resolveLoggedChromeCdpHint()}. Close the old GradLaunch Chrome window, or quit Chrome and retry. Stale copied-profile locks are cleared automatically.`;
+  return `The controlled logged Chrome profile at ${profileDir} is already open, but GradLaunch cannot safely control it because remote debugging is not available on ${resolveLoggedChromeCdpHint()}. Close that Chrome window and retry, or launch it with --remote-debugging-port=${resolveLoggedChromeDebugPort()}. GradLaunch will not clone cookies or attach to an uncontrolled browser.`;
 }
 
 function resolveLoggedChromeCdpHint() {

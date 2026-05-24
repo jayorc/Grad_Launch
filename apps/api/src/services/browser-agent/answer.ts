@@ -14,6 +14,16 @@ type BuildAnswerPlanInput = {
   workspacePath: string;
 };
 
+type AnswerCandidate = {
+  label: string;
+  value: string;
+  fieldId: string;
+  inputType: string;
+  options: string[];
+  required: boolean;
+  reason: string;
+};
+
 export async function buildStageAnswerPlan(input: BuildAnswerPlanInput): Promise<StageAnswerPlan> {
   const deterministicAnswers = createDeterministicAnswerMap(input.visibleFields, input.baseFields, input.student, input.job, input.memory, input.resumeText);
 
@@ -22,7 +32,7 @@ export async function buildStageAnswerPlan(input: BuildAnswerPlanInput): Promise
 
     if (llmPlan) {
       const answers = normalizeChoiceAnswers(input.visibleFields
-        .map((field) => llmPlan.answers.get(field.id) ?? deterministicAnswers.get(field.id))
+        .map((field) => chooseStageAnswer(field, deterministicAnswers.get(field.id), llmPlan.answers.get(field.id)))
         .filter((value): value is NonNullable<typeof value> => Boolean(value)), input);
 
       return {
@@ -44,6 +54,73 @@ export async function buildStageAnswerPlan(input: BuildAnswerPlanInput): Promise
   };
 }
 
+function chooseStageAnswer(field: VisibleField, deterministic: AnswerCandidate | undefined, llm: AnswerCandidate | undefined) {
+  if (deterministic && shouldPreferDeterministicAnswer(field)) {
+    return deterministic;
+  }
+
+  if (!deterministic && shouldRequireTrustedProfileFact(field)) {
+    return undefined;
+  }
+
+  if (llm && !shouldRejectAnswerValue(field, llm.value)) {
+    return llm;
+  }
+
+  return deterministic;
+}
+
+function shouldRequireTrustedProfileFact(field: VisibleField) {
+  const label = normalizeKey([field.label, field.context, field.options.join(" ")].join(" "));
+
+  return /\b(first name|given name|last name|surname|family name|full name|legal name|email|e mail|phone|mobile|contact number|linkedin|linked in|github|git hub|portfolio|website|web site|personal site|homepage|profile url|profile link|url|leetcode|kaggle)\b/.test(label);
+}
+
+function shouldPreferDeterministicAnswer(field: VisibleField) {
+  const label = normalizeKey([field.label, field.context, field.options.join(" ")].join(" "));
+
+  return /\b(first name|given name|last name|surname|family name|full name|email|phone|mobile|contact number|linkedin|linked in|github|git hub|portfolio|website|personal site|homepage|url|leetcode|kaggle|city|location|country|work authorization|authorized to work|visa|sponsorship)\b/.test(label)
+    || field.inputType === "checkbox"
+    || field.inputType === "radio"
+    || field.inputType === "select"
+    || field.inputType === "combobox";
+}
+
+function shouldRejectAnswerValue(field: VisibleField, value: string) {
+  const label = normalizeKey(field.label);
+  const valueKey = normalizeKey(value);
+
+  if (isProfileUrlField(field) && !isAcceptedProfileUrlForField(field, value)) {
+    return true;
+  }
+
+  const isDateField = field.inputType === "date"
+    || (/\b(start date|end date|from date|completion date|graduation date|date of birth|dob)\b/.test(label)
+      && !/\b(up to date|keep you up to date)\b/.test(label));
+
+  if (isDateField && !/^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(value.trim())) {
+    return true;
+  }
+
+  if (/\b(degree name|qualification|field of study|major)\b/.test(label) && isSchoolBoardValue(valueKey)) {
+    return true;
+  }
+
+  if (/\b(university|college|institution)\b/.test(label) && isSchoolBoardValue(valueKey)) {
+    return true;
+  }
+
+  if (/\b(university|college|school|institution)\b/.test(label) && /\b(b tech|btech|bachelor|computer science|degree)\b/.test(valueKey) && !/\b(university|college|institute|school)\b/.test(valueKey)) {
+    return true;
+  }
+
+  if (isOptionBackedField(field) && meaningfulOptions(field.options).length > 0) {
+    return !findMatchingOption(value, field.options, field);
+  }
+
+  return false;
+}
+
 function createDeterministicAnswerMap(
   visibleFields: VisibleField[],
   baseFields: FilledField[],
@@ -54,15 +131,7 @@ function createDeterministicAnswerMap(
 ) {
   const prepared = createPreparedValueMap(baseFields, memory);
 
-  const answers = new Map<string, {
-    label: string;
-    value: string;
-    fieldId: string;
-    inputType: string;
-    options: string[];
-    required: boolean;
-    reason: string;
-  }>();
+  const answers = new Map<string, AnswerCandidate>();
 
   for (const field of visibleFields) {
     if (field.inputType === "file") {
@@ -70,11 +139,7 @@ function createDeterministicAnswerMap(
     }
 
     const fieldKey = normalizeKey(field.label);
-    const value = resolvePreparedChoiceValue(field, prepared, student, job, resumeText)
-      ?? resolveLocationFieldValue(field, prepared, student, job, resumeText)
-      ?? resolvePreparedValue(field.label, prepared)
-      ?? fallbackForVisibleField(field, student, job)
-      ?? retrieveProfileAnswer(field, student, job);
+    const value = resolveDeterministicFieldValue(field, prepared, student, job, resumeText);
 
     if (!value) {
       continue;
@@ -94,6 +159,42 @@ function createDeterministicAnswerMap(
   }
 
   return answers;
+}
+
+function resolveDeterministicFieldValue(
+  field: VisibleField,
+  prepared: Map<string, string>,
+  student: StudentProfile | undefined,
+  job: Job,
+  resumeText: string | undefined
+) {
+  const label = normalizeKey(field.label);
+
+  if (/\bmiddle name\b/.test(label)) {
+    return prepared.get("middle name") ?? prepared.get("legal middle name");
+  }
+
+  const candidates = [
+    resolveChoiceFieldValue(field, student),
+    resolvePreparedChoiceValue(field, prepared, student, job, resumeText),
+    resolveAddressFieldValue(field, prepared, student, job, resumeText),
+    resolveLocationFieldValue(field, prepared, student, job, resumeText),
+    resolveEducationFieldValue(field, prepared, student, resumeText),
+    resolveTrustedProfileValue(field, student),
+    resolvePreparedValue(field.label, prepared),
+    fallbackForVisibleField(field, student, job),
+    retrieveProfileAnswer(field, student, job)
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeAnswerForField(field, candidate);
+
+    if (normalized && !shouldRejectAnswerValue(field, normalized)) {
+      return normalized;
+    }
+  }
+
+  return undefined;
 }
 
 function resolvePreparedChoiceValue(
@@ -147,6 +248,56 @@ function resolvePreparedChoiceValue(
   return undefined;
 }
 
+function resolveTrustedProfileValue(field: VisibleField, student: StudentProfile | undefined) {
+  if (!student) {
+    return undefined;
+  }
+
+  const details = student.completeProfile;
+  const label = normalizeKey([field.label, field.context, field.options.join(" ")].join(" "));
+
+  if (isOptionBackedField(field)) {
+    return undefined;
+  }
+
+  if (/\b(email|email address)\b/.test(label)) {
+    return student.email;
+  }
+
+  if (/\b(phone|mobile|contact number)\b/.test(label)) {
+    return details?.phone;
+  }
+
+  if (/\b(first name|given name)\b/.test(label)) {
+    return student.fullName.trim().split(/\s+/).filter(Boolean)[0];
+  }
+
+  if (/\b(last name|surname|family name)\b/.test(label)) {
+    const parts = student.fullName.trim().split(/\s+/).filter(Boolean);
+    return parts.length > 1 ? parts.slice(1).join(" ") : undefined;
+  }
+
+  if (/\b(full name|legal name|candidate name)\b/.test(label) || label === "name") {
+    return student.fullName;
+  }
+
+  if (!isProfileUrlField(field)) {
+    return undefined;
+  }
+
+  const candidates = getTrustedProfileUrlCandidates(label, details);
+
+  for (const candidate of candidates) {
+    const normalized = normalizeProfileUrl(candidate);
+
+    if (normalized && isAcceptedProfileUrlForField(field, normalized)) {
+      return normalized;
+    }
+  }
+
+  return undefined;
+}
+
 function normalizeCountryAnswer(value: string) {
   const normalized = normalizeKey(value);
 
@@ -167,6 +318,146 @@ function normalizeCountryAnswer(value: string) {
   }
 
   return value.trim();
+}
+
+function resolveChoiceFieldValue(field: VisibleField, student: StudentProfile | undefined) {
+  const descriptor = normalizeKey(`${field.label} ${field.context} ${field.options.join(" ")}`);
+
+  if (!isOptionBackedField(field)) {
+    return undefined;
+  }
+
+  if (/\b(preferred name|different from your legal name|select yes below otherwise please select no)\b/.test(descriptor)) {
+    return findNegativeChoiceOption(field.options) ?? "No";
+  }
+
+  if (/\b(talent network|career opportunities|upcoming events|job alerts|recruiting updates|keep you up to date|marketing updates)\b/.test(descriptor)) {
+    return findNegativeChoiceOption(field.options) ?? "No";
+  }
+
+  if (/\b(past working experience|prior work experience|work experience|employment experience|professional experience)\b/.test(descriptor)) {
+    const hasWorkHistory = Boolean(
+      student?.completeProfile?.currentCompany
+      || student?.completeProfile?.currentTitle
+      || (student?.completeProfile?.totalExperienceYears ?? 0) > 0
+      || (student?.completeProfile?.employmentHistory?.length ?? 0) > 0
+    );
+
+    return hasWorkHistory
+      ? findAffirmativeChoiceOption(field.options) ?? "Yes"
+      : findNegativeChoiceOption(field.options) ?? "No";
+  }
+
+  if (/\b(china|south korea|korea)\b/.test(descriptor) && /\b(resident|residence|currently reside|citizen|national)\b/.test(descriptor)) {
+    return findNegativeChoiceOption(field.options) ?? "No";
+  }
+
+  if (/\b(privacy|terms|consent|agree|acknowledge|accept|declaration|data processing|read and understand)\b/.test(descriptor)
+    && !/\b(talent network|career opportunities|upcoming events|job alerts|marketing|whatsapp|sms|text messages)\b/.test(descriptor)) {
+    return findAffirmativeChoiceOption(field.options) ?? "Yes";
+  }
+
+  return undefined;
+}
+
+function resolveAddressFieldValue(
+  field: VisibleField,
+  prepared: Map<string, string>,
+  student: StudentProfile | undefined,
+  job: Job,
+  resumeText: string | undefined
+) {
+  const label = normalizeKey(`${field.label} ${field.context}`);
+  const details = student?.completeProfile;
+  const preparedPrimaryLocation = prepared.get("location")
+    ?? prepared.get("location city")
+    ?? prepared.get("current location")
+    ?? prepared.get("preferred location")
+    ?? prepared.get("city");
+  const resolved = resolveBestProfileLocation({
+    student,
+    job,
+    resumeText,
+    proposedLocation: preparedPrimaryLocation,
+    preparedLocations: getPreparedLocationHints(prepared),
+    countryHint: resolveCountryHint(prepared, student, resumeText),
+    phone: resolvePreparedPhone(prepared)
+  });
+
+  if (/\b(address line 1|street address|address 1|address)\b/.test(label) && !/\b(address line 2|address 2)\b/.test(label)) {
+    return details?.addressLine1
+      ?? prepared.get("address line 1")
+      ?? prepared.get("street address")
+      ?? resolved?.label
+      ?? prepared.get("location");
+  }
+
+  if (/\b(address line 2|address 2|apartment|suite)\b/.test(label)) {
+    return details?.addressLine2
+      ?? prepared.get("address line 2")
+      ?? resolved?.region
+      ?? prepared.get("state")
+      ?? prepared.get("province");
+  }
+
+  if (/\b(state|province|region)\b/.test(label)) {
+    return details?.state
+      ?? prepared.get("state")
+      ?? prepared.get("province")
+      ?? resolved?.region;
+  }
+
+  if (/\b(zip|postal|postcode|pin code|pincode)\b/.test(label)) {
+    return details?.postalCode
+      ?? prepared.get("postal code")
+      ?? prepared.get("zip code")
+      ?? extractPostalCode(resumeText);
+  }
+
+  return undefined;
+}
+
+function resolveEducationFieldValue(
+  field: VisibleField,
+  prepared: Map<string, string>,
+  student: StudentProfile | undefined,
+  resumeText: string | undefined
+) {
+  const label = normalizeKey(field.label);
+  const education = student?.completeProfile?.educationHistory?.[0];
+  const graduationYear = student?.graduationYear ?? education?.endYear;
+
+  if (/\b(type of degree|degree type|level of education|education level)\b/.test(label)) {
+    return degreeTypeFromValue(student?.degree ?? education?.degree ?? prepared.get("degree"), field.options);
+  }
+
+  if (/\b(degree name|degree|qualification)\b/.test(label) && !/\b(type of degree|degree type)\b/.test(label)) {
+    return cleanEducationDegreeName(education?.fieldOfStudy)
+      ?? cleanEducationDegreeName(education?.degree)
+      ?? cleanEducationDegreeName(prepared.get("degree"))
+      ?? cleanEducationDegreeName(student?.degree);
+  }
+
+  if (/\b(university|college|school|institution)\b/.test(label)) {
+    return chooseHigherEducationInstitution([
+      education?.school,
+      prepared.get("university"),
+      prepared.get("college"),
+      prepared.get("school"),
+      extractUniversityFromResume(resumeText)
+    ]);
+  }
+
+  if (/\b(start date|start year|from date|begin date|education start)\b/.test(label)) {
+    const startYear = education?.startYear ?? (graduationYear ? graduationYear - 4 : undefined);
+    return formatEducationDate(startYear, "start");
+  }
+
+  if (/\b(end date|end year|completion date|graduation date|education end)\b/.test(label)) {
+    return formatEducationDate(education?.endYear ?? graduationYear, "end");
+  }
+
+  return undefined;
 }
 
 function resolveLocationFieldValue(
@@ -191,11 +482,17 @@ function resolveLocationFieldValue(
   const preparedLocations = proposedValue
     ? [proposedValue, ...getPreparedLocationHints(prepared)]
     : getPreparedLocationHints(prepared);
+  const preparedPrimaryLocation = proposedValue
+    ?? prepared.get("location")
+    ?? prepared.get("location city")
+    ?? prepared.get("current location")
+    ?? prepared.get("preferred location")
+    ?? prepared.get("city");
   const resolved = resolveBestProfileLocation({
     student,
     job,
     resumeText,
-    proposedLocation: proposedValue,
+    proposedLocation: preparedPrimaryLocation,
     preparedLocations,
     countryHint: resolveCountryHint(prepared, student, resumeText),
     phone: resolvePreparedPhone(prepared)
@@ -262,6 +559,10 @@ function normalizeChoiceAnswers(
         return [];
       }
 
+      if ((inputType === "checkbox" || inputType === "radio") && isStandaloneChoiceOptionLabel(answer.label) && !choiceValueMatchesOption(answer.value, [answer.label])) {
+        return [];
+      }
+
       if (countryOptionIds.has(answer.fieldId)) {
         if (labelKey === desiredCountryKey) {
           return [{
@@ -313,6 +614,10 @@ function isCountryListQuestion(value: string) {
   return /\b(country|countries|working in|role in which you are applying|currently reside)\b/.test(normalizeKey(value));
 }
 
+function isStandaloneChoiceOptionLabel(value: string) {
+  return /^(yes|no|no thanks|no thank you|yes please|i agree|agree|accept|decline|not now|skip|continue)$/i.test(value.trim());
+}
+
 function isCountryChoiceGroupQuestion(value: string) {
   const normalized = normalizeKey(value);
 
@@ -327,6 +632,42 @@ function isCountryOptionLabel(value: string) {
 
 function fallbackForVisibleField(field: VisibleField, student: StudentProfile | undefined, job: Job) {
   const label = normalizeKey(field.label);
+  const descriptor = normalizeKey(`${field.label} ${field.context} ${field.options.join(" ")}`);
+
+  if (
+    (field.inputType === "checkbox" || field.inputType === "radio")
+    && /\b(privacy|terms|consent|agree|acknowledge|accept|declaration|data processing|read and understand)\b/.test(descriptor)
+    && !/\b(talent network|career opportunities|upcoming events|job alerts|marketing|whatsapp|sms|text messages)\b/.test(descriptor)
+  ) {
+    return findAffirmativeChoiceOption(field.options) ?? field.label;
+  }
+
+  if (
+    isOptionBackedField(field)
+    && /\b(talent network|career opportunities|upcoming events|job alerts|recruiting updates|keep you up to date|marketing updates)\b/.test(descriptor)
+  ) {
+    return findNegativeChoiceOption(field.options) ?? "No";
+  }
+
+  if (
+    isOptionBackedField(field)
+    && /\b(preferred name|different from your legal name|select yes below otherwise please select no)\b/.test(descriptor)
+  ) {
+    return findNegativeChoiceOption(field.options) ?? "No";
+  }
+
+  if (isOptionBackedField(field) && /\b(past working experience|prior work experience|work experience|employment experience|professional experience)\b/.test(descriptor)) {
+    const hasWorkHistory = Boolean(
+      student?.completeProfile?.currentCompany
+      || student?.completeProfile?.currentTitle
+      || (student?.completeProfile?.totalExperienceYears ?? 0) > 0
+      || (student?.completeProfile?.employmentHistory?.length ?? 0) > 0
+    );
+
+    return hasWorkHistory
+      ? findAffirmativeChoiceOption(field.options) ?? "Yes"
+      : findNegativeChoiceOption(field.options) ?? "No";
+  }
 
   if (label.includes("full name") || label === "name") {
     return student?.fullName;
@@ -409,6 +750,101 @@ function fallbackForVisibleField(field: VisibleField, student: StudentProfile | 
   return undefined;
 }
 
+function findNegativeChoiceOption(options: string[]) {
+  return options.find((option) => /\b(no thanks|no thank you|decline|do not|don t|dont|not now|skip)\b/i.test(option))
+    ?? options.find((option) => /^no\b/i.test(option));
+}
+
+function findAffirmativeChoiceOption(options: string[]) {
+  return options.find((option) => /\b(i agree|agree|accept|acknowledge|confirm|yes)\b/i.test(option))
+    ?? options.find((option) => /^yes\b/i.test(option));
+}
+
+function choiceValueMatchesOption(value: string, options: string[]) {
+  return Boolean(findMatchingOption(value, options));
+}
+
+function normalizeAnswerForField(field: VisibleField, value: string | undefined) {
+  const cleanValue = value?.trim();
+
+  if (!cleanValue) {
+    return undefined;
+  }
+
+  const matchedOption = findMatchingOption(cleanValue, field.options, field);
+
+  if (matchedOption) {
+    return matchedOption;
+  }
+
+  return cleanValue;
+}
+
+function isOptionBackedField(field: VisibleField) {
+  return field.inputType === "radio"
+    || field.inputType === "checkbox"
+    || field.inputType === "select"
+    || field.inputType === "combobox";
+}
+
+function meaningfulOptions(options: string[]) {
+  return options
+    .map((option) => option.trim())
+    .filter((option) => {
+      const normalized = normalizeKey(option);
+      return Boolean(normalized) && !/^(select|select an option|choose|choose one|please select|none selected|not selected)$/.test(normalized);
+    });
+}
+
+function findMatchingOption(value: string, options: string[], field?: VisibleField) {
+  const normalizedValue = normalizeKey(value);
+  const normalizedLabel = normalizeKey(`${field?.label ?? ""} ${field?.context ?? ""}`);
+  const candidates = meaningfulOptions(options);
+
+  if (!normalizedValue || candidates.length === 0) {
+    return undefined;
+  }
+
+  const direct = candidates.find((option) => {
+    const normalizedOption = normalizeKey(option);
+
+    if (!normalizedOption) {
+      return false;
+    }
+
+    return normalizedOption === normalizedValue
+      || normalizedOption.includes(normalizedValue)
+      || normalizedValue.includes(normalizedOption);
+  });
+
+  if (direct) {
+    return direct;
+  }
+
+  if (/^(yes|true|agree|accept|consent|confirm|i agree)$/.test(normalizedValue)) {
+    return findAffirmativeChoiceOption(candidates);
+  }
+
+  if (/^(no|false|decline|do not|don t|dont|not now|no thanks)$/.test(normalizedValue)) {
+    return findNegativeChoiceOption(candidates);
+  }
+
+  if (/\b(type of degree|degree type|education level|level of education)\b/.test(normalizedLabel)) {
+    return degreeTypeFromValue(value, candidates);
+  }
+
+  if (/\bcountry\b/.test(normalizedLabel) || isCountryOptionLabel(value)) {
+    const normalizedCountry = normalizeCountryAnswer(value);
+    const countryKey = normalizeKey(normalizedCountry);
+    return candidates.find((option) => {
+      const optionKey = normalizeKey(option);
+      return optionKey === countryKey || (countryKey === "india" && optionKey === "in");
+    });
+  }
+
+  return undefined;
+}
+
 function addPreparedValue(prepared: Map<string, string>, label: string, value: string) {
   const cleanValue = value.trim();
 
@@ -461,8 +897,151 @@ function resolvePreparedPhone(prepared: Map<string, string>) {
   return prepared.get("phone number") ?? prepared.get("phone") ?? prepared.get("mobile");
 }
 
+function degreeTypeFromValue(value: string | undefined, options: string[] = []) {
+  const normalized = normalizeKey(value ?? "");
+  const candidates = meaningfulOptions(options);
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  const degreeKind =
+    /\b(b tech|btech|b e|be|bachelor|undergraduate|ug)\b/.test(normalized)
+      ? "bachelor"
+      : /\b(m tech|mtech|m e|me|master|postgraduate|pg|mca|msc)\b/.test(normalized)
+        ? "master"
+        : /\b(phd|ph d|doctorate|doctoral)\b/.test(normalized)
+          ? "doctor"
+          : undefined;
+
+  if (!degreeKind) {
+    return value?.trim();
+  }
+
+  const matched = candidates.find((option) => {
+    const optionKey = normalizeKey(option);
+
+    if (degreeKind === "bachelor") {
+      return /\b(bachelor|bachelors|undergraduate|ug|b tech|btech|b e|be)\b/.test(optionKey);
+    }
+
+    if (degreeKind === "master") {
+      return /\b(master|masters|postgraduate|pg|m tech|mtech|m e|me|mca|msc)\b/.test(optionKey);
+    }
+
+    return /\b(phd|ph d|doctor|doctorate|doctoral)\b/.test(optionKey);
+  });
+
+  if (matched) {
+    return matched;
+  }
+
+  return degreeKind === "bachelor" ? "Bachelor's Degree" : degreeKind === "master" ? "Master's Degree" : "Doctorate";
+}
+
+function formatEducationDate(year: number | undefined, kind: "start" | "end") {
+  if (!year || !Number.isFinite(year)) {
+    return undefined;
+  }
+
+  const month = kind === "start" ? "08" : "05";
+  return `${year}-${month}-01`;
+}
+
+function extractPostalCode(text: string | undefined) {
+  const match = text?.match(/\b\d{6}\b|\b\d{5}(?:-\d{4})?\b/);
+  return match?.[0];
+}
+
+function extractUniversityFromResume(text: string | undefined) {
+  const lines = (text ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const match = lines
+    .filter((line) => /\b(university|college|institute|school|nit|iit|iiit)\b/i.test(line) && line.length <= 140)
+    .map((line) => ({
+      line,
+      score: scoreEducationInstitutionLine(line)
+    }))
+    .sort((left, right) => right.score - left.score)[0]?.line;
+
+  if (!match) {
+    return undefined;
+  }
+
+  return match.replace(/\s+[|•-]\s+.*$/g, "").trim();
+}
+
+function chooseHigherEducationInstitution(values: Array<string | undefined>) {
+  const candidates = values
+    .map((value) => value?.replace(/\s+/g, " ").trim())
+    .filter((value): value is string => Boolean(value));
+
+  return candidates
+    .map((value) => ({
+      value,
+      score: scoreEducationInstitutionLine(value)
+    }))
+    .sort((left, right) => right.score - left.score)[0]?.value;
+}
+
+function cleanEducationDegreeName(value: string | undefined) {
+  const cleanValue = value?.replace(/\s+/g, " ").trim();
+
+  if (!cleanValue || isSchoolBoardValue(normalizeKey(cleanValue))) {
+    return undefined;
+  }
+
+  const normalized = normalizeKey(cleanValue);
+
+  if (/\b(computer science|computer engineering|information technology|electronics|mechanical|civil|electrical|data science|software engineering)\b/.test(normalized)) {
+    return cleanValue
+      .replace(/\bbachelor(?:'s)?(?: degree)?\s+(?:of|in)?\s*/i, "")
+      .replace(/\bb\.?\s*tech\s+(?:in)?\s*/i, "")
+      .trim() || cleanValue;
+  }
+
+  return cleanValue;
+}
+
+function isSchoolBoardValue(valueKey: string) {
+  return /\b(cbse|icse|isc|state board|senior secondary|higher secondary|secondary school|high school|intermediate|public school|12th|10th|xii|x)\b/.test(valueKey);
+}
+
+function scoreEducationInstitutionLine(value: string) {
+  const normalized = normalizeKey(value);
+  let score = 0;
+
+  if (/\b(national institute of technology|indian institute of technology|indian institute of information technology|nit|iit|iiit)\b/.test(normalized)) {
+    score += 120;
+  }
+
+  if (/\b(university|college|institute|institution)\b/.test(normalized)) {
+    score += 80;
+  }
+
+  if (/\b(b tech|btech|bachelor|computer science|engineering)\b/.test(normalized)) {
+    score += 25;
+  }
+
+  if (isSchoolBoardValue(normalized)) {
+    score -= 90;
+  }
+
+  if (/\bschool\b/.test(normalized) && !/\b(school of engineering|school of technology|business school)\b/.test(normalized)) {
+    score -= 55;
+  }
+
+  return score;
+}
+
 function resolvePreparedValue(label: string, prepared: Map<string, string>) {
   const normalizedLabel = normalizeKey(label);
+
+  if (isProfileUrlLabel(normalizedLabel)) {
+    return resolvePreparedProfileUrlValue(normalizedLabel, prepared);
+  }
 
   if (/\b(authorized|eligible|work authorization|legally work)\b/.test(normalizedLabel)) {
     return prepared.get("work authorization") ?? prepared.get("legally authorized to work");
@@ -496,6 +1075,223 @@ function resolvePreparedValue(label: string, prepared: Map<string, string>) {
   return undefined;
 }
 
+function resolvePreparedProfileUrlValue(normalizedLabel: string, prepared: Map<string, string>) {
+  const candidates = getPreparedProfileUrlCandidates(normalizedLabel, prepared);
+
+  for (const candidate of candidates) {
+    const normalized = normalizeProfileUrl(candidate);
+
+    if (normalized && isAcceptedProfileUrlForLabel(normalizedLabel, normalized)) {
+      return normalized;
+    }
+  }
+
+  return undefined;
+}
+
+function isProfileUrlField(field: VisibleField) {
+  return isProfileUrlLabel(normalizeKey([field.label, field.context, field.options.join(" ")].join(" ")));
+}
+
+function isProfileUrlLabel(normalizedLabel: string) {
+  return /\b(linkedin|linked in|github|git hub|portfolio|website|web site|personal site|homepage|profile url|profile link|url|leetcode|kaggle)\b/.test(normalizedLabel);
+}
+
+function getTrustedProfileUrlCandidates(
+  normalizedLabel: string,
+  details: StudentProfile["completeProfile"] | undefined
+) {
+  if (!details) {
+    return [];
+  }
+
+  if (/\b(linkedin|linked in)\b/.test(normalizedLabel)) {
+    return [details.linkedInUrl];
+  }
+
+  if (/\b(github|git hub)\b/.test(normalizedLabel)) {
+    return [details.githubUrl];
+  }
+
+  if (/\bleetcode\b/.test(normalizedLabel)) {
+    return [details.leetcodeUrl];
+  }
+
+  if (/\bkaggle\b/.test(normalizedLabel)) {
+    return [details.kaggleUrl];
+  }
+
+  if (/\b(portfolio|personal site|homepage)\b/.test(normalizedLabel)) {
+    return [details.portfolioUrl, details.websiteUrl, details.githubUrl];
+  }
+
+  return [details.websiteUrl, details.portfolioUrl, details.githubUrl];
+}
+
+function getPreparedProfileUrlCandidates(normalizedLabel: string, prepared: Map<string, string>) {
+  if (/\b(linkedin|linked in)\b/.test(normalizedLabel)) {
+    return [
+      prepared.get("linkedin"),
+      prepared.get("linkedin url"),
+      prepared.get("linkedin profile"),
+      prepared.get("linked in")
+    ];
+  }
+
+  if (/\b(github|git hub)\b/.test(normalizedLabel)) {
+    return [
+      prepared.get("github"),
+      prepared.get("github url"),
+      prepared.get("github profile"),
+      prepared.get("git hub")
+    ];
+  }
+
+  if (/\bleetcode\b/.test(normalizedLabel)) {
+    return [prepared.get("leetcode"), prepared.get("leetcode url"), prepared.get("leetcode profile")];
+  }
+
+  if (/\bkaggle\b/.test(normalizedLabel)) {
+    return [prepared.get("kaggle"), prepared.get("kaggle url"), prepared.get("kaggle profile")];
+  }
+
+  if (/\b(portfolio|personal site|homepage)\b/.test(normalizedLabel)) {
+    return [
+      prepared.get("portfolio"),
+      prepared.get("portfolio url"),
+      prepared.get("personal portfolio"),
+      prepared.get("website"),
+      prepared.get("website url"),
+      prepared.get("personal website"),
+      prepared.get("github"),
+      prepared.get("github url")
+    ];
+  }
+
+  return [
+    prepared.get("website"),
+    prepared.get("website url"),
+    prepared.get("personal website"),
+    prepared.get("portfolio"),
+    prepared.get("portfolio url"),
+    prepared.get("github"),
+    prepared.get("github url")
+  ];
+}
+
+function isAcceptedProfileUrlForField(field: VisibleField, value: string) {
+  return isAcceptedProfileUrlForLabel(normalizeKey([field.label, field.context, field.options.join(" ")].join(" ")), value);
+}
+
+function isAcceptedProfileUrlForLabel(normalizedLabel: string, value: string) {
+  const url = parseProfileUrl(value);
+
+  if (!url) {
+    return false;
+  }
+
+  if (/\b(linkedin|linked in)\b/.test(normalizedLabel)) {
+    return isLinkedInProfileUrl(url);
+  }
+
+  if (/\b(github|git hub)\b/.test(normalizedLabel)) {
+    return isGitHubProfileUrl(url);
+  }
+
+  if (/\bleetcode\b/.test(normalizedLabel)) {
+    return isSpecificPlatformProfileUrl(url, "leetcode.com");
+  }
+
+  if (/\bkaggle\b/.test(normalizedLabel)) {
+    return isSpecificPlatformProfileUrl(url, "kaggle.com");
+  }
+
+  return hasMeaningfulProfileUrlTarget(url);
+}
+
+function normalizeProfileUrl(value: string | undefined) {
+  const url = parseProfileUrl(value);
+
+  if (!url) {
+    return undefined;
+  }
+
+  const path = url.pathname.replace(/\/+$/g, "");
+  return `${url.protocol}//${url.host}${path}${url.search}${url.hash}`;
+}
+
+function parseProfileUrl(value: string | undefined) {
+  const cleanValue = value?.trim().replace(/[),.;]+$/g, "");
+
+  if (!cleanValue || !/[a-z0-9.-]+\.[a-z]{2,}/i.test(cleanValue)) {
+    return undefined;
+  }
+
+  try {
+    return new URL(/^https?:\/\//i.test(cleanValue) ? cleanValue : `https://${cleanValue}`);
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function hasMeaningfulProfileUrlTarget(url: URL) {
+  const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+  const pathParts = getUrlPathParts(url);
+
+  if (host === "github.com") {
+    return isGitHubProfileUrl(url);
+  }
+
+  if (host === "linkedin.com") {
+    return isLinkedInProfileUrl(url);
+  }
+
+  if (host === "leetcode.com") {
+    return isSpecificPlatformProfileUrl(url, "leetcode.com");
+  }
+
+  if (host === "kaggle.com") {
+    return isSpecificPlatformProfileUrl(url, "kaggle.com");
+  }
+
+  return Boolean(pathParts.length > 0 || url.hostname.split(".").length > 2);
+}
+
+function isLinkedInProfileUrl(url: URL) {
+  const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+  const pathParts = getUrlPathParts(url);
+
+  if (host !== "linkedin.com") {
+    return false;
+  }
+
+  if (pathParts[0] === "in" || pathParts[0] === "pub") {
+    return Boolean(pathParts[1]);
+  }
+
+  return pathParts.length > 1 && !["feed", "login", "jobs", "company", "school"].includes(pathParts[0] ?? "");
+}
+
+function isGitHubProfileUrl(url: URL) {
+  const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+  const pathParts = getUrlPathParts(url);
+
+  if (host !== "github.com") {
+    return false;
+  }
+
+  return Boolean(pathParts[0]) && !["about", "blog", "collections", "enterprise", "events", "explore", "features", "login", "marketplace", "new", "pricing", "search", "signup", "topics"].includes(pathParts[0]);
+}
+
+function isSpecificPlatformProfileUrl(url: URL, expectedHost: string) {
+  const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+  return host === expectedHost && getUrlPathParts(url).length > 0;
+}
+
+function getUrlPathParts(url: URL) {
+  return url.pathname.split("/").map((part) => part.trim()).filter(Boolean);
+}
+
 function getFieldAliases(label: string) {
   const normalizedLabel = label.toLowerCase().trim();
   const aliases = new Set([label]);
@@ -526,6 +1322,43 @@ function getFieldAliases(label: string) {
     aliases.add("Phone number");
     aliases.add("Mobile");
     aliases.add("Contact number");
+  }
+
+  if (normalizedLabel.includes("linkedin") || normalizedLabel.includes("linked in")) {
+    aliases.add("LinkedIn");
+    aliases.add("LinkedIn URL");
+    aliases.add("LinkedIn profile");
+  }
+
+  if (normalizedLabel.includes("github") || normalizedLabel.includes("git hub")) {
+    aliases.add("GitHub");
+    aliases.add("GitHub URL");
+    aliases.add("GitHub profile");
+  }
+
+  if (normalizedLabel.includes("portfolio")) {
+    aliases.add("Portfolio");
+    aliases.add("Portfolio URL");
+    aliases.add("Personal portfolio");
+  }
+
+  if (normalizedLabel.includes("website") || normalizedLabel.includes("web site") || normalizedLabel.includes("personal site") || normalizedLabel.includes("homepage")) {
+    aliases.add("Website");
+    aliases.add("Website URL");
+    aliases.add("Personal website");
+    aliases.add("Portfolio");
+  }
+
+  if (normalizedLabel.includes("leetcode")) {
+    aliases.add("LeetCode");
+    aliases.add("LeetCode URL");
+    aliases.add("LeetCode profile");
+  }
+
+  if (normalizedLabel.includes("kaggle")) {
+    aliases.add("Kaggle");
+    aliases.add("Kaggle URL");
+    aliases.add("Kaggle profile");
   }
 
   if (normalizedLabel.includes("country")) {

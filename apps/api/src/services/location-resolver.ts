@@ -36,6 +36,7 @@ type ResolveBestProfileLocationInput = {
 const knownLocations: KnownLocation[] = [
   { city: "Aurangabad", region: "Bihar", country: "India", aliases: ["aurangabad", "aurangabad bihar"] },
   { city: "Aurangabad", region: "Maharashtra", country: "India", aliases: ["aurangabad maharashtra", "chhatrapati sambhajinagar"] },
+  { city: "Bhiwani", region: "Haryana", country: "India", aliases: ["bhiwani", "bhiwani haryana"] },
   { city: "Bengaluru", region: "Karnataka", country: "India", aliases: ["bengaluru", "bangalore", "banglore", "bangluru", "blr"] },
   { city: "Gurugram", region: "Haryana", country: "India", aliases: ["gurugram", "gurgaon"] },
   { city: "Delhi", country: "India", aliases: ["delhi", "new delhi", "ncr"] },

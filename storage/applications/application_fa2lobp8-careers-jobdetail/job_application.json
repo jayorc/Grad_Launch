@@ -26,7 +26,7 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_xf3zc57v",
+    "id": "run_a085vdws",
     "status": "needs_review",
     "executionMode": "browser_apply",
     "filledFields": [
@@ -157,23 +157,23 @@
     ],
     "submission": {
       "intent": "browser_fill",
-      "outcome": "confirmed",
+      "outcome": "blocked",
       "externalSubmitted": false,
-      "confirmation": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
-      "submittedAt": "2026-05-23T06:31:31.597Z",
+      "confirmation": "The job portal still needs login before GradLaunch can continue.",
+      "submittedAt": "2026-05-23T09:05:37.937Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "jaynrk200211@gmail.com",
         "subject": "GradLaunch filled Careers - JobDetail",
-        "sentAt": "2026-05-23T06:31:31.597Z",
+        "sentAt": "2026-05-23T09:05:37.937Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
-        "status": "needs_manual_review",
+        "status": "handoff_required",
         "sourceUrl": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
-        "openedAt": "2026-05-23T06:30:45.219Z",
-        "completedAt": "2026-05-23T06:31:31.358Z",
+        "openedAt": "2026-05-23T09:04:10.530Z",
+        "completedAt": "2026-05-23T09:05:37.937Z",
         "filledLabels": [
           "IBMid"
         ],
@@ -185,56 +185,58 @@
           "browser-stage-1-start.png",
           "browser-stage-2-start.png",
           "browser-stage-3-start.png",
-          "browser-stage-4-start.png"
+          "browser-login-needed.png"
         ],
-        "message": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+        "message": "The job portal still needs login before GradLaunch can continue.",
         "planner": {
           "sessionId": "planner-job_url_aHR0cHM6Ly9jYXJlZXJzLmli",
           "resumeToken": "job_url_aHR0cHM6Ly9jYXJlZXJzLmli:2026-05-23T05:38:56.591Z",
           "goal": "Complete the JobDetail application at Careers autonomously until a protected or review checkpoint.",
-          "status": "needs_review",
-          "summary": "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
+          "status": "handoff_required",
+          "summary": "Sign in is required. Use Google/email in this controlled Chrome window, then click I'm logged in, continue when the job form is visible.",
           "formMode": "multi_stage",
-          "currentStep": "stage_5",
-          "currentStageLabel": "Section 5",
-          "currentUrl": "about:blank",
+          "currentStep": "stage_3",
+          "currentStageLabel": "Section 3",
+          "currentUrl": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D8a466b63-02b8-41e1-9819-8e980383ab13%26client_id%3DZmNmMjY5NjMtZTBlZS00",
           "retryCount": 0,
-          "handoffCount": 0,
-          "validationErrors": [],
+          "handoffCount": 11,
+          "validationErrors": [
+            "Resume upload"
+          ],
           "subgoals": [
             {
               "id": "open_job_page",
               "label": "Open job page",
               "status": "completed",
               "detail": "Job page opened successfully in a visible Chrome session.",
-              "attempts": 10,
-              "lastUpdatedAt": "2026-05-23T06:30:50.346Z",
-              "completedAt": "2026-05-23T06:30:50.346Z"
+              "attempts": 34,
+              "lastUpdatedAt": "2026-05-23T09:04:14.144Z",
+              "completedAt": "2026-05-23T09:04:14.144Z"
             },
             {
               "id": "authenticate_if_needed",
               "label": "Handle login if needed",
-              "status": "running",
-              "detail": "Login gate cleared using the existing browser profile. Resuming autonomous execution.",
-              "attempts": 6,
-              "lastUpdatedAt": "2026-05-23T06:31:25.636Z"
+              "status": "needs_user",
+              "detail": "Sign in is required. Use Google/email in this controlled Chrome window, then click I'm logged in, continue when the job form is visible.",
+              "attempts": 26,
+              "lastUpdatedAt": "2026-05-23T09:04:38.873Z"
             },
             {
               "id": "finish_current_section",
               "label": "Finish active section",
-              "status": "completed",
-              "detail": "Completed Section 4 and advanced to the next stage.",
-              "attempts": 33,
-              "lastUpdatedAt": "2026-05-23T06:31:31.295Z",
-              "completedAt": "2026-05-23T06:31:31.295Z"
+              "status": "running",
+              "detail": "Reading Section 3 and planning the next safe action.",
+              "attempts": 99,
+              "lastUpdatedAt": "2026-05-23T09:04:34.717Z",
+              "completedAt": "2026-05-23T09:04:34.311Z"
             },
             {
               "id": "recover_from_validation_errors",
               "label": "Recover from validation errors",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-23T05:38:56.591Z"
+              "status": "blocked",
+              "detail": "Validation or required-answer blockers were found: Resume upload.",
+              "attempts": 1,
+              "lastUpdatedAt": "2026-05-23T07:34:13.762Z"
             },
             {
               "id": "retry_alternative_path",
@@ -256,27 +258,27 @@
               "id": "save_checkpoint",
               "label": "Save checkpoint",
               "status": "completed",
-              "detail": "Saved the latest resumable checkpoint before pausing the browser run.",
+              "detail": "Saved checkpoint before handing control to the student.",
               "attempts": 0,
-              "lastUpdatedAt": "2026-05-23T06:31:31.295Z",
-              "completedAt": "2026-05-23T06:31:31.295Z"
+              "lastUpdatedAt": "2026-05-23T09:04:38.873Z",
+              "completedAt": "2026-05-23T09:04:38.873Z"
             }
           ],
           "lastDecision": {
-            "kind": "navigate_next",
-            "source": "heuristic",
-            "stageIndex": 3,
-            "stageLabel": "Section 4",
-            "url": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
-            "reason": "Page classified as start; continuing to the next logical stage.",
+            "kind": "wait_for_login",
+            "source": "system",
+            "stageIndex": 2,
+            "stageLabel": "Section 3",
+            "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D8a466b63-02b8-41e1-9819-8e980383ab13%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+            "reason": "Sign in is required. Use Google/email in this controlled Chrome window, then click I'm logged in, continue when the job form is visible.",
             "fieldLabels": [],
-            "createdAt": "2026-05-23T06:31:29.717Z"
+            "createdAt": "2026-05-23T09:04:38.873Z"
           },
           "stageHistory": [
             {
               "stageIndex": 0,
               "label": "Section 1",
-              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D34fd5049-58a3-454f-b471-a9c6685ead46%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D8a466b63-02b8-41e1-9819-8e980383ab13%26client_id%3DZmNmMjY5NjMtZTBlZS00",
               "visibleFieldLabels": [],
               "requiredFieldLabels": [],
               "filledFieldLabels": [],
@@ -289,14 +291,14 @@
                 "url": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
                 "reason": "Page classified as start; continuing to the next logical stage.",
                 "fieldLabels": [],
-                "createdAt": "2026-05-23T06:30:58.119Z"
+                "createdAt": "2026-05-23T09:04:21.891Z"
               },
-              "lastUpdatedAt": "2026-05-23T06:31:01.414Z"
+              "lastUpdatedAt": "2026-05-23T09:04:25.672Z"
             },
             {
               "stageIndex": 1,
               "label": "Section 2",
-              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D34fd5049-58a3-454f-b471-a9c6685ead46%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D8a466b63-02b8-41e1-9819-8e980383ab13%26client_id%3DZmNmMjY5NjMtZTBlZS00",
               "visibleFieldLabels": [
                 "IBMid",
                 "Remember me"
@@ -309,34 +311,34 @@
                 "source": "heuristic",
                 "stageIndex": 1,
                 "stageLabel": "Section 2",
-                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D34fd5049-58a3-454f-b471-a9c6685ead46%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D8a466b63-02b8-41e1-9819-8e980383ab13%26client_id%3DZmNmMjY5NjMtZTBlZS00",
                 "reason": "Page classified as questionnaire; continuing to the next logical stage.",
                 "fieldLabels": [],
-                "createdAt": "2026-05-23T06:31:07.400Z"
+                "createdAt": "2026-05-23T09:04:31.294Z"
               },
-              "lastUpdatedAt": "2026-05-23T06:31:10.386Z"
+              "lastUpdatedAt": "2026-05-23T09:04:34.311Z"
             },
             {
               "stageIndex": 2,
               "label": "Section 3",
-              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D34fd5049-58a3-454f-b471-a9c6685ead46%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D8a466b63-02b8-41e1-9819-8e980383ab13%26client_id%3DZmNmMjY5NjMtZTBlZS00",
               "visibleFieldLabels": [
                 "Password"
               ],
               "requiredFieldLabels": [],
               "filledFieldLabels": [],
-              "outcome": "advanced",
+              "outcome": "handoff",
               "decision": {
-                "kind": "navigate_next",
-                "source": "heuristic",
+                "kind": "wait_for_login",
+                "source": "system",
                 "stageIndex": 2,
                 "stageLabel": "Section 3",
-                "url": "https://accounts.google.com/v3/signin/identifier?opparams=%253F&dsh=S153538372%3A1779517049831813&client_id=1098965259977-8560kv8ot2ghegiqtubpfqbvnc6vgkl8.apps.googleusercontent.com&nonce=8sWUREJnWDAdTWfw4qcSPU9Zrrjb4IA3slymwHWZ9VA&o2v=2&redirect_uri=https%3A%2F%2Flogin.ibm.com%2Fauth%2Fredirect&response_type=code&scope=openid+email+profile&service=lso&state=Vvc8ZkV_o5W-iXnNDS3gUcR7pkXhfoiMnvvcUK6RdVs&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAOKv4l4lb_wLpAw8xfTKXvFDzCqRut0_2vMy6g9H0mkL1ZmqLVbsEaYIg70V9lHTWW10nEAULebEWWTfG5FRWHnZk8wq9SaWtt-TeVK37e0Rujn-9ignAYCQqX41bSDFtLpXUP7UMXXtdUPv3V12PHl3GuGiWGYH_AGTSvrg6xGVnXrbkSe9kiny6LrazIkhtI3Rn38zsduaEWNOb8KL7jxEQnS3gsn2W-RZ2GUgfVOrG_xh1rWf9HAcXbW-g2WsQQGr4zcTYIwqZObrMSJAMtKxZR4GxfdP3yZ3EwyyiKSjrt6C5wFhlOVkKkd0VoBHCHpWK1TDsRhPioh7zQcMsbvaNuezpNE6pOK9Efmmv8MF1UqJU_t_-gyKHE13puhM2cH3hopy5toJKh0iRncXdvLPvnKG4JXnYlrk1hbSVTVrfwHd820WvRfuNvkIYznqKAkR_pTDtaik1TFQUXyxoSN9ZylFQ%26flowName%3DGeneralOAuthFlow%26as%3DS153538372%253A1779517049831813%26client_id%3D1098965259977-8560kv8ot2ghegiqtubpfqbvnc6vgkl8.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Flogin.ibm.com&rart=ANgoxccgWI_f0tlkxssIbfVI1dhUaapuCYonijT3WLwXGVbpcKmhuuwddGk6sM25_M_oBBdVXJn16LdSfw2rO8TuPAMxqdHf4NoXr8pAl1Ukuo08qSgCOnM",
-                "reason": "Page classified as consent; continuing to the next logical stage.",
+                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D8a466b63-02b8-41e1-9819-8e980383ab13%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Sign in is required. Use Google/email in this controlled Chrome window, then click I'm logged in, continue when the job form is visible.",
                 "fieldLabels": [],
-                "createdAt": "2026-05-23T06:17:33.277Z"
+                "createdAt": "2026-05-23T09:04:38.873Z"
               },
-              "lastUpdatedAt": "2026-05-23T06:31:14.134Z"
+              "lastUpdatedAt": "2026-05-23T09:04:38.873Z"
             },
             {
               "stageIndex": 3,
@@ -351,42 +353,41 @@
                 "source": "heuristic",
                 "stageIndex": 3,
                 "stageLabel": "Section 4",
-                "url": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
-                "reason": "Page classified as start; continuing to the next logical stage.",
+                "url": "about:blank",
+                "reason": "Page classified as empty; continuing to the next logical stage.",
                 "fieldLabels": [],
-                "createdAt": "2026-05-23T06:31:29.717Z"
+                "createdAt": "2026-05-23T08:25:10.197Z"
               },
-              "lastUpdatedAt": "2026-05-23T06:31:31.295Z"
+              "lastUpdatedAt": "2026-05-23T08:25:10.197Z"
             },
             {
               "stageIndex": 4,
               "label": "Section 5",
-              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D62a15967-9c41-4342-a525-4713bb4bed5f%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3Dbf9e6493-1373-40f3-b9ba-1f45d693f695%26client_id%3DZmNmMjY5NjMtZTBlZS00",
               "visibleFieldLabels": [
-                "IBMid",
-                "Remember me"
+                "Password"
               ],
               "requiredFieldLabels": [],
               "filledFieldLabels": [],
-              "outcome": "advanced",
+              "outcome": "handoff",
               "decision": {
-                "kind": "navigate_next",
-                "source": "heuristic",
+                "kind": "wait_for_login",
+                "source": "system",
                 "stageIndex": 4,
                 "stageLabel": "Section 5",
-                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D62a15967-9c41-4342-a525-4713bb4bed5f%26client_id%3DZmNmMjY5NjMtZTBlZS00",
-                "reason": "Page classified as questionnaire; continuing to the next logical stage.",
+                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3Dbf9e6493-1373-40f3-b9ba-1f45d693f695%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Sign in is required. Use Google/email in this controlled Chrome window, then click I'm logged in, continue when the job form is visible.",
                 "fieldLabels": [],
-                "createdAt": "2026-05-23T06:18:52.850Z"
+                "createdAt": "2026-05-23T08:02:52.213Z"
               },
-              "lastUpdatedAt": "2026-05-23T06:18:55.842Z"
+              "lastUpdatedAt": "2026-05-23T08:02:52.213Z"
             },
             {
               "stageIndex": 5,
               "label": "Section 6",
-              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D62a15967-9c41-4342-a525-4713bb4bed5f%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "url": "https://www.ibm.com/account/reg/us-en/reset-password?formid=urx-19776&target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3Dbf9e6493-1373-40f3-b9ba-1f45d693f695%26client_id%3DZmNmMjY5NjMtZTBlZS00",
               "visibleFieldLabels": [
-                "Password"
+                "IBMid"
               ],
               "requiredFieldLabels": [],
               "filledFieldLabels": [],
@@ -396,18 +397,20 @@
                 "source": "heuristic",
                 "stageIndex": 5,
                 "stageLabel": "Section 6",
-                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D5caabcac-eefb-44bf-9be1-4cf06328af89%26client_id%3DZmNmMjY5NjMtZTBlZS00",
-                "reason": "Page classified as login; continuing to the next logical stage.",
+                "url": "https://www.ibm.com/account/reg/us-en/reset-password?formid=urx-19776&target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3Dbf9e6493-1373-40f3-b9ba-1f45d693f695%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Page classified as consent; continuing to the next logical stage.",
                 "fieldLabels": [],
-                "createdAt": "2026-05-23T05:40:33.347Z"
+                "createdAt": "2026-05-23T08:03:27.371Z"
               },
-              "lastUpdatedAt": "2026-05-23T06:18:59.707Z"
+              "lastUpdatedAt": "2026-05-23T08:03:33.103Z"
             },
             {
               "stageIndex": 6,
               "label": "Section 7",
-              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D6390a32e-4ead-47d6-ac05-4b6fefbd4d66%26client_id%3DZmNmMjY5NjMtZTBlZS00",
-              "visibleFieldLabels": [],
+              "url": "https://www.ibm.com/account/reg/us-en/reset-password?formid=urx-19776&target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3Dbf9e6493-1373-40f3-b9ba-1f45d693f695%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "visibleFieldLabels": [
+                "Code"
+              ],
               "requiredFieldLabels": [],
               "filledFieldLabels": [],
               "outcome": "advanced",
@@ -416,47 +419,46 @@
                 "source": "heuristic",
                 "stageIndex": 6,
                 "stageLabel": "Section 7",
-                "url": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
-                "reason": "Page classified as start; continuing to the next logical stage.",
+                "url": "https://www.ibm.com/account/reg/us-en/reset-password?formid=urx-19776&target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3Dbf9e6493-1373-40f3-b9ba-1f45d693f695%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+                "reason": "Page classified as consent; continuing to the next logical stage.",
                 "fieldLabels": [],
-                "createdAt": "2026-05-23T06:19:15.509Z"
+                "createdAt": "2026-05-23T08:03:38.426Z"
               },
-              "lastUpdatedAt": "2026-05-23T06:19:18.744Z"
+              "lastUpdatedAt": "2026-05-23T08:03:38.426Z"
             },
             {
               "stageIndex": 7,
               "label": "Section 8",
-              "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D6390a32e-4ead-47d6-ac05-4b6fefbd4d66%26client_id%3DZmNmMjY5NjMtZTBlZS00",
+              "url": "https://www.youtube.com/watch?v=jIQ0Dx-4peE&list=RDe_fye_I0n0U&index=3",
               "visibleFieldLabels": [
-                "IBMid",
-                "Remember me"
+                "Search"
               ],
               "requiredFieldLabels": [],
               "filledFieldLabels": [],
-              "outcome": "advanced",
+              "outcome": "handoff",
               "decision": {
-                "kind": "navigate_next",
-                "source": "heuristic",
+                "kind": "wait_for_user_input",
+                "source": "system",
                 "stageIndex": 7,
                 "stageLabel": "Section 8",
-                "url": "https://login.ibm.com/authsvc/mtfim/sps/authsvc?PolicyId=urn:ibm:security:authentication:asf:basicldapuser&Target=https%3A%2F%2Flogin.ibm.com%2Foidc%2Fendpoint%2Fdefault%2Fauthorize%3FqsId%3D6390a32e-4ead-47d6-ac05-4b6fefbd4d66%26client_id%3DZmNmMjY5NjMtZTBlZS00",
-                "reason": "Page classified as questionnaire; continuing to the next logical stage.",
+                "url": "https://www.youtube.com/watch?v=jIQ0Dx-4peE&list=RDe_fye_I0n0U&index=3",
+                "reason": "GradLaunch needs your help with required answers on this screen: Resume upload.",
                 "fieldLabels": [],
-                "createdAt": "2026-05-23T06:19:25.901Z"
+                "createdAt": "2026-05-23T07:34:14.371Z"
               },
-              "lastUpdatedAt": "2026-05-23T06:19:28.892Z"
+              "lastUpdatedAt": "2026-05-23T07:34:14.371Z"
             }
           ],
-          "lastUpdatedAt": "2026-05-23T06:31:31.295Z"
+          "lastUpdatedAt": "2026-05-23T09:04:38.873Z"
         }
       }
     },
     "notes": [
-      "The browser window was closed. GradLaunch saved the latest checkpoint so you can resume later.",
-      "Browser fill status: needs_manual_review.",
+      "The job portal still needs login before GradLaunch can continue.",
+      "Browser fill status: handoff_required.",
       "Filled fields: 1. Skipped fields: 1."
     ]
   },
   "createdAt": "2026-05-23T05:38:56.589Z",
-  "updatedAt": "2026-05-23T06:31:31.597Z"
+  "updatedAt": "2026-05-23T09:05:37.937Z"
 }
