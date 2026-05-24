@@ -5,6 +5,7 @@ import { createId } from "../lib/id";
 import { nowIso } from "../lib/time";
 import { LiveJobSearchService } from "./live-job-search-service";
 
+//saves new job from url
 export class JobIntakeService {
   constructor(
     private readonly students = new StudentRepository(),

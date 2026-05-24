@@ -1,4 +1,5 @@
 import type { Job, StudentMemory, StudentProfile } from "@gradlaunch/shared";
+import { fieldSemanticText, semanticKey } from "./semantic-nlp";
 import type { BrowserFillField, StageReflectionResult, VisibleField } from "./types";
 import { jsonBlock, normalizeKey, writeBrowserDebug } from "./util";
 
@@ -13,6 +14,9 @@ type ReflectStageInput = {
   workspacePath: string;
 };
 
+// Asks the LLM for a narrowly scoped retry plan after deterministic/autonomous
+// filling leaves required fields or validation blockers. It only uses supplied
+// context and returns revised field answers, not navigation decisions.
 export async function reflectOnStageAnswers(input: ReflectStageInput): Promise<StageReflectionResult | undefined> {
   if (!shouldUseReflection(input)) {
     return undefined;
@@ -55,12 +59,15 @@ export async function reflectOnStageAnswers(input: ReflectStageInput): Promise<S
     answers?: Array<{ fieldId?: string; label?: string; value?: string; reason?: string }>;
   };
   const visibleById = new Map(input.visibleFields.map((field) => [field.id, field]));
-  const visibleByLabel = new Map(input.visibleFields.map((field) => [normalizeKey(field.label), field]));
+  const visibleByLabel = new Map(input.visibleFields.flatMap((field) => [
+    [normalizeKey(field.label), field] as const,
+    [semanticKey(fieldSemanticText(field)), field] as const
+  ]));
   const answers: BrowserFillField[] = [];
 
   for (const candidate of parsed.answers ?? []) {
     const visibleField = (candidate.fieldId ? visibleById.get(candidate.fieldId) : undefined)
-      ?? (candidate.label ? visibleByLabel.get(normalizeKey(candidate.label)) : undefined);
+      ?? (candidate.label ? visibleByLabel.get(normalizeKey(candidate.label)) ?? visibleByLabel.get(semanticKey(candidate.label)) : undefined);
     const value = String(candidate.value ?? "").trim();
 
     if (!visibleField || !value) {
@@ -73,6 +80,11 @@ export async function reflectOnStageAnswers(input: ReflectStageInput): Promise<S
       fieldId: visibleField.id,
       inputType: visibleField.inputType,
       options: visibleField.options,
+      placeholder: visibleField.placeholder,
+      name: visibleField.name,
+      ariaLabel: visibleField.ariaLabel,
+      autocomplete: visibleField.autocomplete,
+      role: visibleField.role,
       required: visibleField.required,
       reason: String(candidate.reason ?? "Reflection suggested an alternative answer.")
     });
@@ -92,12 +104,16 @@ export async function reflectOnStageAnswers(input: ReflectStageInput): Promise<S
   };
 }
 
+// Enables reflection only when LLM answers are configured and there is a real
+// blocker to improve. This avoids unnecessary LLM calls on clean stages.
 function shouldUseReflection(input: ReflectStageInput) {
   return process.env.LLM_ANSWER_ENABLED === "true"
     && Boolean(process.env.OPENAI_API_KEY)
     && (input.missingRequiredLabels.length > 0 || input.validationMessages.length > 0);
 }
 
+// Sends the reflection prompt to the configured OpenAI-compatible chat endpoint
+// and returns the JSON response content for parsing by reflectOnStageAnswers().
 async function callOpenAiCompatible(prompt: string) {
   const endpoint = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1/chat/completions";
   const model = process.env.OPENAI_MODEL ?? process.env.LLM_MODEL ?? "gpt-4o-mini";

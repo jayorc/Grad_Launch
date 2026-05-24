@@ -41,8 +41,10 @@ gradlaunch/
       engine.ts                    # Main browser loop/orchestrator
       observe.ts                   # Reads visible fields, buttons, page state
       plan.ts                      # Chooses next action for the current stage
+      strategy.ts                  # Classifies page state, ranks actions, plans recovery
       answer.ts                    # Deterministic + LLM answer selection
-      fill.ts                      # Actually fills fields and uploads resume
+      fill.ts                      # DOM-first field type detection + field-specific fill strategies
+      autonomous-fill.ts           # Multi-round fill -> verify -> repair loop
       reflect.ts                   # LLM retry when required fields fail
       session.ts                   # Saves live browser execution session
       util.ts                      # Debug logging + helpers
@@ -78,12 +80,16 @@ gradlaunch/
 9. `BrowserApplyService.apply()` delegates to `BrowserAgentEngine.apply()`.
 10. `BrowserAgentEngine` checks Chrome availability, creates the workspace folder, launches or attaches Chrome, and opens the job `sourceUrl`.
 11. On every stage, it scans visible fields with `discoverVisibleFields()` and builds a page observation with `observeBrowserPage()`.
-12. `buildStageExecutionPlan()` decides whether the page needs login, resume upload, normal filling, next-step click, review, or submit.
-13. If the stage has fields, `buildStageAnswerPlan()` creates answers from deterministic profile/resume data and optionally asks the LLM.
-14. `fillFormField()` fills text/select/radio/checkbox/autocomplete-style fields.
-15. `attachResume()` uploads the latest stored resume when a resume/CV upload input is detected.
-16. The engine checks missing required fields and validation messages. If needed, `reflectOnStageAnswers()` asks the LLM for a retry plan.
-17. The engine either clicks next, pauses for manual help, stops at review, submits if allowed, or saves a receipt.
+12. `classifyPage()` and `rankActions()` score the page as login, captcha, resume upload, form fill, validation error, loading, review, submit, start, or unknown.
+13. `buildStageExecutionPlan()` chooses the safest action from those scores: ask user, wait, explore, upload resume, fill, click next, stop, or submit.
+14. If login/CAPTCHA/account verification is visible, the engine stops filling completely and waits for the user to click `I am logged in, continue`.
+15. If a resume upload is visible, `attachResume()` uploads the latest stored resume using direct file input, upload trigger, or file chooser fallback.
+16. If the stage has fields, `runAutonomousStageFill()` starts the autonomous solver.
+17. `buildStageAnswerPlan()` creates answers from deterministic profile/resume data and optionally asks the LLM for semantic matching.
+18. `fillFormField()` detects the real DOM control type and routes to text, native select, custom select, autocomplete, radio, checkbox, date, or file-safe behavior.
+19. The solver verifies each field after filling. Failed required/profile fields go through a repair pass before the engine is allowed to click Continue.
+20. The engine re-checks missing required fields, validation messages, pending resume uploads, and current-page completion guards.
+21. The engine either clicks next, pauses for manual help, stops at review, submits if allowed, or saves a receipt.
 
 ## Code Execution Chain
 
@@ -113,15 +119,107 @@ Browser stage loop:
 BrowserAgentEngine.apply()
   -> getAvailability() / launchContext()
   -> navigateToJobPage()
+  -> detectProtectedCheckpoint()
+  -> waitForLoginConfirmation() if login is visible
   -> discoverVisibleFields()
   -> observeBrowserPage()
+  -> classifyPage() / rankActions()
   -> buildStageExecutionPlan()
   -> attachResume()
-  -> buildStageAnswerPlan()
-  -> fillFormField()
+  -> runAutonomousStageFill()
+     -> buildStageAnswerPlan()
+     -> fillFormField()
+        -> resolveFillStrategy()
+        -> fillByClassifiedControl()
+        -> fillClassifiedNativeSelect() / fillClassifiedSelectLike()
+        -> fillClassifiedAutocomplete() / fillClassifiedChoice()
+        -> commitTextLikeLocator()
+     -> verifyFieldAnswer()
+     -> verifyAndRepairKnownFields()
   -> reflectOnStageAnswers() if required fields still fail
+  -> evaluateStageReadiness()
   -> clickNextStageControl() or stop/submit
 ```
+
+## Current Agent Architecture
+
+```text
+Observer
+  -> Reads fields, controls, validation, page text, progress, protected gates
+
+Strategy
+  -> Classifies page state
+  -> Ranks safe actions
+  -> Builds recovery plans for validation/upload/missing-required failures
+
+Answer Planner
+  -> Uses profile, resume, job, and memory first
+  -> Uses LLM only when enabled and useful for semantic matching/writing
+  -> Rejects unsafe personal-data hallucinations
+
+Fill Executor
+  -> Detects actual DOM control kind
+  -> Chooses text/select/autocomplete/choice/date/file-safe strategy
+  -> Commits values through browser-like events
+
+Verifier + Repair
+  -> Re-reads the live DOM
+  -> Checks required fields, invalid state, selected options, committed widget text
+  -> Retries failed known fields before navigation
+
+Engine
+  -> Owns Chrome/session/workspace
+  -> Pauses on login/CAPTCHA
+  -> Runs one stage at a time
+  -> Saves screenshots, debug logs, planner checkpoint, and receipt
+```
+
+## Field Filling Strategy
+
+The browser agent should not use typing for every field. `fill.ts` follows this routing model:
+
+```text
+Normalize answer
+  -> Resolve strategy from declared field type + live DOM inspection
+  -> If file: skip normal fill and let attachResume() handle it
+  -> If country/location: use strict select/autocomplete matching
+  -> If native select: select option by value/label and verify selection
+  -> If custom select: open widget, click option, type query only if needed
+  -> If autocomplete: type query, wait for suggestions, select matched suggestion
+  -> If radio/checkbox: score choices in the group and click one label/wrapper
+  -> If date/text: type/fill/set native value and dispatch input/change/blur
+  -> Verify committed result
+```
+
+This is why the important files are split:
+
+```text
+answer.ts
+  decides "what value should this field have?"
+
+fill.ts
+  decides "what kind of control is this and how should it be interacted with?"
+
+autonomous-fill.ts
+  decides "did the page accept the value, and should we repair it?"
+```
+
+## Login Handoff Strategy
+
+Login is deliberately manual and explicit:
+
+```text
+Open job URL in controlled persistent Chrome profile
+  -> Detect login/account gate
+  -> Stop all filling/observing-as-action
+  -> Show user handoff in the same Chrome window
+  -> User completes Google/email/MFA manually
+  -> User clicks "I am logged in, continue"
+  -> Re-detect protected checkpoint
+  -> Resume stage loop only if the real form is visible
+```
+
+This avoids the earlier failure mode where the bot kept acting while the user was typing credentials or changing pages.
 
 ## Where The LLM Is Called
 

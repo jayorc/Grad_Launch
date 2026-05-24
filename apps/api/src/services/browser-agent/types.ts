@@ -36,6 +36,11 @@ export type BrowserAvailability = {
 export type VisibleField = {
   id: string;
   label: string;
+  placeholder?: string;
+  name?: string;
+  ariaLabel?: string;
+  autocomplete?: string;
+  role?: string;
   required: boolean;
   tagName: string;
   inputType: string;
@@ -127,6 +132,11 @@ export type BrowserFillField = FilledField & {
   fieldId?: string;
   inputType?: string;
   options?: string[];
+  placeholder?: string;
+  name?: string;
+  ariaLabel?: string;
+  autocomplete?: string;
+  role?: string;
   required?: boolean;
   reason?: string;
 };

@@ -1,32 +1,26 @@
 {
   "intent": "browser_fill",
-  "outcome": "blocked",
+  "outcome": "confirmed",
   "externalSubmitted": false,
-  "confirmation": "GradLaunch paused because this screen still needs manual answers: Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, University, Start date, End date, Do you have past working experience? Select an option.",
-  "submittedAt": "2026-05-23T18:35:36.872Z",
+  "confirmation": "GradLaunch safely explored the page but could not confidently decide the next form action.",
+  "submittedAt": "2026-05-24T06:53:34.503Z",
   "email": {
     "status": "skipped",
     "provider": "outbox",
     "to": "arpitarpit2003@gmail.com",
     "subject": "GradLaunch filled Careers - JobDetail",
-    "sentAt": "2026-05-23T18:35:36.872Z",
+    "sentAt": "2026-05-24T06:53:34.503Z",
     "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
   },
   "browser": {
-    "status": "handoff_required",
+    "status": "needs_manual_review",
     "sourceUrl": "https://careers.ibm.com/en_US/careers/JobDetail?jobId=114835&source=SN_LinkedIn",
-    "openedAt": "2026-05-23T18:33:47.676Z",
-    "completedAt": "2026-05-23T18:35:36.871Z",
-    "filledLabels": [
-      "I agree",
-      "Tell us more about yourself and we’ll keep you up to date regarding upcoming events and career opportunities that match your interests.",
-      "Are you a resident of China or South Korea?",
-      "Legal first name",
-      "Legal last name"
-    ],
+    "openedAt": "2026-05-24T06:52:23.555Z",
+    "completedAt": "2026-05-24T06:53:34.503Z",
+    "filledLabels": [],
     "skippedLabels": [
       "Tell us more about yourself and we’ll keep you up to date regarding upcoming events and career opportunities that match your interests.",
-      "No thanks, continue to apply",
+      "I agree",
       "Legal first name",
       "Legal last name",
       "Address line 1",
@@ -36,38 +30,32 @@
       "City",
       "Home Email",
       "Phone number",
-      "Degree name",
-      "Type of degree",
-      "University",
+      "Type of degreeSelect an option",
       "Start date",
       "End date",
       "Do you have past working experience? Select an option",
-      "If you have a preferred name that is different from your legal name, please select yes below; otherwise, please select no.",
-      "Yes"
+      "If you have a preferred name that is different from your legal name, please select yes below; otherwise, please select no."
     ],
     "screenshots": [
       "browser-opened.png",
       "browser-stage-1-start.png",
       "browser-handoff-needed.png",
       "browser-stage-2-start.png",
-      "browser-handoff-needed.png",
-      "browser-stage-3-start.png",
-      "browser-handoff-needed.png",
-      "browser-stage-4-start.png"
+      "browser-stage-3-start.png"
     ],
-    "message": "GradLaunch paused because this screen still needs manual answers: Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, University, Start date, End date, Do you have past working experience? Select an option.",
+    "message": "GradLaunch safely explored the page but could not confidently decide the next form action.",
     "planner": {
       "sessionId": "planner-job_url_aHR0cHM6Ly9jYXJlZXJzLmli",
       "resumeToken": "job_url_aHR0cHM6Ly9jYXJlZXJzLmli:2026-05-23T12:11:20.008Z",
       "goal": "Complete the JobDetail application at Careers autonomously until a protected or review checkpoint.",
-      "status": "handoff_required",
-      "summary": "GradLaunch needs your help with required answers on this screen: Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, University, Start date, End date, Do you have past working experience? Select an option.",
+      "status": "needs_review",
+      "summary": "Safe exploration did not reveal a confident form action.",
       "formMode": "multi_stage",
-      "currentStep": "stage_4",
-      "currentStageLabel": "Section 4",
-      "currentUrl": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-      "retryCount": 16,
-      "handoffCount": 17,
+      "currentStep": "stage_3",
+      "currentStageLabel": "Section 3",
+      "currentUrl": "about:blank",
+      "retryCount": 17,
+      "handoffCount": 24,
       "validationErrors": [
         "Tell us more about yourself and we’ll keep you up to date regarding upcoming events and career opportunities that match your interests.",
         "No thanks, continue to apply",
@@ -85,7 +73,8 @@
         "Start date",
         "End date",
         "Do you have past working experience? Select an option",
-        "University"
+        "University",
+        "I agree"
       ],
       "subgoals": [
         {
@@ -93,34 +82,34 @@
           "label": "Open job page",
           "status": "completed",
           "detail": "Job page opened successfully in a visible Chrome session.",
-          "attempts": 28,
-          "lastUpdatedAt": "2026-05-23T18:33:50.283Z",
-          "completedAt": "2026-05-23T18:33:50.283Z"
+          "attempts": 31,
+          "lastUpdatedAt": "2026-05-24T06:52:29.113Z",
+          "completedAt": "2026-05-24T06:52:29.113Z"
         },
         {
           "id": "authenticate_if_needed",
           "label": "Handle login if needed",
-          "status": "needs_user",
-          "detail": "GradLaunch needs your help with required answers on this screen: Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, University, Start date, End date, Do you have past working experience? Select an option.",
-          "attempts": 45,
-          "lastUpdatedAt": "2026-05-23T18:35:36.807Z"
+          "status": "running",
+          "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+          "attempts": 60,
+          "lastUpdatedAt": "2026-05-24T06:53:33.224Z"
         },
         {
           "id": "finish_current_section",
           "label": "Finish active section",
           "status": "running",
-          "detail": "Reading Section 4 and planning the next safe action.",
-          "attempts": 74,
-          "lastUpdatedAt": "2026-05-23T18:35:17.069Z",
+          "detail": "Reading Section 3 and planning the next safe action.",
+          "attempts": 85,
+          "lastUpdatedAt": "2026-05-24T06:53:33.628Z",
           "completedAt": "2026-05-23T18:11:03.066Z"
         },
         {
           "id": "recover_from_validation_errors",
           "label": "Recover from validation errors",
           "status": "blocked",
-          "detail": "Validation or required-answer blockers were found: Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, University, Start date, End date, Do you have past working experience? Select an option.",
-          "attempts": 18,
-          "lastUpdatedAt": "2026-05-23T18:35:36.744Z"
+          "detail": "Validation or required-answer blockers were found: I agree, Legal first name, Legal last name, Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Start date, End date, Do you have past working experience? Select an option.",
+          "attempts": 25,
+          "lastUpdatedAt": "2026-05-24T06:53:33.116Z"
         },
         {
           "id": "retry_alternative_path",
@@ -144,31 +133,27 @@
           "status": "completed",
           "detail": "Saved checkpoint before handing control to the student.",
           "attempts": 0,
-          "lastUpdatedAt": "2026-05-23T18:35:36.807Z",
-          "completedAt": "2026-05-23T18:35:36.807Z"
+          "lastUpdatedAt": "2026-05-24T06:53:33.209Z",
+          "completedAt": "2026-05-24T06:53:33.209Z"
         }
       ],
       "lastDecision": {
         "kind": "wait_for_user_input",
         "source": "system",
-        "stageIndex": 3,
-        "stageLabel": "Section 4",
+        "stageIndex": 1,
+        "stageLabel": "Section 2",
         "url": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-        "reason": "GradLaunch needs your help with required answers on this screen: Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, University, Start date, End date, Do you have past working experience? Select an option.",
+        "reason": "GradLaunch needs your help with required answers on this screen: I agree, Legal first name, Legal last name, Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Start date, End date, Do you have past working experience? Select an option.",
         "fieldLabels": [],
-        "createdAt": "2026-05-23T18:35:36.807Z"
+        "createdAt": "2026-05-24T06:53:33.209Z"
       },
       "stageHistory": [
         {
           "stageIndex": 0,
           "label": "Section 1",
           "url": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-          "visibleFieldLabels": [
-            "Tell us more about yourself and we’ll keep you up to date regarding upcoming events and career opportunities that match your interests."
-          ],
-          "requiredFieldLabels": [
-            "Tell us more about yourself and we’ll keep you up to date regarding upcoming events and career opportunities that match your interests."
-          ],
+          "visibleFieldLabels": [],
+          "requiredFieldLabels": [],
           "filledFieldLabels": [],
           "outcome": "handoff",
           "decision": {
@@ -177,51 +162,18 @@
             "stageIndex": 0,
             "stageLabel": "Section 1",
             "url": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-            "reason": "GradLaunch needs your help with required answers on this screen: Tell us more about yourself and we’ll keep you up to date regarding upcoming events and career opportunities that match your interests., No thanks, continue to apply.",
+            "reason": "GradLaunch needs your help with required answers on this screen: Tell us more about yourself and we’ll keep you up to date regarding upcoming events and career opportunities that match your interests..",
             "fieldLabels": [],
-            "createdAt": "2026-05-23T18:34:04.906Z"
+            "createdAt": "2026-05-24T06:52:46.385Z"
           },
-          "lastUpdatedAt": "2026-05-23T18:34:04.906Z"
+          "lastUpdatedAt": "2026-05-24T06:52:46.385Z"
         },
         {
           "stageIndex": 1,
           "label": "Section 2",
           "url": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-          "visibleFieldLabels": [
-            "I agree",
-            "Legal first name",
-            "Legal middle name",
-            "Legal last name",
-            "If you have a preferred name that is different from your legal name, please select yes below; otherwise, please select no.",
-            "Address line 1",
-            "Address line 2",
-            "Country",
-            "State/Province",
-            "City",
-            "Zip code/Postal code",
-            "Home Email",
-            "Phone number",
-            "Degree name",
-            "Type of degree",
-            "University",
-            "Start date",
-            "End date",
-            "Do you have past working experience?"
-          ],
-          "requiredFieldLabels": [
-            "I agree",
-            "Legal first name",
-            "Legal last name",
-            "If you have a preferred name that is different from your legal name, please select yes below; otherwise, please select no.",
-            "Address line 1",
-            "Country",
-            "State/Province",
-            "City",
-            "Zip code/Postal code",
-            "Home Email",
-            "Phone number",
-            "Do you have past working experience?"
-          ],
+          "visibleFieldLabels": [],
+          "requiredFieldLabels": [],
           "filledFieldLabels": [
             "Resume upload"
           ],
@@ -232,53 +184,18 @@
             "stageIndex": 1,
             "stageLabel": "Section 2",
             "url": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-            "reason": "GradLaunch needs your help with required answers on this screen: Legal first name, Legal last name, Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, Yes, Start date, End date, Do you have past working experience? Select an option.",
+            "reason": "GradLaunch needs your help with required answers on this screen: I agree, Legal first name, Legal last name, Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Start date, End date, Do you have past working experience? Select an option.",
             "fieldLabels": [],
-            "createdAt": "2026-05-23T18:34:37.265Z"
+            "createdAt": "2026-05-24T06:53:33.209Z"
           },
-          "lastUpdatedAt": "2026-05-23T18:34:37.265Z"
+          "lastUpdatedAt": "2026-05-24T06:53:33.209Z"
         },
         {
           "stageIndex": 2,
           "label": "Section 3",
-          "url": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-          "visibleFieldLabels": [
-            "I agree",
-            "Are you a resident of China or South Korea?",
-            "Legal first name",
-            "Legal middle name",
-            "Legal last name",
-            "If you have a preferred name that is different from your legal name, please select yes below; otherwise, please select no.",
-            "Address line 1",
-            "Address line 2",
-            "Country",
-            "State/Province",
-            "City",
-            "Zip code/Postal code",
-            "Home Email",
-            "Phone number",
-            "Degree name",
-            "Type of degree",
-            "University",
-            "Start date",
-            "End date",
-            "Do you have past working experience?"
-          ],
-          "requiredFieldLabels": [
-            "I agree",
-            "Are you a resident of China or South Korea?",
-            "Legal first name",
-            "Legal last name",
-            "If you have a preferred name that is different from your legal name, please select yes below; otherwise, please select no.",
-            "Address line 1",
-            "Country",
-            "State/Province",
-            "City",
-            "Zip code/Postal code",
-            "Home Email",
-            "Phone number",
-            "Do you have past working experience?"
-          ],
+          "url": "about:blank",
+          "visibleFieldLabels": [],
+          "requiredFieldLabels": [],
           "filledFieldLabels": [],
           "outcome": "handoff",
           "decision": {
@@ -287,11 +204,11 @@
             "stageIndex": 2,
             "stageLabel": "Section 3",
             "url": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-            "reason": "GradLaunch needs your help with required answers on this screen: Legal last name, Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, Yes, Start date, End date, Do you have past working experience? Select an option.",
+            "reason": "GradLaunch needs your help with required answers on this screen: Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Start date, End date, Do you have past working experience? Select an option.",
             "fieldLabels": [],
-            "createdAt": "2026-05-23T18:35:15.024Z"
+            "createdAt": "2026-05-24T06:34:41.609Z"
           },
-          "lastUpdatedAt": "2026-05-23T18:35:15.024Z"
+          "lastUpdatedAt": "2026-05-24T06:53:33.673Z"
         },
         {
           "stageIndex": 3,
@@ -339,16 +256,16 @@
           ],
           "outcome": "handoff",
           "decision": {
-            "kind": "wait_for_user_input",
+            "kind": "stop",
             "source": "system",
             "stageIndex": 3,
             "stageLabel": "Section 4",
             "url": "https://careers.ibm.com/en_US/careers/JobApplication?jobId=114835&source=SN_LinkedIn",
-            "reason": "GradLaunch needs your help with required answers on this screen: Address line 1, Country Select an option, State/Province Select an option, City, Home Email, Phone number, Degree name, Type of degree, University, Start date, End date, Do you have past working experience? Select an option.",
+            "reason": "GradLaunch stopped because you clicked Quit in the live bot.",
             "fieldLabels": [],
-            "createdAt": "2026-05-23T18:35:36.807Z"
+            "createdAt": "2026-05-24T06:34:49.743Z"
           },
-          "lastUpdatedAt": "2026-05-23T18:35:36.807Z"
+          "lastUpdatedAt": "2026-05-24T06:34:49.743Z"
         },
         {
           "stageIndex": 4,
@@ -481,7 +398,7 @@
           "lastUpdatedAt": "2026-05-23T13:58:34.292Z"
         }
       ],
-      "lastUpdatedAt": "2026-05-23T18:35:36.807Z"
+      "lastUpdatedAt": "2026-05-24T06:53:34.503Z"
     }
   }
 }

@@ -1,10 +1,14 @@
 import { constants as fsConstants } from "node:fs";
 import { access, appendFile } from "node:fs/promises";
 
+// Normalizes labels, option text, URLs, and validation snippets into a stable
+// lowercase key so fuzzy matching compares meaning instead of punctuation.
 export function normalizeKey(value: string | undefined | null) {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+// Removes duplicate field labels while preserving the first readable label for
+// user-facing summaries, planner checkpoints, and debug logs.
 export function dedupeLabels(values: string[]) {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -23,6 +27,9 @@ export function dedupeLabels(values: string[]) {
   return result;
 }
 
+// Separates harmless dynamic status text from real validation failures. This
+// prevents phrases like "loading" or "options available" from blocking form
+// navigation as if they were required-field errors.
 export function isTransientStatusMessage(value: string | undefined | null) {
   const normalized = normalizeKey(value);
 
@@ -41,6 +48,8 @@ export function isTransientStatusMessage(value: string | undefined | null) {
   return /\b(options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|selected 1 of|selected \d+ of|results found|no results found)\b/.test(normalized);
 }
 
+// Parses a URL hostname defensively for ATS adapter checks and page-origin
+// comparisons. Invalid URLs return an empty string instead of throwing.
 export function safeHostname(url: string) {
   try {
     return new URL(url).hostname;
@@ -49,6 +58,8 @@ export function safeHostname(url: string) {
   }
 }
 
+// Checks whether a local file or directory exists. Browser launch, resume
+// upload, and storage setup all use this before touching paths.
 export async function pathExists(path: string) {
   try {
     await access(path, fsConstants.F_OK);
@@ -58,6 +69,8 @@ export async function pathExists(path: string) {
   }
 }
 
+// Extracts a JSON object from an LLM response. It accepts fenced JSON blocks
+// first, then falls back to the first/last brace range for imperfect responses.
 export function jsonBlock(text: string) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
 
@@ -70,6 +83,8 @@ export function jsonBlock(text: string) {
   return start >= 0 && end > start ? text.slice(start, end + 1) : text.trim();
 }
 
+// Appends one structured event to the run's browser-agent-debug.log. Logging is
+// best-effort so a file-system problem never breaks the browser automation.
 export async function writeBrowserDebug(workspacePath: string, label: string, payload: unknown) {
   try {
     await appendFile(

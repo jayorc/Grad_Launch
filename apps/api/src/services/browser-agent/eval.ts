@@ -9,6 +9,9 @@ type EvaluateStageInput = {
   allowExternalSubmit: boolean;
 };
 
+// Converts the current page's required-field and validation state into a single
+// readiness verdict. The engine uses this as the final gate before retrying,
+// asking the user, clicking Continue, pausing at review, or submitting.
 export function evaluateStageReadiness(input: EvaluateStageInput): StageEvaluation {
   if (input.validationMessages.length > 0) {
     return {

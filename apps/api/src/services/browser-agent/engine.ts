@@ -48,6 +48,10 @@ import { BrowserExecutionSessionService } from "./session";
 import { clearUserContinueRequest, clearUserStopRequest, consumeUserContinueConfirmation, didUserRequestStop, isLiveBotMounted, updateLiveBot } from "./ui";
 import { dedupeLabels, normalizeKey, pathExists, writeBrowserDebug } from "./util";
 
+// BrowserAgentEngine is the top-level browser runner. It owns the safe
+// sequence for a job application: open Chrome, detect protected gates, hand
+// login/CAPTCHA back to the user, fill one visible stage at a time, verify the
+// current page, and only then navigate forward.
 const defaultChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 type BrowserLaunchMode = "logged_cdp" | "logged_profile" | "logged_profile_clone" | "managed_cdp" | "managed_profile" | "ephemeral";
@@ -63,6 +67,10 @@ export class BrowserAgentEngine {
   private readonly executionSessions = new BrowserExecutionSessionService();
 
   async getAvailability(): Promise<BrowserAvailability> {
+    // Prefer an explicitly debuggable logged-in Chrome first. If that is not
+    // available, decide whether to use GradLaunch's persistent browser profile
+    // or block with a clear setup message. This keeps external portal logins
+    // in the browser, not in the LLM or API process.
     const loggedCdpUrl = shouldPreferLoggedBrowser() ? await resolveLoggedChromeCdpUrl() : undefined;
 
     if (loggedCdpUrl) {
@@ -157,6 +165,9 @@ export class BrowserAgentEngine {
   }
 
   async apply(input: BrowserApplyInput): Promise<BrowserApplyReceipt> {
+    // Every run starts with a planner checkpoint and a workspace. The planner
+    // is the durable "memory" of the browser run, while the workspace stores
+    // screenshots and debug logs that explain what happened after the fact.
     const availability = await this.getAvailability();
     const openedAt = nowIso();
     const screenshots: string[] = [];
@@ -258,6 +269,10 @@ export class BrowserAgentEngine {
       });
       await clickSoftGate(activePage);
 
+      // Before any filling starts, check for login/CAPTCHA/protected screens.
+      // Login handoff is intentionally a hard pause: the agent must not keep
+      // typing while the user is logging in, because that is how context gets
+      // lost and fields get overwritten.
       let initialCheckpoint = await detectProtectedCheckpoint(activePage);
 
       if (initialCheckpoint.blocked && initialCheckpoint.kind === "login") {
@@ -395,6 +410,9 @@ export class BrowserAgentEngine {
       const seenStageVisitKeys = new Set<string>();
       const resumeUploadAttemptsByStage = new Map<string, number>();
 
+      // A job portal can be a multi-step wizard. This loop treats each visible
+      // screen as a stage, with loop guards so the bot does not bounce backward
+      // and forward forever when a site refuses navigation.
       for (let stageIndex = 0; stageIndex < maxStages; stageIndex += 1) {
         if (!hasOpenPage(context)) {
           return await handleGracefulStop({
@@ -440,6 +458,9 @@ export class BrowserAgentEngine {
         await saveScreenshot(activePage, workspacePath, screenshots, `browser-stage-${stageIndex + 1}-start.png`);
         await clickSoftGate(activePage);
 
+        // Protected checkpoints can appear mid-application after a "Continue"
+        // click. Re-check every stage and pause again instead of trying to
+        // fill across a login wall.
         let protectedCheckpoint = await detectProtectedCheckpoint(activePage);
 
         if (protectedCheckpoint.blocked && protectedCheckpoint.kind === "login") {
@@ -540,6 +561,9 @@ export class BrowserAgentEngine {
           continue;
         }
 
+        // Observation and planning are separated on purpose. observe.ts reads
+        // the screen; plan.ts/strategy.ts decide what kind of page it is and
+        // which action is safest.
         let stageVisibleFields = await discoverVisibleFields(activePage);
         let observation = await observeBrowserPage(activePage, stageVisibleFields);
         const stageSignature = await getStageSignature(activePage, observation);
@@ -673,6 +697,9 @@ export class BrowserAgentEngine {
         }
 
         if (stageAction === "explore") {
+          // Exploration mode only performs safe probes: wait, dismiss soft
+          // gates, scroll, and re-observe. It should not submit or navigate
+          // blindly when the page classification is weak.
           const probe = await probeAndReobservePage({
             page: activePage,
             workspacePath,
@@ -743,6 +770,9 @@ export class BrowserAgentEngine {
           }
         }
 
+        // If the same non-fillable screen repeats, stop instead of looping.
+        // Fillable screens are exempt because the autonomous fill/repair loop
+        // may legitimately need multiple passes on the same page.
         const shouldPauseForSameScreenLoop = sameScreenAttempts > loopThreshold
           && stageAction !== "fill"
           && stageVisibleFields.length === 0;
@@ -832,6 +862,10 @@ export class BrowserAgentEngine {
           };
         }
 
+        // Resume upload is attempted before normal text/choice filling because
+        // many portals parse the resume and then reveal the real application
+        // form. The upload completion wait is limited so a stuck upload does
+        // not trap the entire run.
         const resumeAvailableOnDisk = Boolean(input.resume?.storagePath && await pathExists(input.resume.storagePath));
         const shouldAttemptResumeUpload = Boolean(
           !resumeUploaded
@@ -966,6 +1000,9 @@ export class BrowserAgentEngine {
         let failedRequiredAfterRetries: BrowserFillField[] = [];
 
         if (stageAction === "fill" && stageVisibleFields.length > 0) {
+          // The autonomous solver is intentionally stronger than a single
+          // pass. It builds answers, fills by field type, verifies committed
+          // values, repairs failed fields, and returns any remaining blockers.
           const autonomousFill = await runAutonomousStageFill({
             page: activePage,
             stageIndex,
@@ -1058,6 +1095,9 @@ export class BrowserAgentEngine {
           await autoResolveConsentControls(activePage);
         }
 
+        // Do not click Continue immediately after filling. First re-read the
+        // live DOM for required fields, validation messages, and pending file
+        // uploads. This is the guard that prevents leaving an incomplete page.
         const submitVisible = await hasFinalSubmitControl(activePage);
         let outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
         let validationMessages = await getVisibleValidationMessages(activePage);
@@ -1328,6 +1368,9 @@ export class BrowserAgentEngine {
         });
 
         if (stageAction === "fill" && evaluation.status === "needs_retry") {
+          // Reflection is the last automated repair path. It gives the LLM the
+          // current blockers and attempted answers, then retries only the
+          // improved answers before asking the user.
           const reflection = await reflectOnStageAnswers({
             job: input.job,
             student: input.student,
@@ -1821,6 +1864,8 @@ export class BrowserAgentEngine {
   }
 }
 
+// Reuses an already-open page for the job URL when possible; otherwise creates
+// a new tab. This preserves context during resume/manual handoff runs.
 async function openOrResumePage(context: BrowserContext, sourceUrl: string, resumeUrl: string | undefined) {
   const candidateUrls = [resumeUrl, sourceUrl].filter((value): value is string => Boolean(value));
 
@@ -1833,6 +1878,9 @@ async function openOrResumePage(context: BrowserContext, sourceUrl: string, resu
   return context.newPage();
 }
 
+// Navigates the controlled Chrome tab to the job URL using multiple fallbacks:
+// normal goto, window.location, then address-bar typing. This fixes cases where
+// Chrome opens a blank tab but initial navigation does not commit.
 async function navigateToJobPage(page: Page, targetUrl: string, workspacePath: string) {
   let gotoError: string | undefined;
 
@@ -1913,10 +1961,13 @@ async function navigateToJobPage(page: Page, targetUrl: string, workspacePath: s
   );
 }
 
+// Detects browser blank/new-tab pages that mean the job URL did not actually
+// load yet.
 function isBlankBrowserUrl(value: string) {
   return value === "about:blank" || value === "chrome://newtab/" || value.startsWith("chrome://new-tab-page");
 }
 
+// Validates that a browser navigation target is a normal HTTP/HTTPS URL.
 function isHttpUrl(value: string) {
   try {
     const parsed = new URL(value);
@@ -1926,6 +1977,8 @@ function isHttpUrl(value: string) {
   }
 }
 
+// Builds a stable visit key from the current stage signature for same-screen
+// loop detection.
 function stageVisitKey(signature: Awaited<ReturnType<typeof getStageSignature>>) {
   return [
     signature.url,
@@ -1934,6 +1987,8 @@ function stageVisitKey(signature: Awaited<ReturnType<typeof getStageSignature>>)
   ].join("|");
 }
 
+// Sanitizes a resume URL from a previous planner state so the bot only resumes
+// safe same-site application pages, never login/personal browsing URLs.
 function sanitizeBrowserResumeUrl(value: string | undefined, sourceUrl: string) {
   if (!value) {
     return undefined;
@@ -1964,6 +2019,8 @@ function sanitizeBrowserResumeUrl(value: string | undefined, sourceUrl: string) 
   return parsed.toString();
 }
 
+// Checks whether a login gate has actually cleared by waiting for load, reading
+// protected checkpoints, and confirming the observed page is no longer login.
 async function loginGateCleared(page: Page) {
   await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => undefined);
   await page.waitForTimeout(600).catch(() => undefined);
@@ -1984,6 +2041,7 @@ async function loginGateCleared(page: Page) {
   return Boolean(observation && observation.pageState !== "login" && observation.pageState !== "account_gate");
 }
 
+// Detects whether a URL looks like a login/auth/account route.
 function looksLikeLoginUrl(value: string) {
   try {
     const parsed = new URL(value);
@@ -1994,6 +2052,8 @@ function looksLikeLoginUrl(value: string) {
   }
 }
 
+// Detects personal browsing URLs that should never be used as resume targets
+// for a job application run.
 function looksLikePersonalBrowsingUrl(value: string) {
   try {
     const parsed = new URL(value);
@@ -2009,6 +2069,7 @@ function looksLikePersonalBrowsingUrl(value: string) {
   }
 }
 
+// Detects Google account authentication pages during manual login handoff.
 function isGoogleAuthUrl(value: string) {
   try {
     const parsed = new URL(value);
@@ -2018,6 +2079,7 @@ function isGoogleAuthUrl(value: string) {
   }
 }
 
+// Compares two URL strings by exact hostname.
 function sameHostname(left: string, right: string) {
   try {
     return new URL(left).hostname === new URL(right).hostname;
@@ -2026,6 +2088,8 @@ function sameHostname(left: string, right: string) {
   }
 }
 
+// Checks whether two hosts are the same site or one is a subdomain of the
+// other, allowing safe application redirects within the same company/ATS site.
 function isSameSiteOrSubdomain(leftHost: string, rightHost: string) {
   const left = leftHost.toLowerCase();
   const right = rightHost.toLowerCase();
@@ -2039,6 +2103,8 @@ function isSameSiteOrSubdomain(leftHost: string, rightHost: string) {
   return Boolean(leftSite && rightSite && leftSite === rightSite);
 }
 
+// Approximates a registrable site domain by taking the last two hostname parts.
+// It is a practical fallback for same-site comparisons, not a full PSL parser.
 function approximateSiteDomain(hostname: string) {
   const parts = hostname.split(".").filter(Boolean);
 
@@ -2049,6 +2115,8 @@ function approximateSiteDomain(hostname: string) {
   return parts.slice(-2).join(".");
 }
 
+// Updates the persisted live execution session if this run has one. Errors are
+// swallowed so UI persistence never breaks browser automation.
 async function updateExecutionSession(
   sessions: BrowserExecutionSessionService,
   sessionId: string | undefined,
@@ -2064,10 +2132,14 @@ async function updateExecutionSession(
   }).catch(() => undefined);
 }
 
+// Returns whether the Playwright browser context still has at least one open
+// page, used for graceful stop/closed-window handling.
 function hasOpenPage(context: BrowserContext) {
   return context.pages().some((page) => !page.isClosed());
 }
 
+// Saves run state and returns a resumable receipt when the user closes/stops the
+// browser or the bot must pause safely.
 async function handleGracefulStop(input: {
   reason: string;
   input: BrowserApplyInput;
@@ -2130,6 +2202,9 @@ async function handleGracefulStop(input: {
   };
 }
 
+// Waits after selecting a resume file until the upload widget finishes, a form
+// appears, or the stage signature changes. It prevents the bot from waiting
+// forever on method-choice upload screens.
 async function waitForResumeUploadCompletion(input: {
   context: BrowserContext;
   page: Page;
@@ -2227,6 +2302,8 @@ async function waitForResumeUploadCompletion(input: {
   };
 }
 
+// Detects the resume upload method-selection screen where the user/site chooses
+// between upload from device, paste/copy, or apply without resume.
 function isResumeMethodChoiceObservation(observation: BrowserAgentObservation) {
   const text = normalizeAgentText([
     observation.title,
@@ -2239,12 +2316,16 @@ function isResumeMethodChoiceObservation(observation: BrowserAgentObservation) {
     && /\b(without resume|without cv|copy paste|copy and paste)\b/.test(text);
 }
 
+// Detects a temporarily blank/empty observation after redirects or upload
+// processing, so the engine waits instead of treating it as final failure.
 function isTransientBlankObservation(observation: BrowserAgentObservation) {
   return observation.visibleFields.length === 0
     && observation.controls.length === 0
     && normalizeAgentText(observation.pageText).length < 25;
 }
 
+// Determines whether the page state after resume upload is enough to continue
+// the normal application loop.
 function isActionablePostUploadState(observation: BrowserAgentObservation) {
   return observation.pageState === "questionnaire"
     || observation.pageState === "consent"
@@ -2255,6 +2336,8 @@ function isActionablePostUploadState(observation: BrowserAgentObservation) {
     || observation.pageState === "login";
 }
 
+// Applies the final current-page guard before navigation by merging required
+// empty labels, still-empty attempted fields, and unverified critical fields.
 async function applyCurrentPageCompletionGuard(input: {
   page: Page;
   failedFields: BrowserFillField[];
@@ -2290,6 +2373,8 @@ async function applyCurrentPageCompletionGuard(input: {
   };
 }
 
+// Re-checks failed required/critical fields against the live page to see which
+// ones are still empty after the fill/repair loop.
 async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: BrowserFillField[]) {
   const requiredFields = failedFields.filter((field) => {
     if (!field.required && !isLikelyRequiredAttemptedLabel(field.label)) {
@@ -2361,11 +2446,15 @@ async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: Br
           return false;
         }
 
+        if (isInactiveFormBranch(control)) {
+          return false;
+        }
+
         if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button", "checkbox", "radio"].includes(control.type)) {
           return false;
         }
 
-        if (wantedType === "select" && !(control instanceof HTMLSelectElement) && !(control instanceof HTMLInputElement && isCustomSelectLike(control))) {
+        if ((wantedType === "select" || wantedType === "combobox") && !(control instanceof HTMLSelectElement) && !(control instanceof HTMLInputElement && isCustomSelectLike(control))) {
           return false;
         }
 
@@ -2375,13 +2464,14 @@ async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: Br
 
         const rect = control.getBoundingClientRect();
         const style = window.getComputedStyle(control);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
+          || control instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(control));
       }
 
       function isEmptyControl(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
         if (control instanceof HTMLSelectElement) {
           const selected = control.selectedOptions[0];
-          const selectedText = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`);
+          const selectedText = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value} ${getCustomSelectRenderedText(control)}`);
           return isEmptySelectText(selectedText);
         }
 
@@ -2411,7 +2501,75 @@ async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: Br
       function isEmptySelectText(value: string) {
         return !value
           || /^(select|select an option|choose|choose an option|please select|none selected)$/.test(value)
-          || /\b(options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
+          || /\b(select an option|choose an option|please select|none selected|options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
+      }
+
+      function isInactiveFormBranch(control: Element) {
+        if (control.closest(".datasetField__row--sample") || control.hasAttribute("hidden")) {
+          return true;
+        }
+
+        if (control.parentElement?.closest("[hidden], [aria-hidden='true']")) {
+          return true;
+        }
+
+        const id = control.getAttribute("id") ?? "";
+        const name = control.getAttribute("name") ?? "";
+        return /(^|-)sample($|-)/i.test(id) || /(^|-)sample($|-)/i.test(name);
+      }
+
+      function getCustomSelectRenderedText(control: HTMLSelectElement) {
+        const proxy = getVisibleCustomSelectProxy(control);
+        const rendered = control.id ? getElementById(`select2-${control.id}-container`) : null;
+        return [
+          rendered?.textContent,
+          rendered?.getAttribute("title"),
+          proxy?.textContent,
+          proxy?.getAttribute("title"),
+          proxy?.getAttribute("aria-valuetext")
+        ].filter(Boolean).join(" ");
+      }
+
+      function getVisibleCustomSelectProxy(control: HTMLSelectElement) {
+        if (!isCustomSelectElement(control)) {
+          return undefined;
+        }
+
+        const candidates = [
+          control.nextElementSibling,
+          control.parentElement?.querySelector("[role='combobox']"),
+          control.parentElement?.querySelector(".select2 [role='combobox']"),
+          control.id ? getElementById(`select2-${control.id}-container`)?.closest("[role='combobox']") : null,
+          control.id ? queryFirst(`.select2Container${CSS.escape(control.id)}`, control) : null,
+          control.id ? queryFirst(`[aria-labelledby~="${CSS.escape(`${control.id}-label`)}"][role='combobox']`, control) : null
+        ];
+
+        for (const candidate of candidates) {
+          const element = candidate instanceof HTMLElement
+            ? candidate
+            : candidate instanceof Element
+              ? candidate.querySelector("[role='combobox']") as HTMLElement | null
+              : null;
+
+          if (element && isVisibleElement(element)) {
+            return element;
+          }
+        }
+
+        return undefined;
+      }
+
+      function isCustomSelectElement(control: HTMLSelectElement) {
+        const className = String(control.getAttribute("class") ?? "");
+        return control.getAttribute("aria-hidden") === "true"
+          || /\b(select2-hidden-accessible|select2|autocomplete|combobox)\b/i.test(className)
+          || Boolean(control.parentElement?.querySelector(".select2, [role='combobox'], [aria-haspopup='true'], [aria-haspopup='listbox']"));
+      }
+
+      function isVisibleElement(element: Element) {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
       }
 
       function isCustomSelectLike(control: HTMLInputElement) {
@@ -2668,6 +2826,8 @@ async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: Br
   return dedupeLabels(missingLabels);
 }
 
+// Identifies labels that are likely required or application-critical even when
+// the DOM did not expose a reliable required attribute.
 function isLikelyRequiredAttemptedLabel(label: string) {
   const normalized = normalizeBrowserAgentLabel(label);
 
@@ -2675,6 +2835,8 @@ function isLikelyRequiredAttemptedLabel(label: string) {
     && !/\b(address line 2|middle name|preferred first|preferred last|preferred name)\b/.test(normalized);
 }
 
+// Detects generic stale validation banners for radio/checkbox groups after the
+// corresponding choice was already selected.
 function isStaleChoiceValidation(
   validationMessages: string[],
   answers: Array<{ label: string; value: string; inputType?: string }>
@@ -2705,14 +2867,19 @@ function isStaleChoiceValidation(
     || choiceText.split(" ").some((token) => token.length > 5 && validationText.includes(token));
 }
 
+// Normalizes page/debug text for comparisons inside engine-level guards.
 function normalizeAgentText(value: string) {
   return value.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+// Normalizes labels for engine completion guards while stripping placeholder
+// text and required asterisks.
 function normalizeBrowserAgentLabel(label: string) {
   return normalizeKey(label.replace(/\bselect an option\b/gi, " ").replace(/\*/g, " "));
 }
 
+// Waits for a user to manually make progress on a stage, then resumes only when
+// the saved stage signature changes and the page becomes readable.
 async function waitForManualProgress(input: {
   context: BrowserContext;
   page: Page;
@@ -2826,6 +2993,9 @@ async function waitForManualProgress(input: {
   };
 }
 
+// Opens or attaches to the best Chrome context for the run. Preference order is
+// logged CDP, controlled logged profile, managed CDP/profile, then ephemeral
+// browser, with explicit lock handling for persistent profiles.
 async function launchContext(chromePath: string | undefined): Promise<BrowserLaunchResult> {
   const launchOptions = {
     executablePath: chromePath,
@@ -2983,6 +3153,8 @@ async function launchContext(chromePath: string | undefined): Promise<BrowserLau
   };
 }
 
+// Attaches to an existing Chrome instance through CDP and returns its first
+// browser context for controlled automation.
 async function connectToChromeCdp(cdpUrl: string, launchMode: Extract<BrowserLaunchMode, "logged_cdp" | "managed_cdp">): Promise<BrowserLaunchResult> {
   const browser = await chromium.connectOverCDP(cdpUrl);
   const context = browser.contexts()[0];
@@ -3000,6 +3172,8 @@ async function connectToChromeCdp(cdpUrl: string, launchMode: Extract<BrowserLau
   };
 }
 
+// Installs safety listeners on all current and future pages in a context so
+// dialogs, page errors, and crashes are recorded instead of surprising the run.
 function installContextSafety(context: BrowserContext, workspacePath: string) {
   for (const page of context.pages()) {
     installPageSafety(page, workspacePath);
@@ -3010,6 +3184,7 @@ function installContextSafety(context: BrowserContext, workspacePath: string) {
   });
 }
 
+// Installs per-page safety handlers for dialogs, page errors, and crashes.
 function installPageSafety(page: Page, workspacePath: string) {
   page.on("dialog", (dialog) => {
     void handleDialogSafely(dialog, page, workspacePath);
@@ -3030,6 +3205,8 @@ function installPageSafety(page: Page, workspacePath: string) {
   });
 }
 
+// Accepts blocking browser dialogs and writes debug traces for both successful
+// and failed dialog handling.
 async function handleDialogSafely(dialog: Dialog, page: Page, workspacePath: string) {
   const payload = {
     url: page.url(),
@@ -3057,6 +3234,9 @@ async function handleDialogSafely(dialog: Dialog, page: Page, workspacePath: str
   }
 }
 
+// Performs the explicit login handoff loop. The bot fully pauses, keeps the
+// live bot mounted, waits for user confirmation, verifies the application page
+// is visible, and only then resumes autonomous filling.
 async function waitForLoginConfirmation(input: HandoffRequest & { sourceUrl: string }) {
   const timeoutMs = Number(process.env.BROWSER_LOGIN_HANDOFF_TIMEOUT_MS ?? process.env.BROWSER_HANDOFF_TIMEOUT_MS ?? 1800000);
   const pollMs = Number(process.env.BROWSER_HANDOFF_POLL_MS ?? 1200);
@@ -3166,6 +3346,8 @@ async function waitForLoginConfirmation(input: HandoffRequest & { sourceUrl: str
   };
 }
 
+// Verifies that the user's login confirmation is actionable. If needed, it
+// reopens the original job URL in the same controlled browser and rechecks.
 async function verifyLoginContinuationReady(input: {
   context: BrowserContext;
   page: Page;
@@ -3208,6 +3390,7 @@ async function verifyLoginContinuationReady(input: {
   };
 }
 
+// Shows the login handoff live bot message and confirmation button.
 async function showLoginHandoffBot(page: Page, stageIndex: number, message: string, label: string) {
   await updateLiveBot(page, {
     step: `Stage ${stageIndex + 1}`,
@@ -3220,10 +3403,14 @@ async function showLoginHandoffBot(page: Page, stageIndex: number, message: stri
   });
 }
 
+// Builds a stable key for detecting whether the login handoff bot needs to be
+// re-rendered after URL/page/message/label changes.
 function buildLoginHandoffBotStateKey(page: Page, message: string, label: string) {
   return `${page.url()}::${page.isClosed() ? "closed" : "open"}::${message}::${label}`;
 }
 
+// Chooses the best page to monitor during login handoff, preferring a ready
+// application page, then auth/login/source-domain pages over blank tabs.
 async function getLoginHandoffPage(context: BrowserContext, fallbackPage: Page, sourceUrl: string) {
   const readyApplicationPage = await findReadyApplicationPage(context).catch(() => undefined);
 
@@ -3244,6 +3431,8 @@ async function getLoginHandoffPage(context: BrowserContext, fallbackPage: Page, 
   return best;
 }
 
+// Scores candidate pages during login handoff so the bot follows Google/auth or
+// application tabs instead of staying on a stale fallback tab.
 function scoreLoginHandoffPage(url: string, sourceUrl: string, isFallback: boolean, index: number) {
   let score = index;
 
@@ -3270,6 +3459,8 @@ function scoreLoginHandoffPage(url: string, sourceUrl: string, isFallback: boole
   return score;
 }
 
+// Finds any open browser page that already looks like a readable application
+// stage after login/redirects.
 async function findReadyApplicationPage(context: BrowserContext) {
   const pages = context.pages().filter((page) => !page.isClosed()).reverse();
 
@@ -3288,6 +3479,9 @@ async function findReadyApplicationPage(context: BrowserContext) {
   return undefined;
 }
 
+// Reads whether one page is ready for the bot to resume after login. It checks
+// blank tabs, Google auth, protected checkpoints, visible fields, upload/review
+// states, and application progress controls.
 async function readApplicationReadiness(page: Page) {
   await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => undefined);
   await page.waitForTimeout(700).catch(() => undefined);
@@ -3405,6 +3599,8 @@ async function readApplicationReadiness(page: Page) {
   };
 }
 
+// Detects controls that indicate the application can progress, while excluding
+// login/account buttons.
 function isApplicationProgressControl(value: string | undefined) {
   const normalized = (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
@@ -3419,6 +3615,8 @@ function isApplicationProgressControl(value: string | undefined) {
   return /\b(apply|start application|continue application|continue|next|proceed|review application|save and continue)\b/.test(normalized);
 }
 
+// Generic manual handoff loop for CAPTCHA, OTP, verification, missing data, or
+// review. It waits until the protected/missing condition clears or times out.
 async function waitForHumanIntervention(input: HandoffRequest) {
   const timeoutMs = Number(process.env.BROWSER_HANDOFF_TIMEOUT_MS ?? 180000);
   const pollMs = Number(process.env.BROWSER_HANDOFF_POLL_MS ?? 1200);
@@ -3508,10 +3706,14 @@ async function waitForHumanIntervention(input: HandoffRequest) {
   };
 }
 
+// Builds a stable key for detecting when the generic handoff live bot needs to
+// be reattached or updated.
 function buildHandoffBotTarget(page: Page, message: string) {
   return `${page.url()}::${page.isClosed() ? "closed" : "open"}::${message}`;
 }
 
+// Saves a screenshot to the run workspace and records the filename in the
+// receipt, ignoring screenshot failures.
 async function saveScreenshot(page: Page, workspacePath: string, screenshots: string[], filename: string) {
   const path = join(workspacePath, filename);
 
@@ -3528,6 +3730,8 @@ async function saveScreenshot(page: Page, workspacePath: string, screenshots: st
   }
 }
 
+// Creates a blocked browser receipt when the run cannot start because of
+// invalid URL, unavailable browser, or launch/navigation failure.
 function blockedReceipt(input: BrowserApplyInput, openedAt: string, screenshots: string[], planner: ReturnType<typeof createPlannerCheckpoint>, message: string): BrowserApplyReceipt {
   return {
     status: "blocked",
@@ -3542,6 +3746,8 @@ function blockedReceipt(input: BrowserApplyInput, openedAt: string, screenshots:
   };
 }
 
+// Brings an open browser page to front when configured to keep the browser open
+// for review/manual inspection.
 async function maybeKeepBrowserOpen(context: BrowserContext) {
   if (shouldKeepBrowserOpenForReview()) {
     const pages = context.pages().filter((page) => !page.isClosed());
@@ -3550,35 +3756,48 @@ async function maybeKeepBrowserOpen(context: BrowserContext) {
   }
 }
 
+// Reads the environment flag that controls whether review-ready browser windows
+// stay open after the agent pauses.
 function shouldKeepBrowserOpenForReview() {
   return process.env.BROWSER_KEEP_OPEN_ON_REVIEW !== "false" && process.env.BROWSER_HEADLESS !== "true";
 }
 
+// Detects profile-lock errors where launching a persistent profile should fail
+// with a clearer user-facing message.
 function shouldFallbackFromLockedProfile(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return /Opening in existing browser session|profile is already in use|user data directory is already in use/i.test(message);
 }
 
+// Resolves the Chrome executable path from environment or the macOS default.
 function resolveChromePath() {
   return process.env.CHROME_EXECUTABLE_PATH ?? defaultChromePath;
 }
 
+// Reads whether GradLaunch should prefer the controlled logged Chrome profile.
 function shouldPreferLoggedBrowser() {
   return process.env.BROWSER_PREFER_LOGGED_PROFILE !== "false";
 }
 
+// Reads whether GradLaunch should fail instead of falling back when no logged
+// profile can be controlled.
 function shouldRequireLoggedBrowser() {
   return process.env.BROWSER_REQUIRE_LOGGED_PROFILE === "true";
 }
 
+// Reads whether GradLaunch may clone a locked logged profile into a runtime
+// copy. This is disabled unless explicitly configured.
 function shouldUseLoggedProfileCloneOnLock() {
   return process.env.BROWSER_ALLOW_LOGGED_PROFILE_CLONE_ON_LOCK === "true";
 }
 
+// Reads whether a locked logged profile may fall back to the managed profile.
 function shouldAllowManagedFallbackOnLockedLoggedProfile() {
   return process.env.BROWSER_ALLOW_MANAGED_FALLBACK_ON_LOCK === "true";
 }
 
+// Copies the configured logged Chrome profile into a controlled runtime profile
+// while excluding caches and singleton lock files.
 async function prepareLoggedRuntimeProfile(sourceProfileDir: string) {
   const profileName = await resolveLoggedChromeProfileName(sourceProfileDir);
   const runtimeProfileDir = join(getBrowserWorkspaceStorageDir(), "logged-runtime-profile");
@@ -3605,6 +3824,8 @@ async function prepareLoggedRuntimeProfile(sourceProfileDir: string) {
   };
 }
 
+// Copies a file/directory if it exists, ignoring ENOENT because Chrome profile
+// optional files vary between machines.
 async function copyIfPresent(source: string, dest: string) {
   try {
     await cp(source, dest, { recursive: true, force: true });
@@ -3615,6 +3836,8 @@ async function copyIfPresent(source: string, dest: string) {
   }
 }
 
+// Returns a filter used while copying Chrome profiles so runtime copies exclude
+// caches and singleton lock files.
 function shouldCopyChromeProfilePath(sourceProfileDir: string) {
   const ignoredNames = new Set([
     "Cache",
@@ -3644,6 +3867,8 @@ function shouldCopyChromeProfilePath(sourceProfileDir: string) {
   };
 }
 
+// Determines whether a Chrome profile is locked, optionally clearing stale
+// GradLaunch-owned locks when safe.
 async function isBrowserProfileLocked(profileDir: string, options: { clearStaleGradLaunchLock?: boolean } = {}) {
   const state = await getBrowserProfileLockState(profileDir);
 
@@ -3659,6 +3884,7 @@ async function isBrowserProfileLocked(profileDir: string, options: { clearStaleG
   return true;
 }
 
+// Reads Chrome singleton files to determine lock status and owning process id.
 async function getBrowserProfileLockState(profileDir: string) {
   const singletonFiles = ["SingletonLock", "SingletonSocket", "SingletonCookie"];
   let locked = false;
@@ -3692,6 +3918,7 @@ async function getBrowserProfileLockState(profileDir: string) {
   };
 }
 
+// Reads the PID encoded in Chrome's SingletonLock symlink when available.
 async function readBrowserProfileLockPid(profileDir: string) {
   try {
     const target = await readlink(join(profileDir, "SingletonLock"));
@@ -3702,6 +3929,7 @@ async function readBrowserProfileLockPid(profileDir: string) {
   }
 }
 
+// Checks whether a process id is still alive without killing it.
 function isProcessRunning(pid: number) {
   try {
     process.kill(pid, 0);
@@ -3712,25 +3940,32 @@ function isProcessRunning(pid: number) {
   }
 }
 
+// Allows stale lock cleanup only for GradLaunch-prepared profiles and when the
+// environment flag does not disable cleanup.
 async function canClearStaleGradLaunchProfileLock(profileDir: string) {
   return process.env.BROWSER_CLEAR_STALE_LOGGED_PROFILE_LOCKS !== "false"
     && await pathExists(join(profileDir, ".gradlaunch-profile-source.json"));
 }
 
+// Removes Chrome singleton lock/socket/cookie files from a profile directory.
 async function clearBrowserProfileSingletonFiles(profileDir: string) {
   for (const filename of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
     await rm(join(profileDir, filename), { force: true }).catch(() => undefined);
   }
 }
 
+// Builds the user-facing explanation when a logged profile is open but cannot
+// be controlled through CDP.
 function buildLockedLoggedProfileMessage(profileDir: string) {
   return `The controlled logged Chrome profile at ${profileDir} is already open, but GradLaunch cannot safely control it because remote debugging is not available on ${resolveLoggedChromeCdpHint()}. Close that Chrome window and retry, or launch it with --remote-debugging-port=${resolveLoggedChromeDebugPort()}. GradLaunch will not clone cookies or attach to an uncontrolled browser.`;
 }
 
+// Returns the CDP URL hint shown in locked-profile setup messages.
 function resolveLoggedChromeCdpHint() {
   return process.env.BROWSER_LOGGED_CDP_URL?.trim() || `http://127.0.0.1:${resolveLoggedChromeDebugPort()}`;
 }
 
+// Resolves and probes the logged Chrome CDP endpoint if configured/enabled.
 async function resolveLoggedChromeCdpUrl() {
   const configuredValue = process.env.BROWSER_LOGGED_CDP_URL?.trim();
   const candidates = configuredValue
@@ -3748,6 +3983,7 @@ async function resolveLoggedChromeCdpUrl() {
   return undefined;
 }
 
+// Resolves and probes the managed GradLaunch Chrome CDP endpoint.
 async function resolveManagedChromeCdpUrl() {
   const configuredValue = process.env.BROWSER_CDP_URL?.trim();
 
@@ -3759,6 +3995,7 @@ async function resolveManagedChromeCdpUrl() {
   return await canConnectToChromeCdp(autoDetectUrl) ? autoDetectUrl : undefined;
 }
 
+// Probes a Chrome DevTools Protocol endpoint by requesting /json/version.
 async function canConnectToChromeCdp(baseUrl: string) {
   try {
     const versionUrl = new URL("/json/version", baseUrl);
@@ -3769,6 +4006,7 @@ async function canConnectToChromeCdp(baseUrl: string) {
   }
 }
 
+// Performs a small JSON HTTP request used only for local Chrome CDP probing.
 function requestJson(url: URL): Promise<Record<string, unknown>> {
   return new Promise((resolvePromise, rejectPromise) => {
     const request = httpRequest(
@@ -3802,14 +4040,17 @@ function requestJson(url: URL): Promise<Record<string, unknown>> {
   });
 }
 
+// Reads the managed Chrome remote debugging port from environment.
 function resolveManagedChromeDebugPort() {
   return Number(process.env.BROWSER_MANAGED_DEBUG_PORT ?? 9333);
 }
 
+// Reads the logged-profile Chrome remote debugging port from environment.
 function resolveLoggedChromeDebugPort() {
   return Number(process.env.BROWSER_LOGGED_DEBUG_PORT ?? 9222);
 }
 
+// Normalizes a CDP host/port/url value into a usable HTTP URL.
 function normalizeChromeCdpUrl(value: string) {
   const trimmed = value.trim();
 
@@ -3824,6 +4065,8 @@ function normalizeChromeCdpUrl(value: string) {
   return `http://${trimmed}`;
 }
 
+// Resolves the Chrome profile directory name to launch, using configured value
+// or Chrome's Local State metadata, then falling back to Default.
 async function resolveLoggedChromeProfileName(profileDir: string) {
   const configuredProfileName = process.env.BROWSER_LOGGED_PROFILE_NAME?.trim();
 
@@ -3861,6 +4104,8 @@ async function resolveLoggedChromeProfileName(profileDir: string) {
   return "Default";
 }
 
+// Validates that the job source URL is a real web application URL GradLaunch is
+// allowed to open in the browser agent.
 function validateSourceUrl(value: string) {
   let parsed: URL;
 
@@ -3893,6 +4138,7 @@ function validateSourceUrl(value: string) {
   };
 }
 
+// Maps protected checkpoint detector kinds into user-facing handoff kinds.
 function mapCheckpointToHandoff(kind: "captcha" | "login" | "otp" | "verification" | undefined): AgentHandoffKind | undefined {
   switch (kind) {
     case "captcha":

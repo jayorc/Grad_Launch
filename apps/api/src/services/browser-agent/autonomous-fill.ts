@@ -3,9 +3,14 @@ import type { Page } from "playwright-core";
 import { buildStageAnswerPlan } from "./answer";
 import { fillFormField } from "./fill";
 import { discoverVisibleFields, getVisibleRequiredEmptyLabels, getVisibleValidationMessages } from "./observe";
+import { fieldSemanticText, semanticKey, semanticSimilarity } from "./semantic-nlp";
 import type { BrowserFillField, StageAnswerPlan, VisibleField } from "./types";
 import { dedupeLabels, normalizeKey, writeBrowserDebug } from "./util";
 
+// Autonomous fill is the page-level solver. It does not trust a single fill
+// pass. For every stage it builds an answer plan, fills by field type, verifies
+// committed DOM values, repairs failed known fields, and returns only after the
+// current screen has been re-read.
 type AutonomousStageFillInput = {
   page: Page;
   stageIndex: number;
@@ -65,11 +70,16 @@ type SemanticFieldIntent =
   | "consent"
   | "preferred_name_choice";
 
+// Runs the full autonomous fill cycle for one page/stage. It builds answers,
+// fills fields with type-specific strategies, verifies each result, re-scans
+// dynamic fields, repairs failed known fields, and returns remaining blockers.
 export async function runAutonomousStageFill(input: AutonomousStageFillInput): Promise<AutonomousStageFillResult> {
   const maxRounds = Number(process.env.BROWSER_AUTONOMOUS_FILL_ROUNDS ?? 3);
   const attempts: AutonomousFieldAttempt[] = [];
   const answerMap = new Map<string, BrowserFillField>();
   let latestPlan: StageAnswerPlan | undefined;
+  // Start with a fresh runtime graph because many ATS pages re-render fields
+  // after resume parsing, dropdown selection, or validation.
   let visibleFields = await discoverRuntimeVisibleFields(input.page, input.visibleFields);
   let failedFields: BrowserFillField[] = [];
   let lastBlockerKey = "";
@@ -81,6 +91,9 @@ export async function runAutonomousStageFill(input: AutonomousStageFillInput): P
     fields: visibleFields.map((field) => ({
       id: field.id,
       label: field.label,
+      placeholder: field.placeholder,
+      name: field.name,
+      ariaLabel: field.ariaLabel,
       inputType: field.inputType,
       required: field.required,
       options: field.options.slice(0, 8),
@@ -103,6 +116,8 @@ export async function runAutonomousStageFill(input: AutonomousStageFillInput): P
 
     const planSignature = getVisibleFieldPlanSignature(visibleFields);
 
+    // Rebuild answers only when the visible field graph changes. This keeps
+    // retry rounds fast while still adapting when new required fields appear.
     if (!latestPlan || planSignature !== lastPlanSignature) {
       latestPlan = await buildStageAnswerPlan({
         job: input.job,
@@ -126,6 +141,9 @@ export async function runAutonomousStageFill(input: AutonomousStageFillInput): P
       answerMap.set(fieldAttemptKey(answer), answer);
     }
 
+    // Rounds get narrower over time: first try all known answers, then retry
+    // only failed or required fields. That avoids repeatedly rewriting fields
+    // that already verified.
     const roundAnswers = latestPlan.answers.filter((field) => shouldAttemptField(field, attempts, round));
 
     await writeBrowserDebug(input.workspacePath, "autonomous-fill-round", {
@@ -158,6 +176,8 @@ export async function runAutonomousStageFill(input: AutonomousStageFillInput): P
         };
       }
 
+      // Verification before filling preserves prefilled portal values that are
+      // already accepted by the site.
       const before = await verifyFieldAnswer(input.page, field);
 
       if (before.satisfied) {
@@ -172,6 +192,8 @@ export async function runAutonomousStageFill(input: AutonomousStageFillInput): P
         continue;
       }
 
+      // fillFormField performs the field-type-specific strategy selection:
+      // text, native select, custom select, autocomplete, radio, checkbox, etc.
       const filled = await fillFormField(input.page, field);
       await input.page.waitForTimeout(180).catch(() => undefined);
       const after = await verifyFieldAnswer(input.page, field);
@@ -204,6 +226,8 @@ export async function runAutonomousStageFill(input: AutonomousStageFillInput): P
     }
 
     failedFields = roundFailures;
+    // Re-observe after each round because answering one question can reveal
+    // additional required fields or mutate input ids.
     visibleFields = await discoverRuntimeVisibleFields(input.page, await discoverVisibleFields(input.page));
     const outstandingRequired = await getVisibleRequiredEmptyLabels(input.page);
     const validationMessages = await getVisibleValidationMessages(input.page);
@@ -230,6 +254,9 @@ export async function runAutonomousStageFill(input: AutonomousStageFillInput): P
   }
 
   if (latestPlan) {
+    // Hard verification is a second safety net for critical profile facts such
+    // as country, city, email, phone, education, and work-experience choices.
+    // It catches fields that looked filled but were not accepted by the portal.
     const repair = await verifyAndRepairKnownFields({
       ...input,
       fields: [...answerMap.values()],
@@ -279,11 +306,16 @@ export async function runAutonomousStageFill(input: AutonomousStageFillInput): P
   };
 }
 
+// Performs the hard verification/repair pass after normal fill rounds. It
+// focuses on required and high-value profile facts that portals often mark as
+// visually filled but not actually accepted.
 async function verifyAndRepairKnownFields(input: AutonomousStageFillInput & {
   fields: BrowserFillField[];
   startRound: number;
   alreadyVerifiedKeys: Set<string>;
 }) {
+  // Repair works from the latest DOM, not stale field handles. Each candidate
+  // is remapped to the current visible field graph before retrying.
   const maxRepairRounds = Number(process.env.BROWSER_AUTONOMOUS_REPAIR_ROUNDS ?? 2);
   const repairAttempts: AutonomousFieldAttempt[] = [];
   const failedFields: BrowserFillField[] = [];
@@ -394,6 +426,9 @@ async function verifyAndRepairKnownFields(input: AutonomousStageFillInput & {
   };
 }
 
+// Deduplicates repair candidates by semantic field key, preferring required
+// fields and shorter/cleaner labels when multiple answers refer to the same
+// logical control.
 function dedupeRepairFields(fields: BrowserFillField[]) {
   const byKey = new Map<string, BrowserFillField>();
 
@@ -409,6 +444,9 @@ function dedupeRepairFields(fields: BrowserFillField[]) {
   return [...byKey.values()];
 }
 
+// Decides whether a field should be included in hard verification. Optional
+// low-risk fields are skipped; required and semantically important fields are
+// rechecked.
 function shouldHardVerifyField(field: BrowserFillField) {
   if (!field.value.trim() || field.inputType === "file") {
     return false;
@@ -421,6 +459,8 @@ function shouldHardVerifyField(field: BrowserFillField) {
   return Boolean(field.required || inferSemanticFieldIntent(field.label, field.value));
 }
 
+// Identifies critical profile facts that should be reverified even if an
+// earlier attempt appeared successful.
 function shouldReverifyCriticalField(field: BrowserFillField) {
   const intent = inferSemanticFieldIntent(field.label, field.value);
 
@@ -441,11 +481,17 @@ function shouldReverifyCriticalField(field: BrowserFillField) {
   ].includes(intent));
 }
 
+// Filters optional fields that should not block the agent if they remain empty
+// or unverifiable.
 function isOptionalLowRiskField(label: string) {
   return /\b(address line 2|address 2|middle name|preferred first|preferred last|preferred name)\b/i.test(label);
 }
 
+// Remaps an old answer to the best currently visible field after the page has
+// re-rendered or validation has replaced DOM nodes.
 function remapFieldToVisibleField(field: BrowserFillField, visibleFields: VisibleField[]) {
+  // Sites frequently replace nodes after validation. Remapping keeps the
+  // original answer but updates field id/type/options to the current DOM node.
   const best = visibleFields
     .map((visibleField) => ({
       field: visibleField,
@@ -463,6 +509,11 @@ function remapFieldToVisibleField(field: BrowserFillField, visibleFields: Visibl
     label: best.field.label,
     inputType: best.field.inputType,
     options: best.field.options,
+    placeholder: best.field.placeholder,
+    name: best.field.name,
+    ariaLabel: best.field.ariaLabel,
+    autocomplete: best.field.autocomplete,
+    role: best.field.role,
     required: field.required || best.field.required,
     reason: field.reason
       ? `${field.reason} Remapped to the current live DOM field.`
@@ -470,11 +521,13 @@ function remapFieldToVisibleField(field: BrowserFillField, visibleFields: Visibl
   };
 }
 
+// Scores how well a newly observed field matches an existing planned answer
+// using id, semantic intent, label similarity, type, and required status.
 function scoreVisibleFieldForAnswer(answer: BrowserFillField, visibleField: VisibleField) {
-  const answerLabel = normalizeSemanticLabel(answer.label);
-  const visibleLabel = normalizeSemanticLabel(`${visibleField.label} ${visibleField.context}`);
-  const answerIntent = inferSemanticFieldIntent(answer.label, answer.value);
-  const visibleIntent = inferSemanticFieldIntent(`${visibleField.label} ${visibleField.context}`, answer.value);
+  const answerLabel = normalizeSemanticLabel(fieldSemanticText(answer));
+  const visibleLabel = normalizeSemanticLabel(fieldSemanticText(visibleField));
+  const answerIntent = inferSemanticFieldIntent(fieldSemanticText(answer), answer.value);
+  const visibleIntent = inferSemanticFieldIntent(fieldSemanticText(visibleField), answer.value);
   let score = 0;
 
   if (answer.fieldId && answer.fieldId === visibleField.id) {
@@ -493,6 +546,7 @@ function scoreVisibleFieldForAnswer(answer: BrowserFillField, visibleField: Visi
     }
 
     score += tokenSimilarityScore(answerLabel, visibleLabel, 55);
+    score += Math.round(semanticSimilarity(answerLabel, visibleLabel) * 42);
   }
 
   if (normalizeFieldInputType(answer.inputType) === normalizeFieldInputType(visibleField.inputType)) {
@@ -514,6 +568,8 @@ function scoreVisibleFieldForAnswer(answer: BrowserFillField, visibleField: Visi
   return score;
 }
 
+// Decides whether the current round should attempt a field. Verified fields are
+// skipped; later rounds focus on failed or required fields.
 function shouldAttemptField(field: BrowserFillField, attempts: AutonomousFieldAttempt[], round: number) {
   if (!field.value.trim() || field.inputType === "file") {
     return false;
@@ -533,26 +589,33 @@ function shouldAttemptField(field: BrowserFillField, attempts: AutonomousFieldAt
   return previous.length > 0 || field.required;
 }
 
+// Builds the stable key used to group attempts for the same logical answer.
 function fieldAttemptKey(field: BrowserFillField) {
   if (isChoiceInputType(field.inputType) && isStandaloneChoiceLabel(field.label)) {
     return `${normalizeFieldInputType(field.inputType)}:${normalizeSemanticLabel(field.label)}`;
   }
 
-  return `${normalizeFieldInputType(field.inputType)}:${inferSemanticFieldIntent(field.label, field.value) ?? normalizeSemanticLabel(field.label)}`;
+  return `${normalizeFieldInputType(field.inputType)}:${inferSemanticFieldIntent(fieldSemanticText(field), field.value) ?? normalizeSemanticLabel(fieldSemanticText(field))}`;
 }
 
+// Builds the stable key used to deduplicate visible fields discovered from the
+// observer and fresh runtime DOM scan.
 function semanticVisibleFieldKey(field: VisibleField) {
   if (isChoiceInputType(field.inputType) && isStandaloneChoiceLabel(field.label)) {
     return `${normalizeFieldInputType(field.inputType)}:${normalizeSemanticLabel(field.label)}`;
   }
 
-  return `${normalizeFieldInputType(field.inputType)}:${inferSemanticFieldIntent(`${field.label} ${field.context}`) ?? normalizeSemanticLabel(field.label)}`;
+  return `${normalizeFieldInputType(field.inputType)}:${inferSemanticFieldIntent(fieldSemanticText(field)) ?? normalizeSemanticLabel(fieldSemanticText(field))}`;
 }
 
+// Returns true for radio/checkbox input types, which require group-level
+// handling instead of plain text filling.
 function isChoiceInputType(inputType: string | undefined) {
   return inputType === "radio" || inputType === "checkbox";
 }
 
+// Detects labels that are actual choice options, such as Yes/No or country
+// names, so they are grouped correctly during dedupe and verification.
 function isStandaloneChoiceLabel(label: string) {
   const normalized = normalizeKey(label);
 
@@ -560,6 +623,7 @@ function isStandaloneChoiceLabel(label: string) {
     || /^(australia|belgium|brazil|canada|france|germany|india|indonesia|ireland|israel|italy|japan|luxembourg|malaysia|mexico|new zealand|poland|portugal|romania|singapore|south korea|spain|sweden|switzerland|thailand|the netherlands|netherlands|uae|uk|us|united states|united kingdom)$/.test(normalized);
 }
 
+// Normalizes input types into the smaller set used by attempt/field keys.
 function normalizeFieldInputType(inputType: string | undefined) {
   const normalized = normalizeKey(inputType ?? "");
 
@@ -570,26 +634,35 @@ function normalizeFieldInputType(inputType: string | undefined) {
   return normalized || "text";
 }
 
+// Removes placeholder and validation words from labels before semantic
+// comparison.
 function normalizeSemanticLabel(label: string) {
-  return normalizeKey(label)
+  return semanticKey(label)
     .replace(/\b(select an option|choose an option|please select|none selected|required|field required)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+// Creates a signature for the currently visible field graph. When this changes,
+// the answer plan must be rebuilt because the page likely revealed new fields.
 function getVisibleFieldPlanSignature(fields: VisibleField[]) {
   return fields
     .map((field) => [
       normalizeKey(field.label),
       field.inputType,
       field.required ? "required" : "optional",
+      semanticKey(`${field.placeholder ?? ""} ${field.name ?? ""} ${field.ariaLabel ?? ""}`),
       field.options.map((option) => normalizeKey(option)).join("/")
     ].join(":"))
     .sort()
     .join("|");
 }
 
+// Re-scans the live DOM for current visible fields, merges those with the seed
+// observer fields, and deduplicates by semantic key.
 async function discoverRuntimeVisibleFields(page: Page, seedFields: VisibleField[]) {
+  // The observer gives the first field list, then this runtime scan supplements
+  // it with fresh ids and current input types from every frame/shadow root.
   const runtimeFields: VisibleField[] = [];
 
   for (const frame of page.frames()) {
@@ -615,10 +688,15 @@ async function discoverRuntimeVisibleFields(page: Page, seedFields: VisibleField
         fields.push({
           id,
           label,
+          placeholder: clean(control.getAttribute("placeholder")),
+          name: clean(control.getAttribute("name")),
+          ariaLabel: clean(control.getAttribute("aria-label")),
+          autocomplete: control instanceof HTMLInputElement ? clean(control.getAttribute("autocomplete")) : "",
+          role: clean(control.getAttribute("role")),
           required: isRequired(control, label),
           tagName: control.tagName.toLowerCase(),
           inputType: control instanceof HTMLSelectElement
-            ? "select"
+            ? getVisibleCustomSelectProxy(control) ? "combobox" : "select"
             : control instanceof HTMLInputElement
               ? normalizeInputType(control)
               : "textarea",
@@ -638,12 +716,73 @@ async function discoverRuntimeVisibleFields(page: Page, seedFields: VisibleField
           return false;
         }
 
+        if (isInactiveFormBranch(control)) {
+          return false;
+        }
+
         if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button", "image", "reset"].includes(control.type)) {
           return false;
         }
 
         const rect = control.getBoundingClientRect();
         const style = window.getComputedStyle(control);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
+          || control instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(control));
+      }
+
+      function isInactiveFormBranch(control: Element) {
+        if (control.closest(".datasetField__row--sample") || control.hasAttribute("hidden")) {
+          return true;
+        }
+
+        if (control.parentElement?.closest("[hidden], [aria-hidden='true']")) {
+          return true;
+        }
+
+        const id = control.getAttribute("id") ?? "";
+        const name = control.getAttribute("name") ?? "";
+        return /(^|-)sample($|-)/i.test(id) || /(^|-)sample($|-)/i.test(name);
+      }
+
+      function getVisibleCustomSelectProxy(control: HTMLSelectElement) {
+        if (!isCustomSelectElement(control)) {
+          return undefined;
+        }
+
+        const candidates = [
+          control.nextElementSibling,
+          control.parentElement?.querySelector("[role='combobox']"),
+          control.parentElement?.querySelector(".select2 [role='combobox']"),
+          control.id ? getElementById(`select2-${control.id}-container`)?.closest("[role='combobox']") : null,
+          control.id ? queryFirst(`.select2Container${CSS.escape(control.id)}`, control) : null,
+          control.id ? queryFirst(`[aria-labelledby~="${CSS.escape(`${control.id}-label`)}"][role='combobox']`, control) : null
+        ];
+
+        for (const candidate of candidates) {
+          const element = candidate instanceof HTMLElement
+            ? candidate
+            : candidate instanceof Element
+              ? candidate.querySelector("[role='combobox']") as HTMLElement | null
+              : null;
+
+          if (element && isVisibleElement(element)) {
+            return element;
+          }
+        }
+
+        return undefined;
+      }
+
+      function isCustomSelectElement(control: HTMLSelectElement) {
+        const className = String(control.getAttribute("class") ?? "");
+        return control.getAttribute("aria-hidden") === "true"
+          || /\b(select2-hidden-accessible|select2|autocomplete|combobox)\b/i.test(className)
+          || Boolean(control.parentElement?.querySelector(".select2, [role='combobox'], [aria-haspopup='true'], [aria-haspopup='listbox']"));
+      }
+
+      function isVisibleElement(element: Element) {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
         return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
       }
 
@@ -838,6 +977,11 @@ async function discoverRuntimeVisibleFields(page: Page, seedFields: VisibleField
           ...existing,
           id: existing.id || field.id,
           label: existing.label || field.label,
+          placeholder: existing.placeholder || field.placeholder,
+          name: existing.name || field.name,
+          ariaLabel: existing.ariaLabel || field.ariaLabel,
+          autocomplete: existing.autocomplete || field.autocomplete,
+          role: existing.role || field.role,
           required: existing.required || field.required,
           options: existing.options.length >= field.options.length ? existing.options : field.options,
           context: existing.context.length >= field.context.length ? existing.context : field.context
@@ -848,6 +992,13 @@ async function discoverRuntimeVisibleFields(page: Page, seedFields: VisibleField
   return [...byKey.values()];
 }
 
+// Verifies one planned answer against the live DOM after a fill attempt. This
+// deliberately checks the committed browser state, not our own memory: invalid
+// ARIA/error text fails the field, selects must have non-placeholder values,
+// custom widgets can verify through their rendered token text, and radio or
+// checkbox groups must have the expected visible option selected. The
+// autonomous loop uses this result to decide whether to repair the field before
+// any Continue/Next navigation is allowed.
 async function verifyFieldAnswer(page: Page, field: BrowserFillField): Promise<FieldVerification> {
   if (!field.value.trim()) {
     return {
@@ -951,7 +1102,7 @@ async function verifyFieldAnswer(page: Page, field: BrowserFillField): Promise<F
 
         if (control instanceof HTMLSelectElement) {
           const selected = control.selectedOptions[0];
-          const actual = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`);
+          const actual = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value} ${getCustomSelectRenderedText(control)}`);
 
           if (isEmptyValue(actual)) {
             return {
@@ -1248,6 +1399,7 @@ async function verifyFieldAnswer(page: Page, field: BrowserFillField): Promise<F
           ?? control.parentElement;
 
         return [
+          control instanceof HTMLSelectElement ? getCustomSelectRenderedText(control) : "",
           control.getAttribute("data-value"),
           control.getAttribute("aria-valuetext"),
           container?.getAttribute("data-value"),
@@ -1267,17 +1419,84 @@ async function verifyFieldAnswer(page: Page, field: BrowserFillField): Promise<F
           return false;
         }
 
+        if (isInactiveFormBranch(control)) {
+          return false;
+        }
+
         if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button", "image", "reset"].includes(control.type)) {
           return false;
         }
 
-        if (wantedType === "select" && !(control instanceof HTMLSelectElement) && !(control instanceof HTMLInputElement && isCustomSelectLike(control))) {
+        if ((wantedType === "select" || wantedType === "combobox") && !(control instanceof HTMLSelectElement) && !(control instanceof HTMLInputElement && isCustomSelectLike(control))) {
           return false;
         }
 
         const rect = control.getBoundingClientRect();
         const style = window.getComputedStyle(control);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
+          || control instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(control));
+      }
+
+      function isInactiveFormBranch(control: Element) {
+        if (control.closest(".datasetField__row--sample") || control.hasAttribute("hidden")) {
+          return true;
+        }
+
+        if (control.parentElement?.closest("[hidden], [aria-hidden='true']")) {
+          return true;
+        }
+
+        const id = control.getAttribute("id") ?? "";
+        const name = control.getAttribute("name") ?? "";
+        return /(^|-)sample($|-)/i.test(id) || /(^|-)sample($|-)/i.test(name);
+      }
+
+      function getCustomSelectRenderedText(control: HTMLSelectElement) {
+        const proxy = getVisibleCustomSelectProxy(control);
+        const rendered = control.id ? document.getElementById(`select2-${control.id}-container`) : null;
+        return [
+          rendered?.textContent,
+          rendered?.getAttribute("title"),
+          proxy?.textContent,
+          proxy?.getAttribute("title"),
+          proxy?.getAttribute("aria-valuetext")
+        ].filter(Boolean).join(" ");
+      }
+
+      function getVisibleCustomSelectProxy(control: HTMLSelectElement) {
+        if (!isCustomSelectElement(control)) {
+          return undefined;
+        }
+
+        const candidates = [
+          control.nextElementSibling,
+          control.parentElement?.querySelector("[role='combobox']"),
+          control.parentElement?.querySelector(".select2 [role='combobox']"),
+          control.id ? document.getElementById(`select2-${control.id}-container`)?.closest("[role='combobox']") : null,
+          control.id ? queryFirst(`.select2Container${CSS.escape(control.id)}`, control) : null,
+          control.id ? queryFirst(`[aria-labelledby~="${CSS.escape(`${control.id}-label`)}"][role='combobox']`, control) : null
+        ];
+
+        for (const candidate of candidates) {
+          const element = candidate instanceof HTMLElement
+            ? candidate
+            : candidate instanceof Element
+              ? candidate.querySelector("[role='combobox']") as HTMLElement | null
+              : null;
+
+          if (element && isVisibleElement(element)) {
+            return element;
+          }
+        }
+
+        return undefined;
+      }
+
+      function isCustomSelectElement(control: HTMLSelectElement) {
+        const className = String(control.getAttribute("class") ?? "");
+        return control.getAttribute("aria-hidden") === "true"
+          || /\b(select2-hidden-accessible|select2|autocomplete|combobox)\b/i.test(className)
+          || Boolean(control.parentElement?.querySelector(".select2, [role='combobox'], [aria-haspopup='true'], [aria-haspopup='listbox']"));
       }
 
       function isCustomSelectLike(control: HTMLInputElement) {
@@ -1664,6 +1883,8 @@ async function verifyFieldAnswer(page: Page, field: BrowserFillField): Promise<F
   };
 }
 
+// Infers the canonical profile/form intent represented by a label/value pair,
+// such as city, country, email, degree type, or consent.
 function inferSemanticFieldIntent(label: string, value = ""): SemanticFieldIntent | undefined {
   const text = normalizeKey(`${label} ${value}`);
 
@@ -1758,6 +1979,8 @@ function inferSemanticFieldIntent(label: string, value = ""): SemanticFieldInten
   return undefined;
 }
 
+// Returns common alias labels for a semantic intent so matching can survive
+// different ATS wording.
 function getSemanticFieldAliases(label: string, value = "") {
   const intent = inferSemanticFieldIntent(label, value);
   const aliases: Record<SemanticFieldIntent, string[]> = {
@@ -1787,6 +2010,8 @@ function getSemanticFieldAliases(label: string, value = "") {
   return intent ? aliases[intent] : [];
 }
 
+// Scores token overlap between two normalized strings for fuzzy field remapping
+// and verification matching.
 function tokenSimilarityScore(left: string, right: string, maxScore: number) {
   const leftTokens = semanticTokens(left);
   const rightTokens = semanticTokens(right);
@@ -1808,6 +2033,8 @@ function tokenSimilarityScore(left: string, right: string, maxScore: number) {
   return Math.round((overlap / union) * maxScore);
 }
 
+// Splits a label/value into meaningful tokens while removing generic form words
+// that would distort similarity scoring.
 function semanticTokens(value: string) {
   return new Set(
     normalizeKey(value)

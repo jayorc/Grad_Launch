@@ -1,8 +1,17 @@
 import type { FileChooser, Frame, Locator, Page } from "playwright-core";
+import { fieldSemanticText, hasSemanticConcept, inferSemanticFieldIntent as inferNlpFieldIntent, semanticKey } from "./semantic-nlp";
 import type { BrowserFillField } from "./types";
 import { normalizeKey } from "./util";
 
+// This file is the low-level form interaction layer. The important rule is:
+// detect the real DOM control first, then choose a strategy. Labels are only
+// hints. That prevents search-selects, radios, checkboxes, and file inputs
+// from being treated like plain text boxes.
 type FillStrategy = "text" | "date" | "native_select" | "custom_select" | "autocomplete" | "choice" | "file";
+
+// The classifier collapses many HTML/ARIA implementations into a small set of
+// canonical control kinds. fillFormField routes on these kinds so each control
+// gets the correct interaction path instead of always using typing.
 type CanonicalFieldKind =
   | "text"
   | "textarea"
@@ -20,14 +29,22 @@ type CanonicalFieldKind =
   | "multi_select"
   | "unknown";
 
+// Fills one planned browser field by resolving its real control type and
+// routing to the correct strategy: text, date, select, autocomplete, choice, or
+// file-safe skip.
 export async function fillFormField(page: Page, field: BrowserFillField) {
   const normalizedField = normalizeBrowserFillField(field);
   const strategy = await resolveFillStrategy(page, normalizedField);
 
+  // File inputs are handled by attachResume(). Returning false here prevents
+  // the generic text/select logic from opening a file picker accidentally.
   if (strategy === "file") {
     return false;
   }
 
+  // Country controls are extra strict because fuzzy matching "India" against
+  // "Indonesia" is a real risk. These paths require exact country-option
+  // selection before falling back to broader select/choice logic.
   if (isCountryOptionLabel(normalizedField.label)) {
     return fillCountryOptionField(page, normalizedField);
   }
@@ -41,6 +58,9 @@ export async function fillFormField(page: Page, field: BrowserFillField) {
   }
 
   if (strategy === "choice") {
+    // Radio/checkbox answers must click one matching option in the group. The
+    // code deliberately avoids toggling every visible checkbox, which was the
+    // cause of earlier "select all countries" behavior.
     if (shouldSkipCountryOptionField(normalizedField)) {
       return false;
     }
@@ -59,6 +79,9 @@ export async function fillFormField(page: Page, field: BrowserFillField) {
   }
 
   if (strategy === "autocomplete") {
+    // Autocomplete and search-select fields require a committed suggestion,
+    // not just typed text. Text fallback is blocked for most of these controls
+    // unless the field is known to accept free-form input.
     if (await fillByClassifiedControl(page, normalizedField, "autocomplete")
       || await fillSelectLikeField(page, normalizedField)
       || await fillByAgentFieldId(page, normalizedField, "autocomplete")) {
@@ -93,6 +116,8 @@ export async function fillFormField(page: Page, field: BrowserFillField) {
     || await fillChoiceField(page, normalizedField);
 }
 
+// Discovers and ranks candidate DOM controls for a field, classifies the best
+// control kind, then dispatches to the matching fill strategy.
 async function fillByClassifiedControl(page: Page, field: BrowserFillField, preferredStrategy?: FillStrategy) {
   if (!field.value.trim() || field.inputType === "file") {
     return false;
@@ -100,6 +125,9 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
 
   for (const frame of page.frames()) {
     const marker = `gl-classified-control-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    // The browser-side classifier scans the live DOM, shadow roots included,
+    // and marks the best matching control with a temporary data attribute. The
+    // Playwright side then fills that exact element using the detected kind.
     const classified = await frame.evaluate(({ fieldId, label, value, inputType, marker, preferredStrategy }) => {
       const searchRoots = getSearchRoots();
       const controls = discoverCandidateControls(searchRoots);
@@ -215,6 +243,9 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
         const { control, labels, labelKey, semanticIntent, fieldId, declaredInputType, kind, preferredStrategy } = input;
         let score = 0;
 
+        // Field ids are strongest because observe.ts assigned them to a live
+        // control. Text/context matching is still used when sites re-render and
+        // the id disappears.
         if (fieldId && control.getAttribute("data-gradlaunch-field-id") === fieldId) {
           score += 180;
         }
@@ -230,6 +261,8 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
             score += 84;
           } else if (descriptorMatchesSemanticIntent(labels.context, semanticIntent)) {
             score += 32;
+          } else if (descriptorConflictsWithSemanticIntent(`${labels.direct} ${labels.nearby} ${labels.context}`, semanticIntent)) {
+            score -= 220;
           }
         }
 
@@ -252,6 +285,9 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
         }
 
         if (preferredStrategy) {
+          // If the planner already knows this should be select/autocomplete/
+          // choice, penalize plain text controls heavily. This is the main
+          // guard against "always type into it" behavior.
           if (kindMatchesPreferredStrategy(kind, preferredStrategy)) {
             score += 120;
           } else if (preferredStrategy !== "text" && isTextLikeKind(kind)) {
@@ -314,6 +350,9 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
       function classifyControlKind(control: HTMLElement, descriptor: string): CanonicalFieldKind {
         const normalized = normalize(descriptor);
 
+        // Real HTML elements win over label guesses. For example, a field
+        // labelled "Country" may be a native select, an autocomplete input, or
+        // a custom combobox, and each needs a different fill method.
         if (control instanceof HTMLTextAreaElement) {
           return "textarea";
         }
@@ -397,6 +436,8 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
         const semanticOwner = findSelectSemanticOwner(control);
         const ownerDescriptor = normalize(`${descriptor} ${describeElement(semanticOwner)}`);
 
+        // Autocomplete means typing should be followed by selecting a suggestion
+        // from a list. These hints catch ARIA widgets and common ATS wording.
         return control.getAttribute("aria-autocomplete") === "list"
           || semanticOwner?.getAttribute("aria-autocomplete") === "list"
           || /\b(autocomplete|autosuggest|type to search|search for|place of residence|search and select)\b/.test(ownerDescriptor);
@@ -411,6 +452,9 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
         const ownerPopup = normalize(semanticOwner?.getAttribute("aria-haspopup") ?? "");
         const ownerDescriptor = normalize(`${descriptor} ${describeElement(semanticOwner)}`);
 
+        // Custom selects usually look like buttons/divs with ARIA popup state,
+        // not <select>. Treat them as select-like so we click/open/pick instead
+        // of only setting text.
         return role === "combobox"
           || ownerRole === "combobox"
           || /^(listbox|menu|dialog|tree|true)$/.test(popup)
@@ -550,6 +594,22 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
           return "work_experience";
         }
 
+        if (/\b(area of interest|interest area|job interest|career interest)\b/.test(text)) {
+          return "area_interest";
+        }
+
+        if (/\b(skills?|skill set|primary skills|technologies|tech stack)\b/.test(text)) {
+          return "skills";
+        }
+
+        if (/\b(experience level|career level|seniority)\b/.test(text)) {
+          return "experience_level";
+        }
+
+        if (/\b(communities of interest|community interest)\b/.test(text)) {
+          return "community_interest";
+        }
+
         if (/\b(zip|postal|postcode|pin code|pincode)\b/.test(text)) {
           return "postal_code";
         }
@@ -572,12 +632,27 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
           city: /\b(city|location|place of residence|town|locality)\b/,
           degree_type: /\b(type of degree|degree type|education level|level of education)\b/,
           work_experience: /\b(work|working|professional|employment).*\bexperience\b|\bexperience\b/,
+          area_interest: /\b(area of interest|interest area|job interest|career interest)\b/,
+          skills: /\b(skills?|skill set|primary skills|technologies|tech stack)\b/,
+          experience_level: /\b(experience level|career level|seniority)\b/,
+          community_interest: /\b(communities of interest|community interest)\b/,
           postal_code: /\b(zip|postal|postcode|pin code|pincode)\b/,
           email: /\b(email|e mail)\b/,
           phone: /\b(phone|mobile|telephone|contact)\b/
         };
 
         return Boolean(patterns[intent]?.test(descriptor));
+      }
+
+      function descriptorConflictsWithSemanticIntent(descriptor: string, intent: string) {
+        const descriptorIntent = inferSemanticIntent(descriptor);
+
+        if (!descriptorIntent || descriptorIntent === intent) {
+          return false;
+        }
+
+        const exclusive = new Set(["country", "state", "city", "area_interest", "skills", "experience_level", "community_interest"]);
+        return exclusive.has(intent) || exclusive.has(descriptorIntent);
       }
 
       function isVisibleCandidate(control: HTMLElement) {
@@ -836,7 +911,11 @@ async function fillByClassifiedControl(page: Page, field: BrowserFillField, pref
   return false;
 }
 
+// Fills a native HTML select or multi-select by selecting the closest matching
+// option value/label and verifying the committed selection.
 async function fillClassifiedNativeSelect(target: Locator, field: BrowserFillField) {
+  // Native <select> controls are filled by selecting the best option by value
+  // or visible label, then verified through the selected option text/value.
   const option = await target.evaluate((element, { fieldValue, fieldLabel }) => {
     if (!(element instanceof HTMLSelectElement)) {
       return undefined;
@@ -943,6 +1022,7 @@ async function fillClassifiedNativeSelect(target: Locator, field: BrowserFillFie
     element.dispatchEvent(new Event("change", { bubbles: true }));
     element.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
     element.dispatchEvent(new Event("blur", { bubbles: true }));
+    triggerJQueryChange(element);
 
     if (element.form) {
       element.form.dispatchEvent(new Event("change", { bubbles: true }));
@@ -959,6 +1039,11 @@ async function fillClassifiedNativeSelect(target: Locator, field: BrowserFillFie
     function normalize(value: string | null | undefined) {
       return (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     }
+
+    function triggerJQueryChange(select: HTMLSelectElement) {
+      const jquery = (window as typeof window & { jQuery?: (element: Element) => { trigger: (eventName: string) => void } }).jQuery;
+      jquery?.(select).trigger("change");
+    }
   }, option.value).catch(() => false);
 
   if (!selected) {
@@ -971,12 +1056,21 @@ async function fillClassifiedNativeSelect(target: Locator, field: BrowserFillFie
   return verifyLocatorCommitted(target, field, { kind: "select", allowPartial: false });
 }
 
+// Fills a custom select/combobox by opening it, selecting visible options, and
+// using typed queries only when the widget requires search.
 async function fillClassifiedSelectLike(page: Page, frame: Frame, target: Locator, field: BrowserFillField) {
+  // Custom dropdowns need user-like behavior: open the widget, click an exact
+  // visible option when possible, type a query only when the list needs search,
+  // then verify that the widget committed the selected value.
   const interactionTarget = await getSelectInteractionTarget(target);
   const wantedCountry = countryLabelFromValue(field.value);
 
   if (await verifySelectLikeValue(target, field.value, { allowPartial: false, fieldLabel: field.label, acceptLocationTextValue: true })
     || await verifySelectLikeValue(interactionTarget, field.value, { allowPartial: false, fieldLabel: field.label, acceptLocationTextValue: true })) {
+    return true;
+  }
+
+  if (await fillClassifiedNativeSelect(target, field)) {
     return true;
   }
 
@@ -1009,10 +1103,7 @@ async function fillClassifiedSelectLike(page: Page, frame: Frame, target: Locato
 
   for (const query of getSelectLikeQueries(field.label, field.value)) {
     await interactionTarget.click({ force: true, timeout: 700 }).catch(() => undefined);
-    await interactionTarget.fill(query, { timeout: 700 }).catch(async () => {
-      await interactionTarget.press(process.platform === "darwin" ? "Meta+A" : "Control+A", { timeout: 250 }).catch(() => undefined);
-      await interactionTarget.type(query, { delay: 12, timeout: 1000 }).catch(() => undefined);
-    });
+    await typeSelectLikeQuery(frame, interactionTarget, query);
     await page.waitForTimeout(260).catch(() => undefined);
 
     if (wantedCountry && await clickExactCountryOption(frame, wantedCountry)
@@ -1033,7 +1124,12 @@ async function fillClassifiedSelectLike(page: Page, frame: Frame, target: Locato
   return false;
 }
 
+// Fills an autocomplete/search field by typing a ranked query and selecting the
+// best suggestion rather than trusting typed text alone.
 async function fillClassifiedAutocomplete(frame: Frame, target: Locator, field: BrowserFillField) {
+  // Search boxes are not considered filled after typing. The strategy types a
+  // ranked query, waits for suggestions, clicks the best suggestion, and uses
+  // ArrowDown/Enter only as a fallback.
   const marker = `gl-classified-autocomplete-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   await target.evaluate((element, marker) => {
@@ -1075,13 +1171,20 @@ async function fillClassifiedAutocomplete(frame: Frame, target: Locator, field: 
   }
 }
 
+// Fills a classified text-like control after normalizing date values when the
+// detected kind is a date field.
 async function fillClassifiedTextLike(target: Locator, field: BrowserFillField, kind: CanonicalFieldKind) {
   const value = normalizeValueForClassifiedText(field, kind);
 
   return commitTextLikeLocator(target, { ...field, value }, kind);
 }
 
+// Fills a classified radio/checkbox group by scoring visible option labels and
+// clicking the best matching label/wrapper.
 async function fillClassifiedChoice(frame: Frame, marker: string, field: BrowserFillField) {
+  // Radios and checkboxes are filled at the group level. We score option text
+  // inside the group and click the associated label/wrapper so React/Angular
+  // listeners receive the same events a user would trigger.
   return frame.evaluate(({ marker, value }) => {
     const target = document.querySelector(`[data-gradlaunch-classified-control="${CSS.escape(marker)}"]`);
 
@@ -1276,6 +1379,8 @@ async function fillClassifiedChoice(frame: Frame, marker: string, field: Browser
   }, { marker, value: field.value }).catch(() => false);
 }
 
+// Removes the temporary data attribute used to bridge browser-side
+// classification and Playwright-side interaction.
 async function cleanupClassifiedControl(frame: Frame, marker: string) {
   await frame.evaluate((marker) => {
     const target = document.querySelector(`[data-gradlaunch-classified-control="${CSS.escape(marker)}"]`);
@@ -1286,6 +1391,8 @@ async function cleanupClassifiedControl(frame: Frame, marker: string) {
   }, marker).catch(() => undefined);
 }
 
+// Commits text into a locator using multiple framework-compatible paths:
+// keyboard typing, Playwright fill(), and native value setter events.
 async function commitTextLikeLocator(target: Locator, field: BrowserFillField, kind: CanonicalFieldKind | FillStrategy = "text") {
   const value = field.value.trim();
 
@@ -1297,6 +1404,10 @@ async function commitTextLikeLocator(target: Locator, field: BrowserFillField, k
 
   await target.scrollIntoViewIfNeeded().catch(() => undefined);
 
+  // Text-like inputs still need multiple commit styles because ATS forms use
+  // different frontend frameworks. We try real keyboard input first, then
+  // Playwright fill(), then a native value setter plus input/change/blur
+  // events. Each attempt must pass verification before it counts.
   const keyboardCommitted = await target.click({ force: true, timeout: 900 })
     .then(async () => {
       await target.press(selectAllKey, { timeout: 350 }).catch(() => undefined);
@@ -1343,6 +1454,8 @@ async function commitTextLikeLocator(target: Locator, field: BrowserFillField, k
   return verifyLocatorCommitted(target, field, { kind, allowPartial: false });
 }
 
+// Dispatches input/change/blur events after programmatic value updates so
+// React, Angular, and other controlled components accept the value.
 async function dispatchCommitEvents(target: Locator, value: string, options?: { onlyIfEmpty?: boolean }) {
   await target.evaluate((element, { expected, onlyIfEmpty }) => {
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
@@ -1391,6 +1504,9 @@ async function dispatchCommitEvents(target: Locator, value: string, options?: { 
   }, { expected: value, onlyIfEmpty: options?.onlyIfEmpty === true }).catch(() => undefined);
 }
 
+// Verifies that the target control truly accepted the value, including
+// placeholder rejection, country exactness, custom widget metadata, and invalid
+// state checks.
 async function verifyLocatorCommitted(
   target: Locator,
   field: BrowserFillField,
@@ -1400,6 +1516,10 @@ async function verifyLocatorCommitted(
     acceptLocationTextValue?: boolean;
   }
 ) {
+  // Verification is intentionally stricter than "the DOM has any value".
+  // Selects must not be on placeholder text, country fields must match the
+  // intended country, and custom widgets can pass through committed metadata
+  // only when the visible input is empty.
   return target.evaluate((element, { expectedValue, fieldLabel, kind, allowPartial, acceptLocationTextValue }) => {
     if (!(element instanceof HTMLElement)) {
       return false;
@@ -1433,7 +1553,7 @@ async function verifyLocatorCommitted(
       if (targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement || targetElement instanceof HTMLSelectElement) {
         if (targetElement instanceof HTMLSelectElement) {
           const selected = targetElement.selectedOptions[0];
-          values.push(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${targetElement.value}`);
+          values.push(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${targetElement.value} ${getSelectProxyText(targetElement)}`);
         } else {
           values.push(targetElement.value);
         }
@@ -1451,6 +1571,7 @@ async function verifyLocatorCommitted(
         targetElement.getAttribute("title") ?? "",
         widget?.getAttribute("data-value") ?? "",
         widget?.getAttribute("aria-valuetext") ?? "",
+        targetElement instanceof HTMLSelectElement ? getSelectProxyText(targetElement) : "",
         Array.from(widget?.querySelectorAll("input[type='hidden'], [aria-selected='true'], [data-selected='true'], [data-state='checked'], [class*='singleValue'], [class*='single-value'], [class*='selected'], [class*='token'], [class*='chip'], [class*='tag'], [class*='pill']") ?? [])
           .map((item) => item instanceof HTMLInputElement ? item.value : item.textContent ?? "")
           .join(" ")
@@ -1463,6 +1584,31 @@ async function verifyLocatorCommitted(
       return values
         .map(normalize)
         .filter((value) => value && !isEmptyValue(value));
+    }
+
+    function getSelectProxyText(select: HTMLSelectElement) {
+      const rendered = select.id ? document.getElementById(`select2-${select.id}-container`) : null;
+      const proxy = getVisibleSelectProxy(select);
+      return [
+        rendered?.textContent,
+        rendered?.getAttribute("title"),
+        proxy?.textContent,
+        proxy?.getAttribute("title"),
+        proxy?.getAttribute("aria-valuetext")
+      ].filter(Boolean).join(" ");
+    }
+
+    function getVisibleSelectProxy(select: HTMLSelectElement) {
+      const candidates = [
+        select.nextElementSibling,
+        select.parentElement?.querySelector("[role='combobox']"),
+        select.parentElement?.querySelector(".select2 [role='combobox']"),
+        select.id ? document.getElementById(`select2-${select.id}-container`)?.closest("[role='combobox']") : null,
+        select.id ? document.querySelector(`.select2Container${CSS.escape(select.id)}`) : null,
+        select.id ? document.querySelector(`[aria-labelledby~="${CSS.escape(`${select.id}-label`)}"][role='combobox']`) : null
+      ];
+
+      return candidates.find((candidate): candidate is HTMLElement => candidate instanceof HTMLElement && isVisible(candidate));
     }
 
     function verifyChoice(control: HTMLInputElement, expectedValue: string, labelText: string) {
@@ -1713,7 +1859,7 @@ async function verifyLocatorCommitted(
     function isEmptyValue(value: string) {
       return !value
         || /^(select|select an option|choose|choose an option|please select|none selected|search|type to search)$/.test(value)
-        || /\b(options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
+        || /\b(select an option|choose an option|please select|none selected|options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
     }
 
     function isVisible(item: Element) {
@@ -1752,6 +1898,8 @@ async function verifyLocatorCommitted(
   }).catch(() => false);
 }
 
+// Normalizes the value for classified text-like controls, especially native
+// date inputs that require full date values.
 function normalizeValueForClassifiedText(field: BrowserFillField, kind: CanonicalFieldKind) {
   if (kind !== "date") {
     return field.value;
@@ -1760,7 +1908,13 @@ function normalizeValueForClassifiedText(field: BrowserFillField, kind: Canonica
   return normalizeBrowserFillField({ ...field, inputType: "date" }).value;
 }
 
+// Chooses the final fill strategy by merging declared observer metadata and
+// live DOM classification, prioritizing non-text strategies when detected.
 async function resolveFillStrategy(page: Page, field: BrowserFillField): Promise<FillStrategy> {
+  // Merge two signals: the observer's declared input type and a fresh runtime
+  // DOM inspection. Select/autocomplete/choice/date strategies take precedence
+  // over text so we do not accidentally type into controls that need option
+  // selection.
   const declared = inferDeclaredFillStrategy(field);
   const runtime = await detectRuntimeFillStrategy(page, field);
 
@@ -1791,9 +1945,15 @@ async function resolveFillStrategy(page: Page, field: BrowserFillField): Promise
   return runtime;
 }
 
+// Infers a fast initial strategy from field metadata, label text, options, and
+// answer value before the live DOM is inspected.
 function inferDeclaredFillStrategy(field: BrowserFillField): FillStrategy {
+  // This is a fast first pass from the VisibleField metadata. Runtime DOM
+  // classification can still override it when the page exposes richer ARIA or
+  // custom-select semantics.
   const inputType = normalizeKey(field.inputType ?? "");
-  const descriptor = normalizeKey(`${field.label} ${field.value} ${(field.options ?? []).join(" ")}`);
+  const descriptor = semanticKey(`${fieldSemanticText(field)} ${field.value}`);
+  const nlpIntent = inferNlpFieldIntent(`${fieldSemanticText(field)} ${field.value}`);
   const meaningfulOptionCount = (field.options ?? []).filter((option) => {
     const normalized = normalizeKey(option);
     return Boolean(normalized) && !/^(select|select an option|choose|choose one|please select|none selected|not selected)$/.test(normalized);
@@ -1807,7 +1967,7 @@ function inferDeclaredFillStrategy(field: BrowserFillField): FillStrategy {
     return "choice";
   }
 
-  if (inputType === "date" || /\b(start date|end date|from date|to date|completion date|graduation date|date of birth|dob)\b/.test(descriptor)) {
+  if (inputType === "date" || nlpIntent === "date" || hasSemanticConcept(descriptor, ["start date", "end date", "completion date", "graduation date", "date of birth", "dob"])) {
     return "date";
   }
 
@@ -1815,36 +1975,38 @@ function inferDeclaredFillStrategy(field: BrowserFillField): FillStrategy {
     return "native_select";
   }
 
-  if (meaningfulOptionCount > 0 || /\b(select an option|choose an option|please select|dropdown|drop down)\b/.test(descriptor)) {
-    if (looksAutocompleteField(field.label, field.value) || /\b(search|type to search|autocomplete|place of residence)\b/.test(descriptor)) {
+  if (meaningfulOptionCount > 0 || hasSemanticConcept(descriptor, ["select an option", "choose an option", "dropdown"])) {
+    if (looksAutocompleteField(field.label, field.value) || hasSemanticConcept(descriptor, ["search", "type to search", "autocomplete", "place of residence"])) {
       return "autocomplete";
     }
 
     return "custom_select";
   }
 
-  if (inputType === "combobox" || /\b(select an option|choose an option|please select|dropdown|drop down|type to search|search|autocomplete)\b/.test(descriptor)) {
+  if (inputType === "combobox" || hasSemanticConcept(descriptor, ["select an option", "choose an option", "dropdown", "type to search", "search", "autocomplete"])) {
     return looksAutocompleteField(field.label, field.value) ? "autocomplete" : "custom_select";
   }
 
   if (
-    /\b(country|state|province|region)\b/.test(descriptor)
+    ["country", "state"].includes(nlpIntent ?? "") || hasSemanticConcept(descriptor, ["country", "state", "province", "region"])
     && /\b(india|australia|canada|united states|usa|united kingdom|uk|haryana|bihar|maharashtra|karnataka)\b/.test(descriptor)
   ) {
     return "custom_select";
   }
 
-  if (looksAutocompleteField(field.label, field.value) && /\b(location|place of residence|search|autocomplete|type to search)\b/.test(descriptor)) {
+  if ((looksAutocompleteField(field.label, field.value) || ["city", "location", "university"].includes(nlpIntent ?? "")) && hasSemanticConcept(descriptor, ["location", "place of residence", "search", "autocomplete", "type to search", "city", "university", "college"])) {
     return "autocomplete";
   }
 
-  if (/^(yes|no|true|false)$/i.test(field.value.trim()) && /\b(agree|consent|authorized|sponsor|experience|preferred name|resident|relocat|remote)\b/.test(descriptor)) {
+  if (/^(yes|no|true|false)$/i.test(field.value.trim()) && hasSemanticConcept(descriptor, ["agree", "consent", "authorized", "sponsor", "experience", "preferred name", "resident", "relocate", "remote"])) {
     return "choice";
   }
 
   return "text";
 }
 
+// Inspects visible live DOM controls across frames to detect the actual runtime
+// strategy needed for this field.
 async function detectRuntimeFillStrategy(page: Page, field: BrowserFillField): Promise<FillStrategy | undefined> {
   for (const frame of page.frames()) {
     const strategy = await frame.evaluate(({ fieldId, label, value, inputType }) => {
@@ -1888,6 +2050,8 @@ async function detectRuntimeFillStrategy(page: Page, field: BrowserFillField): P
 
         if (semanticIntent && descriptorMatchesSemanticIntent(descriptor, semanticIntent)) {
           score += 90;
+        } else if (semanticIntent && descriptorConflictsWithSemanticIntent(descriptor, semanticIntent)) {
+          score -= 220;
         }
 
         score += tokenSimilarityScore(labelKey, descriptor, 52);
@@ -2086,6 +2250,22 @@ async function detectRuntimeFillStrategy(page: Page, field: BrowserFillField): P
           return "work_experience";
         }
 
+        if (/\b(area of interest|interest area|job interest|career interest)\b/.test(text)) {
+          return "area_interest";
+        }
+
+        if (/\b(skills?|skill set|primary skills|technologies|tech stack)\b/.test(text)) {
+          return "skills";
+        }
+
+        if (/\b(experience level|career level|seniority)\b/.test(text)) {
+          return "experience_level";
+        }
+
+        if (/\b(communities of interest|community interest)\b/.test(text)) {
+          return "community_interest";
+        }
+
         return undefined;
       }
 
@@ -2095,10 +2275,25 @@ async function detectRuntimeFillStrategy(page: Page, field: BrowserFillField): P
           state: /\b(state|province|region)\b/,
           city: /\b(city|location|place of residence|town|locality)\b/,
           degree_type: /\b(type of degree|degree type|education level|level of education)\b/,
-          work_experience: /\b(work|working|professional|employment).*\bexperience\b|\bexperience\b/
+          work_experience: /\b(work|working|professional|employment).*\bexperience\b|\bexperience\b/,
+          area_interest: /\b(area of interest|interest area|job interest|career interest)\b/,
+          skills: /\b(skills?|skill set|primary skills|technologies|tech stack)\b/,
+          experience_level: /\b(experience level|career level|seniority)\b/,
+          community_interest: /\b(communities of interest|community interest)\b/
         };
 
         return Boolean(patterns[intent]?.test(descriptor));
+      }
+
+      function descriptorConflictsWithSemanticIntent(descriptor: string, intent: string) {
+        const descriptorIntent = inferSemanticIntent(descriptor);
+
+        if (!descriptorIntent || descriptorIntent === intent) {
+          return false;
+        }
+
+        const exclusive = new Set(["country", "state", "city", "area_interest", "skills", "experience_level", "community_interest"]);
+        return exclusive.has(intent) || exclusive.has(descriptorIntent);
       }
 
       function labelledByText(control: Element) {
@@ -2287,6 +2482,8 @@ async function detectRuntimeFillStrategy(page: Page, field: BrowserFillField): P
   return undefined;
 }
 
+// Allows text fallback only for institution autocomplete fields that commonly
+// accept free-form school names.
 function shouldAllowTextFallbackForAutocomplete(field: BrowserFillField) {
   const descriptor = normalizeKey(`${field.label} ${field.value}`);
 
@@ -2294,12 +2491,16 @@ function shouldAllowTextFallbackForAutocomplete(field: BrowserFillField) {
     && !/\b(location|city|country|state|province|region|place of residence)\b/.test(descriptor);
 }
 
+// Detects country-like fields so strict country select/choice logic can run
+// before generic text or fuzzy option handling.
 function isCountryLikeField(field: BrowserFillField) {
   const descriptor = normalizeKey(`${field.label} ${field.value}`);
 
   return /\bcountry\b/.test(descriptor) && /\b(india|australia|canada|united states|usa|united kingdom|uk)\b/.test(descriptor);
 }
 
+// Normalizes the fill field before execution, converting year-only date answers
+// into full dates for date controls.
 function normalizeBrowserFillField(field: BrowserFillField): BrowserFillField {
   const inputType = field.inputType ?? "";
 
@@ -2321,6 +2522,8 @@ function normalizeBrowserFillField(field: BrowserFillField): BrowserFillField {
   return field;
 }
 
+// Repairs known required choice blockers from validation text by selecting
+// obvious Yes/No/consent options directly in the live DOM.
 export async function resolveKnownRequiredChoice(page: Page, blockers: string[]) {
   const blockerText = blockers.join(" ");
 
@@ -2572,7 +2775,13 @@ export async function resolveKnownRequiredChoice(page: Page, blockers: string[])
   return false;
 }
 
+// Uploads the resume using the safest available path: resume method screen,
+// direct file input, associated hidden input, or guarded file chooser trigger.
 export async function attachResume(page: Page, resumePath: string) {
+  // Resume upload is separate from fillFormField because file inputs may be
+  // hidden behind "Upload resume", "From device", or drag/drop triggers. This
+  // routine tries method-choice pages first, direct file inputs second, and a
+  // guarded file-chooser trigger as the final fallback.
   if (await pageHasResumeMethodChoice(page)) {
     if (await continueAfterResumeUploadIfReady(page, resumePath)) {
       return true;
@@ -2685,7 +2894,12 @@ export async function attachResume(page: Page, resumePath: string) {
   return false;
 }
 
+// Finds the highest-confidence resume/CV file input and uploads the resume
+// directly, avoiding cover-letter/photo/avatar inputs.
 async function attachResumeToBestFileInput(page: Page, resumePath: string) {
+  // Score all file inputs instead of using the first one. This avoids uploading
+  // the resume into cover-letter, photo, or avatar fields when multiple upload
+  // controls are present.
   for (const frame of page.frames()) {
     const marker = `gl-resume-input-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const found = await frame.evaluate((marker) => {
@@ -2892,6 +3106,8 @@ async function attachResumeToBestFileInput(page: Page, resumePath: string) {
   return false;
 }
 
+// Checks whether a resume-like file input already has a selected file, so the
+// agent does not reopen the file picker or re-upload unnecessarily.
 async function hasExistingAttachedFile(page: Page) {
   for (const frame of page.frames()) {
     const alreadyAttached = await frame.evaluate(() => {
@@ -2954,6 +3170,8 @@ async function hasExistingAttachedFile(page: Page) {
   return false;
 }
 
+// Clicks a visible resume upload trigger and handles either an associated file
+// input or the browser file chooser that opens from the click.
 async function attachResumeViaUploadTrigger(page: Page, resumePath: string) {
   for (const frame of page.frames()) {
     const trigger = await findResumeUploadTrigger(frame);
@@ -3025,6 +3243,8 @@ async function attachResumeViaUploadTrigger(page: Page, resumePath: string) {
   return false;
 }
 
+// Waits for a resume method-choice page to accept the uploaded file or expose a
+// Continue button that can advance to the application form.
 async function waitForMethodChoiceUploadAcceptance(page: Page, resumePath: string) {
   const timeoutMs = Number(process.env.BROWSER_METHOD_UPLOAD_ACCEPT_TIMEOUT_MS ?? 5000);
   const pollMs = 500;
@@ -3046,6 +3266,8 @@ async function waitForMethodChoiceUploadAcceptance(page: Page, resumePath: strin
   return false;
 }
 
+// Clicks Continue on resume-upload method pages only when there is evidence
+// that the resume was selected or attached.
 export async function continueAfterResumeUploadIfReady(page: Page, resumePath?: string) {
   const resumeFileName = resumePath?.split(/[\\/]/).pop() ?? "";
 
@@ -3275,12 +3497,15 @@ export async function continueAfterResumeUploadIfReady(page: Page, resumePath?: 
   return false;
 }
 
+// Verifies whether a file chooser interaction selected at least one file.
 async function verifyFileChooserSelection(chooser: FileChooser) {
   return chooser.element().evaluate((control) => {
     return control instanceof HTMLInputElement && (control.files?.length ?? 0) > 0;
   }).catch(() => false);
 }
 
+// Detects pages asking how to apply/upload resume, such as "from device" vs
+// "without resume" method-choice screens.
 async function pageHasResumeMethodChoice(page: Page) {
   for (const frame of page.frames()) {
     const found = await frame.evaluate(() => {
@@ -3307,6 +3532,8 @@ async function pageHasResumeMethodChoice(page: Page) {
   return false;
 }
 
+// Finds the best visible button/link/label that should open a resume upload
+// input or file chooser.
 async function findResumeUploadTrigger(frame: Frame) {
   const marker = `gl-resume-trigger-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const found = await frame.evaluate((marker) => {
@@ -3522,6 +3749,8 @@ async function findResumeUploadTrigger(frame: Frame) {
   return frame.locator(`[data-gradlaunch-resume-trigger="${marker}"]`).first();
 }
 
+// Looks near a clicked upload trigger for a hidden/associated file input and
+// uploads directly without requiring a file chooser.
 async function attachResumeToAssociatedInput(frame: Frame, trigger: Locator, resumePath: string) {
   const marker = `gl-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const found = await trigger.evaluate((element, targetMarker) => {
@@ -3714,11 +3943,16 @@ async function attachResumeToAssociatedInput(frame: Frame, trigger: Locator, res
   }
 }
 
+// Fills a field by the data-gradlaunch-field-id assigned during observation,
+// while respecting preferred non-text strategies.
 async function fillByAgentFieldId(page: Page, field: BrowserFillField, preferredStrategy?: FillStrategy) {
   if (!field.fieldId || !field.value.trim()) {
     return false;
   }
 
+  // Field ids are the fastest path when the observer tagged the exact control,
+  // but they are still strategy-guarded. A preferred select/autocomplete/choice
+  // strategy is not allowed to fall through to plain text.
   if (!isNonTextPreferredStrategy(preferredStrategy) && shouldPreferPlaywrightFieldTarget(field) && await fillByPlaywrightFieldTarget(page, field)) {
     return true;
   }
@@ -4028,6 +4262,7 @@ async function fillByAgentFieldId(page: Page, field: BrowserFillField, preferred
   return fillByPlaywrightFieldTarget(page, field);
 }
 
+// Returns true when a preferred strategy must not fall back to plain text.
 function isNonTextPreferredStrategy(strategy: FillStrategy | undefined) {
   return strategy === "choice"
     || strategy === "native_select"
@@ -4035,12 +4270,16 @@ function isNonTextPreferredStrategy(strategy: FillStrategy | undefined) {
     || strategy === "autocomplete";
 }
 
+// Decides when Playwright's high-level label/role targeting is safe to try
+// before lower-level DOM filling.
 function shouldPreferPlaywrightFieldTarget(field: BrowserFillField) {
   const inputType = field.inputType ?? "";
 
   return !["checkbox", "radio", "select", "combobox", "file"].includes(inputType);
 }
 
+// Uses Playwright label/placeholder/role locators for straightforward fields
+// where high-level targeting is reliable.
 async function fillByPlaywrightFieldTarget(page: Page, field: BrowserFillField) {
   if (!field.fieldId || !field.value.trim()) {
     return false;
@@ -4102,6 +4341,8 @@ async function fillByPlaywrightFieldTarget(page: Page, field: BrowserFillField) 
   return false;
 }
 
+// Re-finds a likely text/select field by live label/context text when the saved
+// field id is stale after a re-render.
 async function fillByFreshLabelTarget(page: Page, field: BrowserFillField) {
   const value = field.value.trim();
 
@@ -4716,7 +4957,12 @@ async function fillByFreshLabelTarget(page: Page, field: BrowserFillField) {
   return false;
 }
 
+// Fallback text/textarea filler for real text controls after specialized
+// select/autocomplete/choice strategies have not claimed the field.
 async function fillTextField(page: Page, field: BrowserFillField) {
+  // Text fallback is intentionally late in the routing order. It only handles
+  // real text/textarea controls after select/autocomplete/choice paths had a
+  // chance to claim their controls.
   if (!field.value.trim()) {
     return false;
   }
@@ -5016,7 +5262,12 @@ async function fillTextField(page: Page, field: BrowserFillField) {
   return false;
 }
 
+// Fills custom dropdowns and combobox-like widgets by opening the control,
+// selecting visible options, and typing search queries only when necessary.
 async function fillSelectLikeField(page: Page, field: BrowserFillField) {
+  // Select-like widgets cover custom dropdowns, searchable selects, and
+  // comboboxes. The strategy is option-first: inspect/click visible choices,
+  // then type a query only when the widget behaves like search.
   const value = field.value.trim();
 
   if (!value || field.inputType === "file") {
@@ -5025,6 +5276,7 @@ async function fillSelectLikeField(page: Page, field: BrowserFillField) {
 
   const aliases = getFieldAliases(field.label);
   const isAutocomplete = looksAutocompleteField(field.label, value);
+  const allowTypedSearch = isAutocomplete || shouldTypeQueryIntoSelectLike(field);
   const queries = getSelectLikeQueries(field.label, value);
 
   if (isAutocomplete && await fillSearchAutocompleteByDom(page, field, queries)) {
@@ -5039,14 +5291,58 @@ async function fillSelectLikeField(page: Page, field: BrowserFillField) {
       frame.getByRole("button", { name: alias, exact: false }).first()
     ]);
     const targets = field.fieldId
-      ? [frame.locator(`[data-gradlaunch-field-id="${field.fieldId}"]`).first(), ...aliasTargets]
+      ? [
+        frame.locator(`[data-gradlaunch-field-id="${field.fieldId}"]:visible`).first(),
+        frame.locator(`[data-gradlaunch-field-id="${field.fieldId}"]`).first(),
+        ...aliasTargets
+      ]
       : aliasTargets;
 
     for (const target of targets) {
       try {
         const visible = await target!.isVisible({ timeout: 100 }).catch(() => false);
 
-        if (!visible) {
+        const isHiddenSelectWithVisibleProxy = !visible && await target!.evaluate((element) => {
+          if (!(element instanceof HTMLSelectElement)) {
+            return false;
+          }
+
+          return Boolean(getVisibleSelectProxy(element));
+
+          function getVisibleSelectProxy(select: HTMLSelectElement) {
+            const candidates = [
+              select.nextElementSibling,
+              select.parentElement?.querySelector("[role='combobox']"),
+              select.parentElement?.querySelector(".select2 [role='combobox']"),
+              select.id ? document.getElementById(`select2-${select.id}-container`)?.closest("[role='combobox']") : null,
+              select.id ? document.querySelector(`.select2Container${CSS.escape(select.id)}`) : null,
+              select.id ? document.querySelector(`[aria-labelledby~="${CSS.escape(`${select.id}-label`)}"][role='combobox']`) : null
+            ];
+
+            for (const candidate of candidates) {
+              const element = candidate instanceof HTMLElement
+                ? candidate
+                : candidate instanceof Element
+                  ? candidate.querySelector("[role='combobox']") as HTMLElement | null
+                  : null;
+
+              if (!element) {
+                continue;
+              }
+
+              const rect = element.getBoundingClientRect();
+              const style = window.getComputedStyle(element);
+
+              if (rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
+                return element;
+              }
+            }
+
+            return undefined;
+          }
+        }).catch(() => false);
+
+        if (!visible && !isHiddenSelectWithVisibleProxy) {
           continue;
         }
 
@@ -5062,6 +5358,10 @@ async function fillSelectLikeField(page: Page, field: BrowserFillField) {
 
         if (await verifySelectLikeValue(target!, value, { allowPartial: !isAutocomplete, fieldLabel: field.label })
           || await verifySelectLikeValue(interactionTarget, value, { allowPartial: !isAutocomplete, fieldLabel: field.label })) {
+          return true;
+        }
+
+        if (await fillClassifiedNativeSelect(target!, field)) {
           return true;
         }
 
@@ -5085,22 +5385,17 @@ async function fillSelectLikeField(page: Page, field: BrowserFillField) {
           }
         }
 
+        if (!allowTypedSearch) {
+          continue;
+        }
+
         for (const query of queries) {
           await interactionTarget.scrollIntoViewIfNeeded().catch(() => undefined);
           await interactionTarget.click({ force: true, timeout: 700 }).catch(() => undefined);
           await page.waitForTimeout(60).catch(() => undefined);
 
-          if (isAutocomplete) {
-            await interactionTarget.press(process.platform === "darwin" ? "Meta+A" : "Control+A", { timeout: 250 }).catch(() => undefined);
-            await interactionTarget.press("Backspace", { timeout: 250 }).catch(() => undefined);
-            await interactionTarget.type(query, { delay: 20, timeout: 1200 }).catch(async () => {
-              await interactionTarget.fill(query, { timeout: 700 }).catch(() => undefined);
-            });
-          } else {
-            await interactionTarget.fill(query, { timeout: 600 }).catch(async () => {
-              await interactionTarget.press(process.platform === "darwin" ? "Meta+A" : "Control+A", { timeout: 250 }).catch(() => undefined);
-              await interactionTarget.type(query, { delay: 10, timeout: 800 }).catch(() => undefined);
-            });
+          if (allowTypedSearch) {
+            await typeSelectLikeQuery(frame, interactionTarget, query);
           }
           await page.waitForTimeout(isAutocomplete ? 350 : 130).catch(() => undefined);
 
@@ -5172,6 +5467,8 @@ async function fillSelectLikeField(page: Page, field: BrowserFillField) {
   return false;
 }
 
+// Handles search/autocomplete inputs by typing ranked queries, waiting for
+// suggestion lists, and selecting the best matching suggestion.
 async function fillSearchAutocompleteByDom(page: Page, field: BrowserFillField, queries: string[]) {
   const expected = field.value.trim();
 
@@ -5347,6 +5644,7 @@ async function fillSearchAutocompleteByDom(page: Page, field: BrowserFillField, 
   return false;
 }
 
+// Clears an autocomplete input using both keyboard and DOM value-setter paths.
 async function clearAutocompleteTarget(target: Locator) {
   await target.press(process.platform === "darwin" ? "Meta+A" : "Control+A", { timeout: 300 }).catch(() => undefined);
   await target.press("Backspace", { timeout: 300 }).catch(() => undefined);
@@ -5373,6 +5671,8 @@ async function clearAutocompleteTarget(target: Locator) {
   }).catch(() => undefined);
 }
 
+// Sets autocomplete text programmatically and dispatches events so suggestions
+// can load even when normal typing fails.
 async function setAutocompleteTargetValue(target: Locator, value: string) {
   await target.evaluate((element, value) => {
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
@@ -5397,6 +5697,8 @@ async function setAutocompleteTargetValue(target: Locator, value: string) {
   }, value).catch(() => undefined);
 }
 
+// Scores visible autocomplete suggestions and clicks the one that best matches
+// the expected value, field label, and typed query.
 async function clickBestAutocompleteSuggestion(
   frame: Frame,
   targetMarker: string,
@@ -5628,6 +5930,8 @@ async function clickBestAutocompleteSuggestion(
   return false;
 }
 
+// Verifies that an autocomplete widget committed a suggestion rather than just
+// retaining unaccepted typed text.
 async function verifySearchAutocompleteCommitted(
   frame: Frame,
   marker: string,
@@ -5783,6 +6087,7 @@ async function verifySearchAutocompleteCommitted(
   }, { marker, expected, fieldLabel, query }).catch(() => false);
 }
 
+// Removes the temporary marker used to identify the active autocomplete target.
 async function cleanupAutocompleteTarget(frame: Frame, marker: string) {
   await frame.evaluate((marker) => {
     const target = document.querySelector(`[data-gradlaunch-autocomplete-target="${CSS.escape(marker)}"]`);
@@ -5793,6 +6098,8 @@ async function cleanupAutocompleteTarget(frame: Frame, marker: string) {
   }, marker).catch(() => undefined);
 }
 
+// Specialized location suggestion clicker that requires city/entity and country
+// evidence to avoid confusing India with Indonesia or other nearby matches.
 async function clickLocationSuggestionByText(
   frame: Frame,
   value: string,
@@ -6011,7 +6318,92 @@ async function clickLocationSuggestionByText(
   }
 }
 
+// Types into the active custom-select search input when the widget creates one
+// after opening; otherwise falls back to the original interaction target.
+async function typeSelectLikeQuery(frame: Frame, interactionTarget: Locator, query: string) {
+  const searchInput = frame.locator([
+    "input.select2-search__field",
+    ".select2-container--open input[type='search']",
+    ".select2-container--open input:not([type='hidden'])",
+    "[role='listbox'] input:not([type='hidden'])",
+    "[role='dialog'] input:not([type='hidden'])"
+  ].join(",")).last();
+  const target = await searchInput.isVisible({ timeout: 180 }).catch(() => false)
+    ? searchInput
+    : interactionTarget;
+
+  await target.fill(query, { timeout: 700 }).catch(async () => {
+    await target.press(process.platform === "darwin" ? "Meta+A" : "Control+A", { timeout: 250 }).catch(() => undefined);
+    await target.press("Backspace", { timeout: 250 }).catch(() => undefined);
+    await target.type(query, { delay: 12, timeout: 1000 }).catch(() => undefined);
+  });
+}
+
+// Finds the clickable/typeable element inside a custom select wrapper.
 async function getSelectInteractionTarget(target: Locator) {
+  const proxySelector = await target.evaluate((element) => {
+    if (!(element instanceof HTMLSelectElement)) {
+      return "";
+    }
+
+    const marker = element.getAttribute("data-gradlaunch-select-proxy")
+      || `gl-select-proxy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const proxy = getVisibleSelectProxy(element);
+
+    if (!proxy) {
+      return "";
+    }
+
+    proxy.setAttribute("data-gradlaunch-select-proxy", marker);
+    return `[data-gradlaunch-select-proxy="${marker}"]`;
+
+    function getVisibleSelectProxy(select: HTMLSelectElement) {
+      const candidates = [
+        select.nextElementSibling,
+        select.parentElement?.querySelector("[role='combobox']"),
+        select.parentElement?.querySelector(".select2 [role='combobox']"),
+        select.id ? document.getElementById(`select2-${select.id}-container`)?.closest("[role='combobox']") : null,
+        select.id ? document.querySelector(`.select2Container${CSS.escape(select.id)}`) : null,
+        select.id ? document.querySelector(`[aria-labelledby~="${CSS.escape(`${select.id}-label`)}"][role='combobox']`) : null
+      ];
+
+      for (const candidate of candidates) {
+        const element = candidate instanceof HTMLElement
+          ? candidate
+          : candidate instanceof Element
+            ? candidate.querySelector("[role='combobox']") as HTMLElement | null
+            : null;
+
+        if (!element) {
+          continue;
+        }
+
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+
+        if (rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
+          return element;
+        }
+      }
+
+      return undefined;
+    }
+  }).catch(() => "");
+
+  if (proxySelector) {
+    const proxy = target.page().locator(proxySelector).first();
+
+    if (await proxy.isVisible({ timeout: 150 }).catch(() => false)) {
+      return proxy;
+    }
+  }
+
+  const siblingProxy = target.locator("xpath=following-sibling::*[contains(concat(' ', normalize-space(@class), ' '), ' select2 ')][1]//*[@role='combobox'] | following-sibling::*[@role='combobox'][1] | ../descendant::*[@role='combobox'][1]").first();
+
+  if (await siblingProxy.isVisible({ timeout: 150 }).catch(() => false)) {
+    return siblingProxy;
+  }
+
   const canUseDirectly = await target.evaluate((element) => {
     if (element instanceof HTMLInputElement) {
       return !["hidden", "file", "checkbox", "radio", "submit", "button"].includes(element.type) && !element.disabled;
@@ -6043,6 +6435,8 @@ async function getSelectInteractionTarget(target: Locator) {
   return nestedVisible ? nested : target;
 }
 
+// Handles country selects and country-like widgets with stricter exact-country
+// matching before any generic select strategy is allowed.
 async function fillCountrySelectField(page: Page, field: BrowserFillField) {
   const desiredCountry = countryLabelFromValue(field.value);
 
@@ -6131,6 +6525,8 @@ async function fillCountrySelectField(page: Page, field: BrowserFillField) {
   return false;
 }
 
+// Verifies custom select/combobox value from visible text, ARIA metadata,
+// selected tokens, and related input values.
 async function verifySelectLikeValue(target: Locator, expected: string, options?: { allowPartial?: boolean; fieldLabel?: string; acceptLocationTextValue?: boolean }) {
   return target.evaluate((element, { wantedValue, allowPartial, fieldLabel, acceptLocationTextValue }) => {
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -6138,7 +6534,9 @@ async function verifySelectLikeValue(target: Locator, expected: string, options?
     const descriptor = normalize(`${fieldLabel ?? ""} ${wantedValue}`);
     const isLocationLike = /\b(location|city|country|state|province|region|india|australia|canada|united states|usa|united kingdom|uk|haryana|bihar|maharashtra|karnataka|uttar pradesh|telangana|tamil nadu|west bengal|aurangabad|bhiwani|bengaluru|bangalore|banglore|gurugram|gurgaon|delhi|noida|hyderabad|pune|mumbai|chennai|kolkata)\b/.test(descriptor);
     const locationAliases = isLocationLike ? getLocationAliases(wanted) : [];
-    const raw = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement
+    const raw = element instanceof HTMLSelectElement
+      ? `${element.value} ${element.selectedOptions[0]?.textContent ?? ""} ${getSelectProxyText(element)}`
+      : element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
       ? element.value
       : element.textContent ?? "";
     const actual = normalize(raw);
@@ -6184,6 +6582,7 @@ async function verifySelectLikeValue(target: Locator, expected: string, options?
       container?.querySelector("[aria-selected='true'], [data-selected='true'], [data-state='checked']")?.textContent,
       selectedText,
       hiddenValues,
+      element instanceof HTMLSelectElement ? getSelectProxyText(element) : "",
       describedBy
         .split(/\s+/)
         .map((id) => document.getElementById(id)?.textContent ?? "")
@@ -6295,6 +6694,31 @@ async function verifySelectLikeValue(target: Locator, expected: string, options?
       return isBlockingValidationText(text) && getFillControlCount(container) <= 3;
     }
 
+    function getSelectProxyText(select: HTMLSelectElement) {
+      const rendered = select.id ? document.getElementById(`select2-${select.id}-container`) : null;
+      const proxy = getVisibleSelectProxy(select);
+      return [
+        rendered?.textContent,
+        rendered?.getAttribute("title"),
+        proxy?.textContent,
+        proxy?.getAttribute("title"),
+        proxy?.getAttribute("aria-valuetext")
+      ].filter(Boolean).join(" ");
+    }
+
+    function getVisibleSelectProxy(select: HTMLSelectElement) {
+      const candidates = [
+        select.nextElementSibling,
+        select.parentElement?.querySelector("[role='combobox']"),
+        select.parentElement?.querySelector(".select2 [role='combobox']"),
+        select.id ? document.getElementById(`select2-${select.id}-container`)?.closest("[role='combobox']") : null,
+        select.id ? document.querySelector(`.select2Container${CSS.escape(select.id)}`) : null,
+        select.id ? document.querySelector(`[aria-labelledby~="${CSS.escape(`${select.id}-label`)}"][role='combobox']`) : null
+      ];
+
+      return candidates.find((candidate): candidate is HTMLElement => candidate instanceof HTMLElement && isVisible(candidate));
+    }
+
     function findFieldContainer(targetElement: HTMLElement) {
       let ancestor: HTMLElement | null = targetElement;
 
@@ -6393,6 +6817,8 @@ async function verifySelectLikeValue(target: Locator, expected: string, options?
   }).catch(() => false);
 }
 
+// Fills native select controls by choosing the best matching visible option and
+// dispatching input/change/blur events.
 async function fillSelectField(page: Page, field: BrowserFillField) {
   const value = field.value.trim();
 
@@ -6602,7 +7028,12 @@ async function fillSelectField(page: Page, field: BrowserFillField) {
   return false;
 }
 
+// Generic radio/checkbox fallback that scores the nearby choice group and clicks
+// one matching option instead of toggling unrelated checkboxes.
 async function fillChoiceField(page: Page, field: BrowserFillField) {
+  // Generic radio/checkbox fallback. It searches the surrounding group and
+  // chooses the option whose visible label best matches the desired answer,
+  // instead of clicking every matching standalone checkbox on the page.
   const normalizedLabel = normalizeKey(field.label);
   const normalizedValue = normalizeKey(field.value);
 
@@ -6781,6 +7212,8 @@ async function fillChoiceField(page: Page, field: BrowserFillField) {
   return false;
 }
 
+// Selects only the desired country/countries in a checkbox/radio country group
+// and normalizes the rest of the group to avoid "select all" behavior.
 async function fillCountryChoiceGroup(page: Page, field: BrowserFillField) {
   const normalizedValue = normalizeKey(field.value);
   const normalizedLabel = normalizeKey(field.label);
@@ -6939,6 +7372,7 @@ async function fillCountryChoiceGroup(page: Page, field: BrowserFillField) {
   return false;
 }
 
+// Handles cases where the visible field label is itself a country option.
 async function fillCountryOptionField(page: Page, field: BrowserFillField) {
   const desiredCountries = extractDesiredCountries(field.value);
 
@@ -6956,6 +7390,8 @@ async function fillCountryOptionField(page: Page, field: BrowserFillField) {
   return Boolean(fieldCountry && desiredCountries.includes(fieldCountry) && await clickCountryOptionFieldTarget(page, field));
 }
 
+// Clicks the exact visible country option target for standalone country option
+// fields.
 async function clickCountryOptionFieldTarget(page: Page, field: BrowserFillField) {
   if (!field.fieldId) {
     return false;
@@ -7012,6 +7448,8 @@ async function clickCountryOptionFieldTarget(page: Page, field: BrowserFillField
   return false;
 }
 
+// Ensures a country checkbox list has only the desired countries checked and
+// undesired countries unchecked.
 async function normalizeCountryCheckboxList(page: Page, desiredCountries: string[]) {
   for (const frame of page.frames()) {
     const normalized = await frame.evaluate(({ desired }) => {
@@ -7429,6 +7867,7 @@ async function normalizeCountryCheckboxList(page: Page, desiredCountries: string
   return false;
 }
 
+// Extracts normalized desired country names from a free-form answer value.
 function extractDesiredCountries(value: string) {
   const normalized = normalizeInline(value);
   const countries: string[] = [];
@@ -7452,6 +7891,7 @@ function extractDesiredCountries(value: string) {
   return [...new Set(countries)];
 }
 
+// Returns the canonical country label when the value clearly names a country.
 function countryLabelFromValue(value: string) {
   const country = extractDesiredCountries(value)[0];
 
@@ -7478,6 +7918,7 @@ function countryLabelFromValue(value: string) {
   return undefined;
 }
 
+// Converts country labels and aliases into canonical country keys.
 function countryKeyFromLabel(value: string) {
   const normalized = normalizeInline(value);
 
@@ -7500,6 +7941,7 @@ function countryKeyFromLabel(value: string) {
   return normalized;
 }
 
+// Detects country checkbox/radio group questions that need country-list logic.
 function isCountryChoiceGroupField(field: BrowserFillField) {
   const label = normalizeInline(field.label);
 
@@ -7508,6 +7950,7 @@ function isCountryChoiceGroupField(field: BrowserFillField) {
     && /\b(countries|anticipate|working in|role in which you are applying|previous response)\b/.test(label);
 }
 
+// Detects country select/search-select fields from label, value, and input type.
 function isCountrySelectField(field: BrowserFillField) {
   const label = normalizeInline(field.label);
 
@@ -7516,6 +7959,7 @@ function isCountrySelectField(field: BrowserFillField) {
     && !/\b(countries|anticipate|working in|role in which you are applying|previous response)\b/.test(label);
 }
 
+// Skips standalone country option fields that do not match the desired country.
 function shouldSkipCountryOptionField(field: BrowserFillField) {
   const inputType = field.inputType ?? "";
 
@@ -7528,14 +7972,17 @@ function shouldSkipCountryOptionField(field: BrowserFillField) {
   return isCountryOptionLabel(field.label);
 }
 
+// Detects whether text is exactly one of the country option labels we know.
 function isCountryOptionLabel(value: string) {
   return /^(australia|belgium|brazil|canada|france|germany|india|indonesia|ireland|israel|italy|japan|luxembourg|malaysia|mexico|new zealand|poland|portugal|romania|singapore|south korea|spain|sweden|switzerland|thailand|the netherlands|netherlands|uae|uk|us|united states|united kingdom)$/i.test(value.trim());
 }
 
+// Normalizes short inline strings for option/country/location matching.
 function normalizeInline(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+// Clicks an exact visible country option from an open select/listbox popup.
 async function clickExactCountryOption(frame: Frame, desiredCountry: string) {
   const marker = `gl-country-option-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const found = await frame.evaluate(({ desired, marker }) => {
@@ -7681,6 +8128,8 @@ async function clickExactCountryOption(frame: Frame, desiredCountry: string) {
   }
 }
 
+// Clicks the best visible option for a custom select popup, with special
+// scoring for location/country options.
 async function clickVisibleSelectOption(
   frame: Frame,
   value: string,
@@ -7955,6 +8404,8 @@ async function clickVisibleSelectOption(
   }
 }
 
+// Retries visible option selection while dynamic listbox content is still
+// rendering.
 async function clickVisibleSelectOptionWithRetries(
   frame: Frame,
   value: string,
@@ -7973,11 +8424,15 @@ async function clickVisibleSelectOptionWithRetries(
   return false;
 }
 
+// Detects fields that are likely search/autocomplete widgets based on location
+// or institution wording.
 function looksAutocompleteField(label: string, value: string) {
   const descriptor = normalizeInline(`${label} ${value}`);
   return isLocationLikeDescriptor(descriptor) || /\b(school|university|college)\b/.test(descriptor);
 }
 
+// Builds ordered search queries for select-like widgets, using city-first
+// queries for location autocomplete fields.
 function getSelectLikeQueries(label: string, value: string) {
   const descriptor = normalizeInline(`${label} ${value}`);
 
@@ -8008,10 +8463,13 @@ function getSelectLikeQueries(label: string, value: string) {
   return unique;
 }
 
+// Detects whether normalized descriptor text refers to location/city/state/
+// country concepts.
 function isLocationLikeDescriptor(descriptor: string) {
   return /\b(location|city|country|state|province|region|india|australia|canada|united states|usa|united kingdom|uk|haryana|bihar|maharashtra|karnataka|uttar pradesh|telangana|tamil nadu|west bengal|aurangabad|bhiwani|bengaluru|bangalore|banglore|gurugram|gurgaon|delhi|noida|hyderabad|pune|mumbai|chennai|kolkata)\b/.test(descriptor);
 }
 
+// Extracts the best city query from a full location string.
 function getLocationQueryCity(value: string) {
   const normalized = normalizeInline(value);
 
@@ -8041,14 +8499,29 @@ function getLocationQueryCity(value: string) {
   return withoutCountry.split(",")[0]?.trim() || value.split(",")[0]?.trim();
 }
 
+// Returns true when a field should prefer select-like interaction over plain
+// text.
 function shouldUseSelectLikeFlow(field: BrowserFillField) {
   return field.inputType === "combobox" || looksAutocompleteField(field.label, field.value);
 }
 
+// Returns true only for custom selects where typing a query is appropriate.
+// Plain dropdowns should open and click an option; typing arbitrary text into
+// them caused profile/location values to be written into unrelated dropdowns.
+function shouldTypeQueryIntoSelectLike(field: BrowserFillField) {
+  const context = (field as BrowserFillField & { context?: string }).context ?? "";
+  const descriptor = normalizeKey(`${field.label} ${field.placeholder ?? ""} ${field.name ?? ""} ${field.ariaLabel ?? ""} ${context} ${field.inputType ?? ""}`);
+
+  return /\b(search|type to search|autocomplete|combobox|current location|place of residence|school|university|college|skills?|skill set|primary skills|technologies|tech stack)\b/.test(descriptor);
+}
+
+// Detects short boolean-like values where partial verification is acceptable
+// for some custom select displays.
 function isShortChoiceValue(value: string) {
   return /^(yes|no|true|false|n\/a|na)$/i.test(value.trim());
 }
 
+// Expands a field label into common aliases for Playwright locator fallbacks.
 function getFieldAliases(label: string) {
   const normalizedLabel = label.toLowerCase().trim();
   const aliases = new Set([label]);

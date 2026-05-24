@@ -9,6 +9,9 @@ type BuildStageExecutionPlanInput = {
   allowExternalSubmit: boolean;
 };
 
+// Builds the action plan for one visible browser stage. It combines page
+// classification with ranked actions, then downgrades uncertain actions to
+// safe exploration or user handoff instead of guessing.
 export function buildStageExecutionPlan(input: BuildStageExecutionPlanInput): StageExecutionPlan {
   const classification = classifyPage(input.observation);
   const rankedActions = rankActions({
@@ -47,6 +50,8 @@ export function buildStageExecutionPlan(input: BuildStageExecutionPlanInput): St
   };
 }
 
+// Produces the human-readable reason stored in the planner/debug trace so we
+// can later understand why a stage was filled, explored, paused, or uploaded.
 function buildPlanReason(
   classification: ReturnType<typeof classifyPage>,
   best: ReturnType<typeof rankActions>[number]
@@ -57,6 +62,8 @@ function buildPlanReason(
   ].join(" ");
 }
 
+// Lists the safety checks expected for each selected action. The checklist is
+// used by the planner/UI to explain what the bot is about to do.
 function buildChecklist(action: StageExecutionPlan["action"]) {
   switch (action) {
     case "ask_user":

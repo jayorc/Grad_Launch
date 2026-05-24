@@ -16,6 +16,9 @@ import type {
 } from "./types";
 import { isTransientStatusMessage, normalizeKey, writeBrowserDebug } from "./util";
 
+// strategy.ts is the decision layer between observation and action. It turns a
+// page snapshot into: "what state is this page in?", "what should the agent do
+// next?", and "how should we recover if the page still has blockers?".
 type RankActionsInput = {
   observation: BrowserAgentObservation;
   classification: PageClassification;
@@ -32,7 +35,13 @@ type RecoveryInput = {
   failedFieldCount: number;
 };
 
+// Classifies the current browser snapshot into a page state such as login,
+// captcha, loading, resume upload, normal form fill, validation error, review,
+// submit, start, empty, or unknown. It assigns confidence and blocking flags so
+// the engine knows whether autonomous action is safe.
 export function classifyPage(observation: BrowserAgentObservation): PageClassification {
+  // Classification is score-based rather than a single hardcoded branch.
+  // Multiple states can match the same page; the most confident state wins.
   const text = normalizeKey([
     observation.title,
     observation.pageText,
@@ -147,7 +156,13 @@ export function classifyPage(observation: BrowserAgentObservation): PageClassifi
   };
 }
 
+// Scores all safe next actions for the classified page. High-risk states like
+// login/CAPTCHA rank manual handoff highest, clear form pages rank fill highest,
+// and uncertain pages rank safe exploration instead of blind navigation.
 export function rankActions(input: RankActionsInput): ActionScore[] {
+  // Ranking keeps dangerous actions behind safer ones. For example, login and
+  // CAPTCHA always become ask_user, while ambiguous pages become exploration
+  // instead of blind clicks.
   const { classification, observation } = input;
   const scores: ActionScore[] = [];
   const hasFields = observation.visibleFields.length > 0;
@@ -239,7 +254,13 @@ export function rankActions(input: RankActionsInput): ActionScore[] {
   return scores.sort((left, right) => right.score - left.score);
 }
 
+// Converts remaining blockers after filling into a normalized recovery plan.
+// The engine uses this to choose wait, retry upload, repair required fields,
+// inspect validation, ask the LLM, or hand off to the user.
 export function classifyRecovery(input: RecoveryInput): RecoveryPlan {
+  // Recovery plans are normalized failure reasons. The engine can then decide
+  // whether to wait, retry upload, repair fields, ask the LLM, or hand off to
+  // the user without duplicating error parsing everywhere.
   const meaningfulValidation = input.validationMessages.filter((message) => !isTransientStatusMessage(message));
 
   if (input.classification?.state === "login") {
@@ -315,11 +336,17 @@ export function classifyRecovery(input: RecoveryInput): RecoveryPlan {
   };
 }
 
+// Performs a reversible page probe when classification is weak. It waits for
+// dynamic content, dismisses soft gates, scrolls to reveal lazy sections, then
+// re-observes the page and reports whether a useful action became visible.
 export async function probeAndReobservePage(input: {
   page: Page;
   workspacePath: string;
   stageIndex: number;
 }) {
+  // Exploration mode performs only reversible, low-risk actions. It waits,
+  // dismisses soft gates, scrolls to reveal lazy fields, then observes again.
+  // It must not submit or click primary workflow buttons.
   await input.page.waitForLoadState("domcontentloaded", { timeout: 1200 }).catch(() => undefined);
   await input.page.waitForTimeout(500).catch(() => undefined);
   await clickSoftGate(input.page).catch(() => undefined);

@@ -12,7 +12,16 @@ import type {
 } from "./types";
 import { dedupeLabels, isTransientStatusMessage, normalizeKey, safeHostname } from "./util";
 
+// observe.ts is the browser agent's "eyes". It reads the current tab across
+// frames/shadow roots, tags visible controls, groups radio/checkbox options,
+// detects protected gates, and reports enough page state for the strategy and
+// fill layers to make safe decisions.
+// Selects the best active page in the browser context after redirects, login
+// flows, or new-tab opens. The agent always acts on this page instead of a
+// stale blank/new-tab page.
 export async function getActivePage(context: BrowserContext, fallbackPage: Page) {
+  // Login flows and ATS redirects often open or focus a different tab. Always
+  // pick the most meaningful non-blank page before observing or acting.
   await fallbackPage.waitForTimeout(400).catch(() => undefined);
   const pages = context.pages().filter((page) => !page.isClosed());
   const meaningfulPages = pages.filter((page) => !isBlankBrowserPage(page.url()));
@@ -31,10 +40,14 @@ export async function getActivePage(context: BrowserContext, fallbackPage: Page)
   return page;
 }
 
+// Detects browser-native blank/new-tab URLs that should not be treated as real
+// job application pages.
 function isBlankBrowserPage(url: string) {
   return !url || url === "about:blank" || url.startsWith("chrome://newtab");
 }
 
+// Safely extracts the origin from a URL so open pages can be compared without
+// throwing on invalid or browser-internal URLs.
 function safePageOrigin(url: string) {
   try {
     return new URL(url).origin;
@@ -43,7 +56,12 @@ function safePageOrigin(url: string) {
   }
 }
 
+// Clicks harmless cookie/consent/continue overlays that block observation of
+// the actual form, while avoiding the GradLaunch live bot.
 export async function clickSoftGate(page: Page) {
+  // Soft gates are low-risk cookie/consent/start overlays that block the real
+  // form. This intentionally avoids the GradLaunch live bot and only clicks
+  // simple visible controls with harmless labels.
   const labels = ["Accept", "Accept all", "Continue", "I agree"];
 
   for (const label of labels) {
@@ -92,7 +110,13 @@ export async function clickSoftGate(page: Page) {
   }
 }
 
+// Discovers visible fillable fields across frames and shadow roots, assigns
+// stable GradLaunch ids, groups radio buttons, and captures labels/options/
+// context needed by answer planning and filling.
 export async function discoverVisibleFields(page: Page): Promise<VisibleField[]> {
+  // Field discovery assigns stable data-gradlaunch-field-id markers to usable
+  // inputs so later answer planning and filling can target the same live DOM
+  // control even when labels are duplicated.
   const fields: VisibleField[] = [];
 
   for (const frame of page.frames()) {
@@ -107,14 +131,19 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
           continue;
         }
 
+        if (isInactiveFormBranch(control)) {
+          continue;
+        }
+
         const isChoiceControl = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type);
         const rect = control.getBoundingClientRect();
+        const customSelectProxy = control instanceof HTMLSelectElement ? getVisibleCustomSelectProxy(control) : undefined;
 
         if ("disabled" in control && control.disabled) {
           continue;
         }
 
-        if ((rect.width <= 0 || rect.height <= 0) && !(isChoiceControl && hasVisibleChoiceTarget(control))) {
+        if ((rect.width <= 0 || rect.height <= 0) && !(isChoiceControl && hasVisibleChoiceTarget(control)) && !customSelectProxy) {
           continue;
         }
 
@@ -142,6 +171,11 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
           items.push({
             id,
             label: clean(groupLabel),
+            placeholder: "",
+            name: clean(control.name),
+            ariaLabel: clean(control.getAttribute("aria-label")),
+            autocomplete: clean(control.getAttribute("autocomplete")),
+            role: clean(control.getAttribute("role")),
             required: radioGroup.some((item) => isRequired(item, groupLabel || findFieldLabel(item))),
             tagName: control.tagName.toLowerCase(),
             inputType: "radio",
@@ -151,16 +185,24 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
           continue;
         }
 
-        const id = control.getAttribute("data-gradlaunch-field-id") || `gl-field-${index}-${normalize(label)}`;
+        const id = control.getAttribute("data-gradlaunch-field-id")
+          || customSelectProxy?.getAttribute("data-gradlaunch-field-id")
+          || (control instanceof HTMLSelectElement && control.id ? `gl-select-${control.id}` : `gl-field-${index}-${normalize(label)}`);
         control.setAttribute("data-gradlaunch-field-id", id);
+        customSelectProxy?.setAttribute("data-gradlaunch-field-id", id);
 
         items.push({
           id,
           label: clean(label),
+          placeholder: clean(control.getAttribute("placeholder")),
+          name: clean(control.getAttribute("name")),
+          ariaLabel: clean(control.getAttribute("aria-label")),
+          autocomplete: control instanceof HTMLInputElement ? clean(control.getAttribute("autocomplete")) : "",
+          role: clean(control.getAttribute("role")),
           required: isRequired(control, label),
           tagName: control.tagName.toLowerCase(),
           inputType: control instanceof HTMLSelectElement
-            ? "select"
+            ? customSelectProxy ? "combobox" : "select"
             : control instanceof HTMLInputElement
               ? getInputType(control)
               : "textarea",
@@ -362,7 +404,64 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
         const rect = control.getBoundingClientRect();
         const style = window.getComputedStyle(control);
         return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
+          || control instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(control))
           || control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type) && hasVisibleChoiceTarget(control);
+      }
+
+      function isInactiveFormBranch(control: Element) {
+        if (control.closest(".datasetField__row--sample") || control.hasAttribute("hidden")) {
+          return true;
+        }
+
+        if (control.parentElement?.closest("[hidden], [aria-hidden='true']")) {
+          return true;
+        }
+
+        const id = control.getAttribute("id") ?? "";
+        const name = control.getAttribute("name") ?? "";
+        return /(^|-)sample($|-)/i.test(id) || /(^|-)sample($|-)/i.test(name);
+      }
+
+      function getVisibleCustomSelectProxy(control: HTMLSelectElement) {
+        if (!isCustomSelectElement(control)) {
+          return undefined;
+        }
+
+        const candidates = [
+          control.nextElementSibling,
+          control.parentElement?.querySelector("[role='combobox']"),
+          control.parentElement?.querySelector(".select2 [role='combobox']"),
+          control.id ? queryFirst(`.select2Container${CSS.escape(control.id)}`, control) : null,
+          control.id ? queryFirst(`[aria-labelledby~="${CSS.escape(`${control.id}-label`)}"][role='combobox']`, control) : null,
+          control.id ? queryFirst(`#select2-${CSS.escape(control.id)}-container`, control)?.closest("[role='combobox']") : null
+        ];
+
+        for (const candidate of candidates) {
+          const element = candidate instanceof HTMLElement
+            ? candidate
+            : candidate instanceof Element
+              ? candidate.querySelector("[role='combobox']") as HTMLElement | null
+              : null;
+
+          if (element && isVisibleElement(element)) {
+            return element;
+          }
+        }
+
+        return undefined;
+      }
+
+      function isCustomSelectElement(control: HTMLSelectElement) {
+        const className = String(control.getAttribute("class") ?? "");
+        return control.getAttribute("aria-hidden") === "true"
+          || /\b(select2-hidden-accessible|select2|autocomplete|combobox)\b/i.test(className)
+          || Boolean(control.parentElement?.querySelector(".select2, [role='combobox'], [aria-haspopup='true'], [aria-haspopup='listbox']"));
+      }
+
+      function isVisibleElement(element: Element) {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
       }
 
       function hasVisibleChoiceTarget(control: HTMLInputElement) {
@@ -561,7 +660,12 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
   });
 }
 
+// Builds the full page observation used by planning: visible fields, controls,
+// text, validation messages, grouped fields, ATS adapter hint, and page state.
 export async function observeBrowserPage(page: Page, visibleFields: VisibleField[]): Promise<BrowserAgentObservation> {
+  // Observation combines structured fields with visible controls/buttons and
+  // validation text. The strategy layer uses this single object to decide
+  // whether the page is login, upload, form fill, review, submit, or unknown.
   const validationMessages = await getVisibleValidationMessages(page);
   const domObservation = await page.evaluate(() => {
     const searchRoots = getSearchRoots();
@@ -678,7 +782,11 @@ export async function observeBrowserPage(page: Page, visibleFields: VisibleField
   };
 }
 
+// Creates a lightweight page fingerprint from URL and visible controls so the
+// engine can detect same-screen loops and failed transitions.
 export async function getPageFingerprint(page: Page) {
+  // Fingerprints are loop guards. They identify "we are still on the same
+  // screen" without depending on exact screenshots.
   return page.evaluate(() => {
     const controls = getSearchRoots().flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
     const visibleControlKeys = controls
@@ -717,6 +825,8 @@ export async function getPageFingerprint(page: Page) {
   }).catch(() => page.url());
 }
 
+// Reads progress/step indicators from the page so stage signatures can tell
+// whether a wizard advanced even if the URL stayed the same.
 export async function getProgressSnapshot(page: Page) {
   return page.evaluate(() => {
     const selectors = [
@@ -747,7 +857,11 @@ export async function getProgressSnapshot(page: Page) {
   }).catch(() => undefined);
 }
 
+// Captures the current stage signature for checkpoints, transition detection,
+// and resume-after-handoff context.
 export async function getStageSignature(page: Page, observation?: BrowserAgentObservation) {
+  // Stage signatures are saved into execution sessions so a paused/manual run
+  // can resume with context about which screen was last active.
   const nextObservation = observation ?? await observeBrowserPage(page, await discoverVisibleFields(page));
   const fingerprint = await getPageFingerprint(page);
   const progressText = await getProgressSnapshot(page);
@@ -764,6 +878,8 @@ export async function getStageSignature(page: Page, observation?: BrowserAgentOb
   };
 }
 
+// Compares the current page against a saved stage signature to decide whether a
+// paused/resumed run is still on the same application stage.
 export async function matchesSavedStageSignature(page: Page, signature: { fingerprint: string; url: string; progressText?: string }) {
   const [fingerprint, progressText] = await Promise.all([
     getPageFingerprint(page),
@@ -774,7 +890,12 @@ export async function matchesSavedStageSignature(page: Page, signature: { finger
     || (page.url() === signature.url && progressText === signature.progressText);
 }
 
+// Detects protected checkpoints such as login, CAPTCHA, OTP, or verification.
+// These always require manual handoff before the agent can continue filling.
 export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCheckpointDetection> {
+  // Protected checkpoints are intentionally detected outside normal planning.
+  // Login/CAPTCHA/MFA should always pause the bot and wait for explicit user
+  // confirmation before any filling continues.
   return page.evaluate(() => {
     function normalize(value: string) {
       return value.toLowerCase().replace(/\s+/g, " ").trim();
@@ -917,6 +1038,8 @@ export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCh
   }).catch(() => ({ blocked: false }));
 }
 
+// Finds visible required fields that are still empty or invalid. The engine uses
+// this as a hard guard before clicking Continue.
 export async function getVisibleRequiredEmptyLabels(page: Page) {
   const labels: string[] = [];
 
@@ -931,10 +1054,15 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
           continue;
         }
 
+        if (isInactiveFormBranch(control)) {
+          continue;
+        }
+
         const isChoiceControl = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type);
         const rect = control.getBoundingClientRect();
+        const customSelectProxy = control instanceof HTMLSelectElement ? getVisibleCustomSelectProxy(control) : undefined;
 
-        if ((rect.width <= 0 || rect.height <= 0) && !(isChoiceControl && hasVisibleChoiceTarget(control))) {
+        if ((rect.width <= 0 || rect.height <= 0) && !(isChoiceControl && hasVisibleChoiceTarget(control)) && !customSelectProxy) {
           continue;
         }
 
@@ -1026,7 +1154,12 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
 
         if (control instanceof HTMLSelectElement) {
           const selected = control.selectedOptions[0];
-          const selectedText = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`);
+          const selectedText = normalize([
+            selected?.textContent,
+            selected?.value,
+            control.value,
+            getCustomSelectRenderedText(control)
+          ].filter(Boolean).join(" "));
 
           if (isEmptySelectText(selectedText)) {
             return false;
@@ -1090,7 +1223,7 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
       function isEmptySelectText(value: string) {
         return !value
           || /^(select|select an option|choose|choose an option|please select|none selected)$/.test(value)
-          || /\b(options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
+          || /\b(select an option|choose an option|please select|none selected|options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
       }
 
       function hasNearbyRequiredError(control: Element) {
@@ -1244,13 +1377,18 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
           return false;
         }
 
+        if (isInactiveFormBranch(element)) {
+          return false;
+        }
+
         if ("disabled" in element && element.disabled) {
           return false;
         }
 
         const rect = element.getBoundingClientRect();
         const style = window.getComputedStyle(element);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
+          || element instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(element));
       }
 
       function isVisibleElement(element: HTMLElement) {
@@ -1358,8 +1496,14 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
         for (let depth = 0; depth < 6 && ancestor; depth += 1) {
           const controls = Array.from(ancestor.querySelectorAll("input, textarea, select")) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
           const visibleEmpty = controls.find((control) => {
+            if (isInactiveFormBranch(control)) {
+              return false;
+            }
+
             const rect = control.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0 && !isSatisfied(control, searchRoots);
+            const visible = rect.width > 0 && rect.height > 0
+              || control instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(control));
+            return visible && !isSatisfied(control, searchRoots);
           });
 
           if (visibleEmpty) {
@@ -1415,6 +1559,67 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
 
       function clean(value: string | null | undefined) {
         return (value ?? "").replace(/\s+/g, " ").replace(/\*/g, "").trim().slice(0, 120);
+      }
+
+      function isInactiveFormBranch(control: Element) {
+        if (control.closest(".datasetField__row--sample") || control.hasAttribute("hidden")) {
+          return true;
+        }
+
+        if (control.parentElement?.closest("[hidden], [aria-hidden='true']")) {
+          return true;
+        }
+
+        const id = control.getAttribute("id") ?? "";
+        const name = control.getAttribute("name") ?? "";
+        return /(^|-)sample($|-)/i.test(id) || /(^|-)sample($|-)/i.test(name);
+      }
+
+      function getVisibleCustomSelectProxy(control: HTMLSelectElement) {
+        if (!isCustomSelectElement(control)) {
+          return undefined;
+        }
+
+        const candidates = [
+          control.nextElementSibling,
+          control.parentElement?.querySelector("[role='combobox']"),
+          control.parentElement?.querySelector(".select2 [role='combobox']"),
+          control.id ? getElementById(`select2-${control.id}-container`)?.closest("[role='combobox']") : null,
+          control.id ? document.querySelector(`.select2Container${CSS.escape(control.id)}`) : null,
+          control.id ? document.querySelector(`[aria-labelledby~="${CSS.escape(`${control.id}-label`)}"][role='combobox']`) : null
+        ];
+
+        for (const candidate of candidates) {
+          const element = candidate instanceof HTMLElement
+            ? candidate
+            : candidate instanceof Element
+              ? candidate.querySelector("[role='combobox']") as HTMLElement | null
+              : null;
+
+          if (element && isVisibleElement(element)) {
+            return element;
+          }
+        }
+
+        return undefined;
+      }
+
+      function getCustomSelectRenderedText(control: HTMLSelectElement) {
+        const proxy = getVisibleCustomSelectProxy(control);
+        const rendered = control.id ? getElementById(`select2-${control.id}-container`) : null;
+        return [
+          rendered?.textContent,
+          proxy?.textContent,
+          proxy?.getAttribute("title"),
+          proxy?.getAttribute("aria-valuetext")
+        ].filter(Boolean).join(" ");
+      }
+
+      function isCustomSelectElement(control: HTMLSelectElement) {
+        const className = String(control.getAttribute("class") ?? "");
+        return control.getAttribute("aria-hidden") === "true"
+          || /\b(select2-hidden-accessible|select2|autocomplete|combobox)\b/i.test(className)
+          || Boolean(control.parentElement?.querySelector(".select2, [role='combobox'], [aria-haspopup='true'], [aria-haspopup='listbox']"));
       }
 
       function findChoiceGroupLabel(control: HTMLInputElement) {
@@ -1624,6 +1829,8 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
   return dedupeLabels(labels);
 }
 
+// Automatically checks safe consent/terms/declaration controls when they are
+// clearly not marketing, relocation, sponsorship, or country-selection choices.
 export async function autoResolveConsentControls(page: Page) {
   let resolvedCount = 0;
 
@@ -1788,6 +1995,8 @@ export async function autoResolveConsentControls(page: Page) {
   return resolvedCount;
 }
 
+// Reads visible validation/error messages and invalid controls from the page,
+// excluding transient loading/status messages.
 export async function getVisibleValidationMessages(page: Page) {
   const messages: string[] = [];
 
@@ -1875,6 +2084,8 @@ export async function getVisibleValidationMessages(page: Page) {
   return dedupeLabels(messages).filter((message) => !isTransientStatusMessage(message));
 }
 
+// Detects whether a resume/CV file upload control or upload-method trigger is
+// visible on the page.
 export async function hasFileUpload(page: Page) {
   for (const frame of page.frames()) {
     const found = await frame.evaluate(() => {
@@ -2040,6 +2251,8 @@ export async function hasFileUpload(page: Page) {
   return false;
 }
 
+// Detects final submit controls while ignoring pages still blocked by login or
+// verification gates.
 export async function hasFinalSubmitControl(page: Page) {
   const checkpoint = await detectProtectedCheckpoint(page);
 
@@ -2083,6 +2296,8 @@ export async function hasFinalSubmitControl(page: Page) {
   }).catch(() => false);
 }
 
+// Scores visible controls that can move the application forward, excluding back,
+// cancel, add, final submit, and unsafe apply-start controls when not allowed.
 export async function detectNavigationCandidates(
   page: Page,
   observation: BrowserAgentObservation,
@@ -2092,6 +2307,7 @@ export async function detectNavigationCandidates(
 
   return observation.controls
     .filter((control) => !control.disabled)
+    .filter((control) => !isBackwardNavigationControl(control))
     .map((control) => {
       const text = normalizeKey(`${control.text} ${control.label}`);
       let score = 0;
@@ -2137,6 +2353,8 @@ export async function detectNavigationCandidates(
     .slice(0, 8);
 }
 
+// After a navigation click, polls until the page URL, fingerprint, progress, or
+// state changes, then reports whether the stage advanced.
 export async function waitForStageTransition(
   context: BrowserContext,
   page: Page,
@@ -2157,6 +2375,17 @@ export async function waitForStageTransition(
     const signatureAfter = await getStageSignature(activePage, observation);
 
     if (signatureAfter.fingerprint !== signatureBefore.fingerprint || signatureAfter.progressText !== signatureBefore.progressText || signatureAfter.url !== signatureBefore.url) {
+      if (isBackwardStageTransition(signatureBefore.progressText, signatureAfter.progressText)) {
+        return {
+          changed: false,
+          activePage,
+          reason: "The click moved to an earlier wizard step, so GradLaunch stopped instead of treating it as progress.",
+          signatureBefore,
+          signatureAfter,
+          outcome: "same_stage"
+        };
+      }
+
       const outcome = observation.pageState === "submit"
         ? "submit_ready"
         : observation.pageState === "review"
@@ -2187,6 +2416,31 @@ export async function waitForStageTransition(
   };
 }
 
+function isBackwardStageTransition(before?: string, after?: string) {
+  const beforeStep = extractProgressStep(before);
+  const afterStep = extractProgressStep(after);
+
+  return beforeStep !== undefined && afterStep !== undefined && afterStep < beforeStep;
+}
+
+function extractProgressStep(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.toLowerCase();
+  const explicit = normalized.match(/\bstep\s+(\d+)\b/) ?? normalized.match(/\b(\d+)\s+of\s+\d+\b/);
+
+  if (!explicit?.[1]) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(explicit[1], 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+// Clicks a final submit control when external submit is explicitly allowed by
+// configuration and the engine has reached ready_to_submit.
 export async function clickFinalSubmit(page: Page) {
   const labels = ["Submit application", "Submit Application", "Submit", "Apply"];
 
@@ -2215,7 +2469,18 @@ export async function clickFinalSubmit(page: Page) {
   }).catch(() => false);
 }
 
+// Chooses and clicks the best next/continue/review control for the current
+// stage, then verifies that the click actually caused a stage transition.
 export async function clickNextStageControl(context: BrowserContext, page: Page, options: { allowApplyStart: boolean }) {
+  const outstandingRequired = await getVisibleRequiredEmptyLabels(page);
+
+  if (outstandingRequired.length > 0) {
+    return {
+      clicked: false,
+      page
+    };
+  }
+
   const observation = await observeBrowserPage(page, await discoverVisibleFields(page));
   const signatureBefore = await getStageSignature(page, observation);
   const candidates = await detectNavigationCandidates(page, observation, options);
@@ -2243,6 +2508,20 @@ export async function clickNextStageControl(context: BrowserContext, page: Page,
   };
 }
 
+function isBackwardNavigationControl(control: ObservedControl) {
+  const text = normalizeKey(`${control.text} ${control.label}`);
+
+  if (!text) {
+    return false;
+  }
+
+  return /(^| )(back|previous|prev|return|cancel|close|discard|remove|add another|add)( |$)/.test(text)
+    || /^<\s*back\b/.test(control.text.trim().toLowerCase())
+    || /^‹\s*back\b/.test(control.text.trim().toLowerCase());
+}
+
+// Clicks a previously observed control by its injected GradLaunch control id,
+// returning a newly opened page if the click spawned one.
 async function clickObservedControl(context: BrowserContext, page: Page, controlId: string) {
   for (const frame of page.frames()) {
     const nextPagePromise = context.waitForEvent("page", { timeout: 1500 }).catch(() => undefined);
@@ -2266,6 +2545,8 @@ async function clickObservedControl(context: BrowserContext, page: Page, control
   return undefined;
 }
 
+// Detects the ATS platform from the hostname so platform-specific scoring hints
+// can be applied without hardcoding a whole site adapter.
 function resolveAtsAdapter(url: string): AtsAdapterHint | undefined {
   const hostname = safeHostname(url);
 
@@ -2292,6 +2573,8 @@ function resolveAtsAdapter(url: string): AtsAdapterHint | undefined {
   return undefined;
 }
 
+// Groups fields that belong to the same question/section, mainly for
+// radio/checkbox groups and questionnaire-style pages.
 function groupVisibleFields(visibleFields: VisibleField[]): BrowserFieldGroup[] {
   const groups = new Map<string, BrowserFieldGroup>();
 
@@ -2325,6 +2608,7 @@ function groupVisibleFields(visibleFields: VisibleField[]): BrowserFieldGroup[] 
     .slice(0, 8);
 }
 
+// Derives a readable group label from field context or the field label itself.
 function deriveFieldGroupLabel(field: VisibleField) {
   const context = field.context.replace(/\s+/g, " ").trim();
 
@@ -2340,6 +2624,8 @@ function deriveFieldGroupLabel(field: VisibleField) {
   return (label.split(":")[0]?.trim() ?? label).slice(0, 120);
 }
 
+// Classifies the observed browser page into a coarse state used by the strategy
+// layer: login, captcha, loading, resume upload, form fill, review, submit, etc.
 function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageState">): BrowserPageState {
   const text = normalizeKey([
     input.title,
@@ -2349,7 +2635,7 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
   ].join(" "));
   const hasVisibleFields = input.visibleFields.length > 0;
   const hasPasswordField = input.visibleFields.some((field) => field.inputType === "password" || /\bpassword\b/i.test(field.label));
-  const visibleFieldText = normalizeKey(input.visibleFields.map((field) => `${field.label} ${field.context}`).join(" "));
+  const visibleFieldText = normalizeKey(input.visibleFields.map((field) => `${field.label} ${field.placeholder ?? ""} ${field.name ?? ""} ${field.ariaLabel ?? ""} ${field.context}`).join(" "));
   const hasResumeMethodChoice = /\b(choose an option to apply|application method|application methods|how would you like to apply|apply with)\b/.test(text)
     && /\b(without resume|without cv|copy paste|copy and paste|from device|from computer|upload from device|upload resume|resume)\b/.test(text);
   const hasResumeUploadField = input.visibleFields.some((field) => field.inputType === "file")
@@ -2425,10 +2711,12 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
   return "unknown";
 }
 
+// Detects text that represents a final submit/send-application action.
 function isFinalSubmitText(value: string) {
   return /\b(submit application|submit my application|submit|send application|send my application)\b/i.test(value);
 }
 
+// Detects text that represents an initial apply/start-application action.
 function isApplyStartText(value: string) {
   return /\bapply\b|apply now|apply for this job|apply for this position/i.test(value);
 }

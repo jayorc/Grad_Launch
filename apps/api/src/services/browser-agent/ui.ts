@@ -16,6 +16,8 @@ type BotState = {
 const stopRequestedContexts = new WeakSet<BrowserContext>();
 const continueRequestedContexts = new WeakSet<BrowserContext>();
 
+// Clears a previous Quit/stop request from the browser context and live bot DOM
+// so a resumed run does not immediately stop because of stale UI state.
 export async function clearUserStopRequest(page: Page) {
   stopRequestedContexts.delete(page.context());
 
@@ -36,6 +38,8 @@ export async function clearUserStopRequest(page: Page) {
   }).catch(() => undefined);
 }
 
+// Clears a previous "continue" confirmation from every open page in the context
+// before a new manual handoff starts.
 export async function clearUserContinueRequest(page: Page) {
   continueRequestedContexts.delete(page.context());
 
@@ -58,6 +62,9 @@ export async function clearUserContinueRequest(page: Page) {
   }));
 }
 
+// Injects or updates the draggable GradLaunch live bot panel inside the current
+// browser page. It displays status, optional action buttons, and exposes stop /
+// continue callbacks back to the Playwright process.
 export async function updateLiveBot(
   page: Page,
   input: {
@@ -506,6 +513,8 @@ export async function updateLiveBot(
   }, input).catch(() => undefined);
 }
 
+// Checks whether the user clicked Quit in the live bot. The WeakSet catches
+// callback-based requests even if the page DOM later changes.
 export async function didUserRequestStop(page: Page) {
   if (stopRequestedContexts.has(page.context())) {
     return true;
@@ -520,6 +529,8 @@ export async function didUserRequestStop(page: Page) {
   }).catch(() => false);
 }
 
+// Verifies that the live bot panel is still mounted and visible on the current
+// page, so handoff loops can re-inject it after navigation or redirects.
 export async function isLiveBotMounted(page: Page) {
   return page.evaluate(() => {
     const root = document.getElementById("gradlaunch-live-bot");
@@ -539,6 +550,8 @@ export async function isLiveBotMounted(page: Page) {
   }).catch(() => false);
 }
 
+// Reads and consumes the user's explicit "I am logged in, continue" confirmation
+// across all pages in the browser context.
 export async function consumeUserContinueConfirmation(page: Page) {
   const contextConfirmed = continueRequestedContexts.has(page.context());
   const pageConfirmations = await Promise.all(page.context().pages().filter((candidate) => !candidate.isClosed()).map((candidate) => {

@@ -33,6 +33,9 @@ type UpdateSessionInput = {
 export class BrowserExecutionSessionService {
   constructor(private readonly repository = new AgentRepository()) {}
 
+  // Creates a new browser execution session or reuses the latest one for the
+  // application. This lets login/manual handoff runs stay resumable instead of
+  // losing context when the browser waits.
   async createOrReuse(input: CreateSessionInput & { sessionId?: string }) {
     const createdAt = nowIso();
     const existing = input.sessionId
@@ -66,6 +69,8 @@ export class BrowserExecutionSessionService {
     return this.repository.upsertBrowserExecutionSession(session);
   }
 
+  // Persists the latest browser execution status, planner snapshot, current URL,
+  // stage label, counts, and pending handoff so the UI can show live progress.
   async update(input: UpdateSessionInput) {
     if (!input.sessionId) {
       throw new Error("Browser execution session id is required.");
@@ -90,6 +95,8 @@ export class BrowserExecutionSessionService {
   }
 }
 
+// Converts planner task state into a compact UI timeline. If no planner exists
+// yet, it creates a single "browser session active" step.
 function buildSessionSteps(planner: PlannerCheckpoint | undefined, latestMessage: string) {
   if (!planner) {
     const steps: AgentTimelineStep[] = [
