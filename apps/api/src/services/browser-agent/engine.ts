@@ -1,14 +1,13 @@
 import { request as httpRequest } from "node:http";
-import { cp, lstat, mkdir, readFile, readlink, rm } from "node:fs/promises";
-import { basename, join, relative, sep } from "node:path";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import type { AgentHandoffKind, BrowserApplyReceipt } from "@gradlaunch/shared";
 import { chromium, type Browser, type BrowserContext, type Dialog, type Page } from "playwright-core";
-import { getBrowserWorkspaceStorageDir, getLoggedBrowserProfileDir, getManagedBrowserProfileDir } from "../../config/storage";
+import { getBrowserWorkspaceStorageDir, getManagedBrowserProfileDir } from "../../config/storage";
 import { nowIso } from "../../lib/time";
-import { runAutonomousStageFill } from "./autonomous-fill";
 import { buildStageAnswerPlan } from "./answer";
 import { evaluateStageReadiness } from "./eval";
-import { attachResume, continueAfterResumeUploadIfReady, fillFormField, resolveKnownRequiredChoice } from "./fill";
+import { attachResume, fillFormField } from "./fill";
 import { buildStageExecutionPlan } from "./plan";
 import {
   bumpPlannerRetries,
@@ -25,7 +24,6 @@ import {
   setPlannerStatus
 } from "./planner";
 import { reflectOnStageAnswers } from "./reflect";
-import { classifyRecovery, probeAndReobservePage } from "./strategy";
 import {
   autoResolveConsentControls,
   clickFinalSubmit,
@@ -43,40 +41,23 @@ import {
   hasFinalSubmitControl,
   observeBrowserPage
 } from "./observe";
-import type { BrowserAgentObservation, BrowserApplyInput, BrowserAvailability, BrowserFillField, HandoffRequest } from "./types";
+import type { BrowserApplyInput, BrowserAvailability, HandoffRequest } from "./types";
 import { BrowserExecutionSessionService } from "./session";
-import { clearUserContinueRequest, clearUserStopRequest, consumeUserContinueConfirmation, didUserRequestStop, isLiveBotMounted, updateLiveBot } from "./ui";
-import { dedupeLabels, normalizeKey, pathExists, writeBrowserDebug } from "./util";
+import { clearUserStopRequest, didUserRequestStop, updateLiveBot } from "./ui";
+import { pathExists, writeBrowserDebug } from "./util";
 
-// BrowserAgentEngine is the top-level browser runner. It owns the safe
-// sequence for a job application: open Chrome, detect protected gates, hand
-// login/CAPTCHA back to the user, fill one visible stage at a time, verify the
-// current page, and only then navigate forward.
 const defaultChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-
-type BrowserLaunchMode = "logged_cdp" | "logged_profile" | "logged_profile_clone" | "managed_cdp" | "managed_profile" | "ephemeral";
-type BrowserLaunchResult = {
-  browser: Browser | undefined;
-  context: BrowserContext;
-  keepContextOpen: boolean;
-  attachedToExistingBrowser: boolean;
-  launchMode: BrowserLaunchMode;
-};
 
 export class BrowserAgentEngine {
   private readonly executionSessions = new BrowserExecutionSessionService();
 
   async getAvailability(): Promise<BrowserAvailability> {
-    // Prefer an explicitly debuggable logged-in Chrome first. If that is not
-    // available, decide whether to use GradLaunch's persistent browser profile
-    // or block with a clear setup message. This keeps external portal logins
-    // in the browser, not in the LLM or API process.
-    const loggedCdpUrl = shouldPreferLoggedBrowser() ? await resolveLoggedChromeCdpUrl() : undefined;
+    const cdpUrl = await resolveManagedChromeCdpUrl();
 
-    if (loggedCdpUrl) {
+    if (cdpUrl) {
       return {
         available: true,
-        message: `Browser worker can attach to the logged Chrome session at ${loggedCdpUrl}.`
+        message: `Browser worker can attach to the managed GradLaunch browser session at ${cdpUrl}.`
       };
     }
 
@@ -87,69 +68,9 @@ export class BrowserAgentEngine {
       };
     }
 
-    const cdpUrl = await resolveManagedChromeCdpUrl();
     const chromePath = resolveChromePath();
-    const chromeExists = await pathExists(chromePath);
-    const loggedProfileDir = shouldPreferLoggedBrowser() ? getLoggedBrowserProfileDir() : undefined;
 
-    if (chromeExists && loggedProfileDir && await pathExists(loggedProfileDir)) {
-      const loggedProfileLocked = await isBrowserProfileLocked(loggedProfileDir, { clearStaleGradLaunchLock: true });
-
-      if (loggedProfileLocked) {
-        if (shouldUseLoggedProfileCloneOnLock()) {
-          return {
-            available: true,
-            chromePath,
-            message: `The controlled logged Chrome profile at ${loggedProfileDir} is locked, and profile cloning was explicitly enabled, so GradLaunch will open a controlled runtime copy.`
-          };
-        }
-
-        if (shouldRequireLoggedBrowser()) {
-          return {
-            available: false,
-            chromePath,
-            message: buildLockedLoggedProfileMessage(loggedProfileDir)
-          };
-        }
-
-        if (shouldAllowManagedFallbackOnLockedLoggedProfile()) {
-          return {
-            available: true,
-            chromePath,
-            message: `The controlled logged Chrome profile at ${loggedProfileDir} is already open without remote debugging, so GradLaunch will use the managed persistent profile and pause for login confirmation if needed.`
-          };
-        }
-
-        return {
-          available: false,
-          chromePath,
-          message: buildLockedLoggedProfileMessage(loggedProfileDir)
-        };
-      }
-
-      return {
-        available: true,
-        chromePath,
-        message: `Browser worker will open the controlled logged Chrome profile at ${loggedProfileDir}; login cookies from this GradLaunch-owned profile will persist across runs.`
-      };
-    }
-
-    if (shouldPreferLoggedBrowser() && shouldRequireLoggedBrowser()) {
-      return {
-        available: false,
-        chromePath,
-        message: `GradLaunch is configured to require a logged Chrome profile, but ${loggedProfileDir ?? "no logged profile directory"} is not available. Run npm run browser:prepare-logged-profile after logging into Chrome.`
-      };
-    }
-
-    if (cdpUrl) {
-      return {
-        available: true,
-        message: `Browser worker can attach to the managed GradLaunch browser session at ${cdpUrl}.`
-      };
-    }
-
-    if (!chromeExists) {
+    if (!(await pathExists(chromePath))) {
       return {
         available: false,
         chromePath,
@@ -165,9 +86,6 @@ export class BrowserAgentEngine {
   }
 
   async apply(input: BrowserApplyInput): Promise<BrowserApplyReceipt> {
-    // Every run starts with a planner checkpoint and a workspace. The planner
-    // is the durable "memory" of the browser run, while the workspace stores
-    // screenshots and debug logs that explain what happened after the fact.
     const availability = await this.getAvailability();
     const openedAt = nowIso();
     const screenshots: string[] = [];
@@ -201,25 +119,17 @@ export class BrowserAgentEngine {
     let context: BrowserContext | undefined;
     let keepContextOpen = false;
     let attachedToExistingBrowser = false;
-    let launchMode: BrowserLaunchMode = "ephemeral";
     let executionSessionId = input.executionSessionId;
-    const resumeUrl = sanitizeBrowserResumeUrl(input.planner?.currentUrl, input.job.sourceUrl);
+    const resumeUrl = sanitizeBrowserResumeUrl(input.planner?.currentUrl);
 
     try {
-      ({ browser, context, keepContextOpen, attachedToExistingBrowser, launchMode } = await launchContext(availability.chromePath));
+      ({ browser, context, keepContextOpen, attachedToExistingBrowser } = await launchContext(availability.chromePath));
       installContextSafety(context, workspacePath);
       console.log(
-        `[GradLaunch][Browser] Mode=${launchMode} headless=${process.env.BROWSER_HEADLESS === "true"}`
+        `[GradLaunch][Browser] Mode=${attachedToExistingBrowser ? "attached_cdp" : keepContextOpen ? "persistent_profile" : "ephemeral"} headless=${process.env.BROWSER_HEADLESS === "true"}`
       );
-      await writeBrowserDebug(workspacePath, "browser-launch-mode", {
-        mode: launchMode,
-        attachedToExistingBrowser,
-        keepContextOpen,
-        preferLoggedProfile: shouldPreferLoggedBrowser()
-      });
       const page = await openOrResumePage(context, input.job.sourceUrl, resumeUrl);
       await clearUserStopRequest(page);
-      await clearUserContinueRequest(page);
       if (input.studentId && input.applicationId && input.runId) {
         const session = await this.executionSessions.createOrReuse({
           sessionId: executionSessionId,
@@ -243,7 +153,10 @@ export class BrowserAgentEngine {
       page.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
       markPlannerTask(planner, "open_job_page", "running", "Opening the target application URL in a new Chrome tab.");
       setPlannerStatus(planner, "running", "Opening the job page in a new Chrome tab.");
-      await navigateToJobPage(page, resumeUrl ?? input.job.sourceUrl, workspacePath);
+      await page.goto(resumeUrl ?? input.job.sourceUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000)
+      });
       let activePage = await getActivePage(context, page);
       markPlannerTask(planner, "open_job_page", "completed", "Job page opened successfully in a visible Chrome session.");
       planner.currentUrl = activePage.url();
@@ -269,73 +182,7 @@ export class BrowserAgentEngine {
       });
       await clickSoftGate(activePage);
 
-      // Before any filling starts, check for login/CAPTCHA/protected screens.
-      // Login handoff is intentionally a hard pause: the agent must not keep
-      // typing while the user is logging in, because that is how context gets
-      // lost and fields get overwritten.
-      let initialCheckpoint = await detectProtectedCheckpoint(activePage);
-
-      if (initialCheckpoint.blocked && initialCheckpoint.kind === "login") {
-        await updateExecutionSession(this.executionSessions, executionSessionId, {
-          status: "waiting",
-          latestMessage: initialCheckpoint.reason ?? "The browser session is waiting for login in the controlled Chrome window.",
-          planner,
-          currentUrl: activePage.url(),
-          currentStageIndex: 0,
-          currentStageLabel: "Login required",
-          workspacePath,
-          lastStageSignature: await getStageSignature(activePage),
-          pendingHandoff: {
-            kind: "login",
-            title: "Login required",
-            detail: "Complete login in this Chrome window, then click the GradLaunch continue button.",
-            requestedAt: nowIso()
-          }
-        });
-        const loginHandoff = await waitForLoginConfirmation({
-          context,
-          page: activePage,
-          stageIndex: 0,
-          workspacePath,
-          screenshots,
-          planner,
-          reason: initialCheckpoint.reason ?? "Please sign in in this controlled Chrome window. When the job form is visible, click I am logged in, continue.",
-          handoffKind: "login",
-          sourceUrl: input.job.sourceUrl
-        });
-        activePage = loginHandoff.activePage;
-        initialCheckpoint = await detectProtectedCheckpoint(activePage);
-
-        if (!loginHandoff.resolved) {
-          await updateExecutionSession(this.executionSessions, executionSessionId, {
-            status: "waiting",
-            latestMessage: "The browser session is waiting for login confirmation before filling starts.",
-            planner,
-            currentUrl: activePage.url(),
-            currentStageIndex: 0,
-            currentStageLabel: "Login required",
-            workspacePath,
-            lastStageSignature: await getStageSignature(activePage),
-            pendingHandoff: {
-              kind: "login",
-              title: "Login required",
-              detail: "Login still needs to be completed or confirmed before GradLaunch can fill the form.",
-              requestedAt: nowIso()
-            }
-          });
-          return {
-            status: "handoff_required",
-            sourceUrl: input.job.sourceUrl,
-            openedAt,
-            completedAt: nowIso(),
-            filledLabels: [],
-            skippedLabels: input.fields.map((field) => field.label),
-            screenshots,
-            message: "GradLaunch opened the job URL in Chrome and is waiting for you to finish login, click the in-browser continue button, and expose the application form.",
-            planner
-          };
-        }
-      }
+      const initialCheckpoint = await detectProtectedCheckpoint(activePage);
 
       if (initialCheckpoint.blocked) {
         await updateExecutionSession(this.executionSessions, executionSessionId, {
@@ -407,12 +254,7 @@ export class BrowserAgentEngine {
       let resumeUploaded = false;
       let lastFingerprint = "";
       let sameScreenAttempts = 0;
-      const seenStageVisitKeys = new Set<string>();
-      const resumeUploadAttemptsByStage = new Map<string, number>();
 
-      // A job portal can be a multi-step wizard. This loop treats each visible
-      // screen as a stage, with loop guards so the bot does not bounce backward
-      // and forward forever when a site refuses navigation.
       for (let stageIndex = 0; stageIndex < maxStages; stageIndex += 1) {
         if (!hasOpenPage(context)) {
           return await handleGracefulStop({
@@ -458,60 +300,7 @@ export class BrowserAgentEngine {
         await saveScreenshot(activePage, workspacePath, screenshots, `browser-stage-${stageIndex + 1}-start.png`);
         await clickSoftGate(activePage);
 
-        // Protected checkpoints can appear mid-application after a "Continue"
-        // click. Re-check every stage and pause again instead of trying to
-        // fill across a login wall.
-        let protectedCheckpoint = await detectProtectedCheckpoint(activePage);
-
-        if (protectedCheckpoint.blocked && protectedCheckpoint.kind === "login") {
-          await updateExecutionSession(this.executionSessions, executionSessionId, {
-            status: "waiting",
-            latestMessage: protectedCheckpoint.reason ?? `Stage ${stageIndex + 1} is waiting for login in the controlled Chrome window.`,
-            planner,
-            currentUrl: activePage.url(),
-            currentStageIndex: stageIndex,
-            currentStageLabel: `Stage ${stageIndex + 1}`,
-            workspacePath,
-            lastStageSignature: await getStageSignature(activePage),
-            filledCount: filledLabels.length,
-            manualCount: skippedLabels.length,
-            pendingHandoff: {
-              kind: "login",
-              title: "Login required",
-              detail: "Complete login in this Chrome window, then click the GradLaunch continue button.",
-              requestedAt: nowIso()
-            }
-          });
-          const loginHandoff = await waitForLoginConfirmation({
-            context,
-            page: activePage,
-            stageIndex,
-            workspacePath,
-            screenshots,
-            planner,
-            reason: protectedCheckpoint.reason ?? "Please sign in in this controlled Chrome window. When the job form is visible, click I am logged in, continue.",
-            handoffKind: "login",
-            sourceUrl: input.job.sourceUrl
-          });
-          activePage = loginHandoff.activePage;
-          protectedCheckpoint = await detectProtectedCheckpoint(activePage);
-
-          if (!loginHandoff.resolved) {
-            return {
-              status: "handoff_required",
-              sourceUrl: input.job.sourceUrl,
-              openedAt,
-              completedAt: nowIso(),
-              filledLabels,
-              skippedLabels,
-              screenshots,
-              message: "The job portal still needs login confirmation before GradLaunch can continue filling.",
-              planner
-            };
-          }
-
-          continue;
-        }
+        const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
 
         if (protectedCheckpoint.blocked) {
           await updateExecutionSession(this.executionSessions, executionSessionId, {
@@ -561,11 +350,8 @@ export class BrowserAgentEngine {
           continue;
         }
 
-        // Observation and planning are separated on purpose. observe.ts reads
-        // the screen; plan.ts/strategy.ts decide what kind of page it is and
-        // which action is safest.
-        let stageVisibleFields = await discoverVisibleFields(activePage);
-        let observation = await observeBrowserPage(activePage, stageVisibleFields);
+        const visibleFields = await discoverVisibleFields(activePage);
+        const observation = await observeBrowserPage(activePage, visibleFields);
         const stageSignature = await getStageSignature(activePage, observation);
         const stagePlan = buildStageExecutionPlan({
           observation,
@@ -573,17 +359,16 @@ export class BrowserAgentEngine {
           submitRequested: input.submit,
           allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
         });
-        const requiredLabels = stageVisibleFields.filter((field) => field.required).map((field) => field.label);
+        const requiredLabels = visibleFields.filter((field) => field.required).map((field) => field.label);
         recordPlannerObservation({
           planner,
           page: activePage,
           stageIndex,
-          visibleFieldLabels: stageVisibleFields.map((field) => field.label),
+          visibleFieldLabels: visibleFields.map((field) => field.label),
           requiredFieldLabels: requiredLabels
         });
 
         const fingerprint = await getPageFingerprint(activePage);
-        seenStageVisitKeys.add(stageVisitKey(stageSignature));
 
         if (fingerprint === lastFingerprint) {
           sameScreenAttempts += 1;
@@ -598,9 +383,7 @@ export class BrowserAgentEngine {
           action: stagePlan.action,
           confidence: stagePlan.confidence,
           reason: stagePlan.reason,
-          checklist: stagePlan.checklist,
-          classification: stagePlan.classification,
-          rankedActions: stagePlan.rankedActions
+          checklist: stagePlan.checklist
         });
         await updateLiveBot(activePage, {
           step: `Stage ${stageIndex + 1}`,
@@ -620,174 +403,7 @@ export class BrowserAgentEngine {
           manualCount: skippedLabels.length
         });
 
-        let stageAction = stagePlan.action;
-        let activeClassification = stagePlan.classification;
-
-        if (stageAction === "ask_user" && (observation.pageState === "login" || stagePlan.classification?.state === "login" || observation.pageState === "account_gate")) {
-          const loginHandoff = await waitForLoginConfirmation({
-            context,
-            page: activePage,
-            stageIndex,
-            workspacePath,
-            screenshots,
-            planner,
-            reason: "Sign in is required. Use Google/email in this controlled Chrome window, then click I am logged in, continue when the job form is visible.",
-            handoffKind: "login",
-            sourceUrl: input.job.sourceUrl
-          });
-          activePage = loginHandoff.activePage;
-
-          if (!loginHandoff.resolved) {
-            return {
-              status: "handoff_required",
-              sourceUrl: input.job.sourceUrl,
-              openedAt,
-              completedAt: nowIso(),
-              filledLabels,
-              skippedLabels,
-              screenshots,
-              message: "The job portal still needs login before GradLaunch can continue.",
-              planner
-            };
-          }
-
-          markPlannerTask(planner, "authenticate_if_needed", "running", "Login gate cleared after user confirmation. Resuming autonomous execution.");
-          setPlannerStatus(planner, "running", "Login gate cleared after user confirmation.");
-          continue;
-        }
-
-        if (stageAction === "ask_user") {
-          const handoff = await waitForHumanIntervention({
-            context,
-            page: activePage,
-            stageIndex,
-            workspacePath,
-            screenshots,
-            planner,
-            reason: stagePlan.reason,
-            handoffKind: stagePlan.classification?.state === "captcha" ? "captcha" : "review"
-          });
-          activePage = handoff.activePage;
-
-          if (!handoff.resolved) {
-            return {
-              status: "handoff_required",
-              sourceUrl: input.job.sourceUrl,
-              openedAt,
-              completedAt: nowIso(),
-              filledLabels,
-              skippedLabels,
-              screenshots,
-              message: stagePlan.reason,
-              planner
-            };
-          }
-
-          continue;
-        }
-
-        if (stageAction === "wait") {
-          await updateLiveBot(activePage, {
-            step: `Stage ${stageIndex + 1}`,
-            mood: "thinking",
-            message: "The portal still looks busy, so I am waiting and re-reading instead of treating the loader as a validation error."
-          });
-          await activePage.waitForTimeout(Number(process.env.BROWSER_DYNAMIC_WAIT_MS ?? 1400)).catch(() => undefined);
-          continue;
-        }
-
-        if (stageAction === "explore") {
-          // Exploration mode only performs safe probes: wait, dismiss soft
-          // gates, scroll, and re-observe. It should not submit or navigate
-          // blindly when the page classification is weak.
-          const probe = await probeAndReobservePage({
-            page: activePage,
-            workspacePath,
-            stageIndex
-          });
-          activePage = await getActivePage(context, activePage);
-
-          if (probe.protectedCheckpoint.blocked) {
-            const handoff = await waitForHumanIntervention({
-              context,
-              page: activePage,
-              stageIndex,
-              workspacePath,
-              screenshots,
-              planner,
-              reason: probe.protectedCheckpoint.reason ?? "Manual attention is required before GradLaunch can continue.",
-              handoffKind: mapCheckpointToHandoff(probe.protectedCheckpoint.kind)
-            });
-            activePage = handoff.activePage;
-
-            if (!handoff.resolved) {
-              return {
-                status: "handoff_required",
-                sourceUrl: input.job.sourceUrl,
-                openedAt,
-                completedAt: nowIso(),
-                filledLabels,
-                skippedLabels,
-                screenshots,
-                message: probe.protectedCheckpoint.reason ?? "The page still needs manual attention.",
-                planner
-              };
-            }
-
-            continue;
-          }
-
-          stageVisibleFields = probe.visibleFields;
-          observation = probe.observation;
-          activeClassification = probe.classification;
-
-          if (probe.uploadVisible && input.resume?.storagePath && await pathExists(input.resume.storagePath)) {
-            stageAction = "upload_resume";
-          } else if (stageVisibleFields.length > 0) {
-            stageAction = "fill";
-          } else if (["review", "submit"].includes(probe.classification.state)) {
-            stageAction = "stop";
-          } else if (probe.classification.state === "start") {
-            stageAction = "click_next";
-          } else {
-            await updateLiveBot(activePage, {
-              step: `Stage ${stageIndex + 1}`,
-              mood: "waiting",
-              message: "I safely probed the page but still could not identify a confident form action."
-            });
-            setPlannerStatus(planner, "needs_review", "Safe exploration did not reveal a confident form action.");
-            return {
-              status: "needs_manual_review",
-              sourceUrl: input.job.sourceUrl,
-              openedAt,
-              completedAt: nowIso(),
-              filledLabels,
-              skippedLabels,
-              screenshots,
-              message: "GradLaunch safely explored the page but could not confidently decide the next form action.",
-              planner
-            };
-          }
-        }
-
-        // If the same non-fillable screen repeats, stop instead of looping.
-        // Fillable screens are exempt because the autonomous fill/repair loop
-        // may legitimately need multiple passes on the same page.
-        const shouldPauseForSameScreenLoop = sameScreenAttempts > loopThreshold
-          && stageAction !== "fill"
-          && stageVisibleFields.length === 0;
-
-        if (sameScreenAttempts > loopThreshold && !shouldPauseForSameScreenLoop) {
-          await writeBrowserDebug(workspacePath, "same-screen-loop-guard-deferred", {
-            stageIndex,
-            sameScreenAttempts,
-            stageAction,
-            visibleFieldCount: stageVisibleFields.length,
-            reason: "The same page is still fillable, so GradLaunch will continue field repair instead of pausing as a navigation loop."
-          });
-        }
-
-        if (shouldPauseForSameScreenLoop) {
+        if (sameScreenAttempts > loopThreshold) {
           const message = `The agent saw the same screen repeatedly after ${sameScreenAttempts + 1} attempts and paused to avoid looping.`;
           bumpPlannerRetries(planner, "retry_alternative_path", message, activePage, stageIndex);
           setPlannerStatus(planner, "needs_review", message);
@@ -816,64 +432,7 @@ export class BrowserAgentEngine {
           };
         }
 
-        if (stageAction === "stop") {
-          await updateLiveBot(activePage, {
-            step: "Review Ready",
-            mood: "done",
-            message: "This page looks like a review or submit checkpoint, so I am pausing instead of navigating away."
-          });
-          markPlannerTask(planner, "reach_submit_gate", "completed", "Reached a review/submit checkpoint safely.");
-          markPlannerTask(planner, "save_checkpoint", "completed", "Saved planner state at the review checkpoint.");
-          setPlannerStatus(planner, "completed", "Planner paused at the review/submit checkpoint.");
-          recordPlannerStageOutcome({
-            planner,
-            page: activePage,
-            stageIndex,
-            outcome: "review",
-            filledFieldLabels: filledLabels
-          });
-          keepContextOpen = shouldKeepBrowserOpenForReview();
-          await maybeKeepBrowserOpen(context);
-          await saveScreenshot(activePage, workspacePath, screenshots, "browser-filled.png");
-          await updateExecutionSession(this.executionSessions, executionSessionId, {
-            status: "review_ready",
-            latestMessage: "The form is ready for review in the open browser.",
-            planner,
-            currentUrl: activePage.url(),
-            currentStageIndex: stageIndex,
-            currentStageLabel: `Stage ${stageIndex + 1}`,
-            workspacePath,
-            lastStageSignature: await getStageSignature(activePage),
-            browserStatus: "filled",
-            filledCount: filledLabels.length,
-            manualCount: skippedLabels.length,
-            pendingHandoff: undefined
-          });
-          return {
-            status: "filled",
-            sourceUrl: input.job.sourceUrl,
-            openedAt,
-            completedAt: nowIso(),
-            filledLabels,
-            skippedLabels,
-            screenshots,
-            message: "The form is filled and paused at a review or submit checkpoint.",
-            planner
-          };
-        }
-
-        // Resume upload is attempted before normal text/choice filling because
-        // many portals parse the resume and then reveal the real application
-        // form. The upload completion wait is limited so a stuck upload does
-        // not trap the entire run.
-        const resumeAvailableOnDisk = Boolean(input.resume?.storagePath && await pathExists(input.resume.storagePath));
-        const shouldAttemptResumeUpload = Boolean(
-          !resumeUploaded
-          && resumeAvailableOnDisk
-          && (stageAction === "upload_resume" || await hasFileUpload(activePage))
-        );
-
-        if (shouldAttemptResumeUpload && input.resume?.storagePath) {
+        if (!resumeUploaded && input.resume?.storagePath && await pathExists(input.resume.storagePath) && await hasFileUpload(activePage)) {
           if (await didUserRequestStop(activePage)) {
             return await handleGracefulStop({
               reason: "GradLaunch stopped because you clicked Quit in the live bot.",
@@ -901,94 +460,10 @@ export class BrowserAgentEngine {
             stageIndex,
             kind: "upload_resume",
             source: "heuristic",
-            reason: stageAction === "upload_resume"
-              ? "The page was classified as a resume upload stage."
-              : "Resume upload field detected on this screen.",
+            reason: "Resume upload field detected on this screen.",
             fieldLabels: ["Resume upload"]
           });
-          await writeBrowserDebug(workspacePath, "resume-upload-attempt", {
-            stageIndex,
-            resumePath: input.resume.storagePath,
-            requiresTransition: isResumeMethodChoiceObservation(observation)
-          });
           resumeUploaded = await attachResume(activePage, input.resume.storagePath);
-          await writeBrowserDebug(workspacePath, "resume-upload-result", {
-            stageIndex,
-            uploaded: resumeUploaded
-          });
-
-          if (resumeUploaded && isResumeMethodChoiceObservation(observation)) {
-            const stageKey = `${stageSignature.url}:${stageSignature.progressText ?? ""}:${stageSignature.controlLabels.join("|")}`;
-            const attempts = (resumeUploadAttemptsByStage.get(stageKey) ?? 0) + 1;
-            resumeUploadAttemptsByStage.set(stageKey, attempts);
-            await updateLiveBot(activePage, {
-              step: `Stage ${stageIndex + 1}`,
-              mood: "thinking",
-              message: "Resume selected. Waiting for the portal to process it and open the next application step."
-            });
-            const completion = await waitForResumeUploadCompletion({
-              context,
-              page: activePage,
-              stageIndex,
-              planner,
-              workspacePath,
-              resumePath: input.resume.storagePath,
-              baselineSignature: stageSignature
-            });
-            activePage = completion.activePage;
-            await writeBrowserDebug(workspacePath, "resume-upload-completion", {
-              stageIndex,
-              completed: completion.completed,
-              reason: completion.reason,
-              attempts
-            });
-
-            if (completion.completed) {
-              if (!seenFilled.has("resume upload")) {
-                seenFilled.add("resume upload");
-                filledLabels.push("Resume upload");
-              }
-
-              continue;
-            }
-
-            resumeUploaded = false;
-
-            if (attempts < 2) {
-              await updateLiveBot(activePage, {
-                step: `Stage ${stageIndex + 1}`,
-                mood: "acting",
-                message: "The portal did not move after the first upload attempt, so I am retrying the From Device upload path once."
-              });
-              continue;
-            }
-
-            const message = `GradLaunch selected the resume upload path, but the portal stayed on the same application-method screen: ${completion.reason}`;
-            setPlannerStatus(planner, "needs_review", message);
-            await updateExecutionSession(this.executionSessions, executionSessionId, {
-              status: "resumable",
-              latestMessage: message,
-              planner,
-              currentUrl: activePage.url(),
-              currentStageIndex: stageIndex,
-              currentStageLabel: `Stage ${stageIndex + 1}`,
-              workspacePath,
-              lastStageSignature: await getStageSignature(activePage),
-              filledCount: filledLabels.length,
-              manualCount: skippedLabels.length
-            });
-            return {
-              status: "needs_manual_review",
-              sourceUrl: input.job.sourceUrl,
-              openedAt,
-              completedAt: nowIso(),
-              filledLabels,
-              skippedLabels,
-              screenshots,
-              message,
-              planner
-            };
-          }
 
           if (resumeUploaded && !seenFilled.has("resume upload")) {
             seenFilled.add("resume upload");
@@ -997,360 +472,89 @@ export class BrowserAgentEngine {
         }
 
         let answerPlan: Awaited<ReturnType<typeof buildStageAnswerPlan>> | undefined;
-        let failedRequiredAfterRetries: BrowserFillField[] = [];
 
-        if (stageAction === "fill" && stageVisibleFields.length > 0) {
-          // The autonomous solver is intentionally stronger than a single
-          // pass. It builds answers, fills by field type, verifies committed
-          // values, repairs failed fields, and returns any remaining blockers.
-          const autonomousFill = await runAutonomousStageFill({
-            page: activePage,
-            stageIndex,
-            visibleFields: stageVisibleFields,
-            baseFields: input.fields,
+        if (stagePlan.action === "fill" && visibleFields.length > 0) {
+          answerPlan = await buildStageAnswerPlan({
             job: input.job,
+            visibleFields,
+            baseFields: input.fields,
             student: input.student,
             memory: input.memory,
             resumeText: input.resume?.extractedText,
-            workspacePath,
-            shouldStop: () => didUserRequestStop(activePage)
+            workspacePath
+          });
+          recordPlannerDecision({
+            planner,
+            page: activePage,
+            stageIndex,
+            kind: plannerActionFromBrowserAction("fill"),
+            source: answerPlan.usedLlm ? "llm" : "heuristic",
+            reason: answerPlan.summary ?? "Visible fields detected, so the agent is filling the current stage.",
+            fieldLabels: answerPlan.answers.map((field) => field.label)
+          });
+          await updateLiveBot(activePage, {
+            step: `Stage ${stageIndex + 1}`,
+            mood: "acting",
+            message: answerPlan.summary ?? `Filling ${answerPlan.answers.length} mapped answers on this stage.`
           });
 
-          if (autonomousFill.stopped) {
-            return await handleGracefulStop({
-              reason: "GradLaunch stopped because you clicked Quit in the live bot.",
-              input,
-              openedAt,
-              screenshots,
-              planner,
-              workspacePath,
-              executionSessions: this.executionSessions,
-              executionSessionId,
-              activePage,
-              filledLabels,
-              skippedLabels,
-              stageIndex
-            });
-          }
+          for (const field of answerPlan.answers) {
+            if (await didUserRequestStop(activePage)) {
+              return await handleGracefulStop({
+                reason: "GradLaunch stopped because you clicked Quit in the live bot.",
+                input,
+                openedAt,
+                screenshots,
+                planner,
+                workspacePath,
+                executionSessions: this.executionSessions,
+                executionSessionId,
+                activePage,
+                filledLabels,
+                skippedLabels,
+                stageIndex
+              });
+            }
 
-          answerPlan = autonomousFill.answerPlan;
-          failedRequiredAfterRetries = autonomousFill.failedFields;
-          stageVisibleFields = autonomousFill.visibleFields;
+            const filled = await fillFormField(activePage, field);
+            const key = field.label.toLowerCase().trim();
 
-          if (!answerPlan) {
-            await writeBrowserDebug(workspacePath, "autonomous-fill-no-plan", {
-              stageIndex,
-              visibleFieldCount: autonomousFill.visibleFields.length
-            });
-          } else {
-            recordPlannerDecision({
-              planner,
-              page: activePage,
-              stageIndex,
-              kind: plannerActionFromBrowserAction("fill"),
-              source: answerPlan.usedLlm ? "llm" : "heuristic",
-              reason: answerPlan.summary ?? "The autonomous form solver mapped and filled the current stage.",
-              fieldLabels: answerPlan.answers.map((field) => field.label)
-            });
-            await updateLiveBot(activePage, {
-              step: `Stage ${stageIndex + 1}`,
-              mood: "acting",
-              message: answerPlan.summary ?? `Autonomous fill verified ${autonomousFill.attempts.filter((attempt) => attempt.verified).length} field answer(s) on this stage.`
-            });
-          }
-
-          for (const attempt of autonomousFill.attempts) {
-            const key = attempt.field.label.toLowerCase().trim();
-            const verified = attempt.verified;
-            await writeBrowserDebug(workspacePath, verified ? "filled-field" : "failed-to-fill-field", {
-              stageIndex,
-              round: attempt.round,
-              fieldId: attempt.field.fieldId,
-              label: attempt.field.label,
-              inputType: attempt.field.inputType,
-              alreadySatisfied: attempt.alreadySatisfied,
-              valuePreview: attempt.field.value.length > 80 ? `${attempt.field.value.slice(0, 77)}...` : attempt.field.value
-            });
-
-            if (verified) {
+            if (filled) {
               if (!seenFilled.has(key)) {
                 seenFilled.add(key);
-                filledLabels.push(attempt.field.label);
+                filledLabels.push(field.label);
               }
             } else if (!seenSkipped.has(key)) {
               seenSkipped.add(key);
-              skippedLabels.push(attempt.field.label);
+              skippedLabels.push(field.label);
             }
-          }
-
-          if (autonomousFill.outstandingRequired.length > 0 || autonomousFill.validationMessages.length > 0) {
-            await writeBrowserDebug(workspacePath, "autonomous-fill-blockers", {
-              stageIndex,
-              outstandingRequired: autonomousFill.outstandingRequired,
-              validationMessages: autonomousFill.validationMessages,
-              failedLabels: failedRequiredAfterRetries.map((field) => field.label)
-            });
           }
 
           await autoResolveConsentControls(activePage);
         }
 
-        // Do not click Continue immediately after filling. First re-read the
-        // live DOM for required fields, validation messages, and pending file
-        // uploads. This is the guard that prevents leaving an incomplete page.
         const submitVisible = await hasFinalSubmitControl(activePage);
         let outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
         let validationMessages = await getVisibleValidationMessages(activePage);
-        let uploadStillPending = Boolean(
+        const uploadStillPending = Boolean(
           input.resume?.storagePath
           && await pathExists(input.resume.storagePath)
           && await hasFileUpload(activePage)
           && !resumeUploaded
         );
 
-        if (uploadStillPending && input.resume?.storagePath) {
-          await writeBrowserDebug(workspacePath, "resume-upload-retry-before-evaluation", {
-            stageIndex,
-            resumePath: input.resume.storagePath
-          });
-          resumeUploaded = await attachResume(activePage, input.resume.storagePath);
-          await writeBrowserDebug(workspacePath, "resume-upload-retry-result", {
-            stageIndex,
-            uploaded: resumeUploaded
-          });
-          uploadStillPending = Boolean(
-            input.resume?.storagePath
-            && await pathExists(input.resume.storagePath)
-            && await hasFileUpload(activePage)
-            && !resumeUploaded
-          );
-
-          if (resumeUploaded && !seenFilled.has("resume upload")) {
-            seenFilled.add("resume upload");
-            filledLabels.push("Resume upload");
-          }
-
-          if (resumeUploaded) {
-            outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
-            validationMessages = await getVisibleValidationMessages(activePage);
-          }
-        }
-
         if (uploadStillPending && !outstandingRequired.some((label) => label.toLowerCase().includes("resume upload"))) {
           outstandingRequired = [...outstandingRequired, "Resume upload"];
         }
 
-        let completionGuardLabels: string[] = [];
-        const guardedReadiness = await applyCurrentPageCompletionGuard({
-          page: activePage,
-          failedFields: failedRequiredAfterRetries,
-          outstandingRequired,
-          workspacePath,
-          stageIndex
-        });
-        outstandingRequired = guardedReadiness.outstandingRequired;
-        completionGuardLabels = guardedReadiness.guardLabels;
-
         let evaluation = evaluateStageReadiness({
-          visibleFields: stageVisibleFields,
+          visibleFields,
           outstandingRequired,
           validationMessages,
           submitVisible,
           submitRequested: input.submit,
           allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
         });
-        let recoveryPlan = classifyRecovery({
-          classification: activeClassification,
-          outstandingRequired,
-          validationMessages,
-          uploadStillPending,
-          failedFieldCount: failedRequiredAfterRetries.length
-        });
-        await writeBrowserDebug(workspacePath, "recovery-plan", {
-          stageIndex,
-          kind: recoveryPlan.kind,
-          confidence: recoveryPlan.confidence,
-          reason: recoveryPlan.reason,
-          actions: recoveryPlan.actions
-        });
-
-        if (recoveryPlan.kind === "network_delay") {
-          await updateLiveBot(activePage, {
-            step: `Stage ${stageIndex + 1}`,
-            mood: "thinking",
-            message: "The page appears to be processing changes, so I am waiting and re-scanning before deciding."
-          });
-          await activePage.waitForTimeout(Number(process.env.BROWSER_DYNAMIC_WAIT_MS ?? 1400)).catch(() => undefined);
-          continue;
-        }
-
-        if (evaluation.status === "needs_user" || evaluation.status === "needs_retry") {
-          const repairedKnownChoice = await resolveKnownRequiredChoice(activePage, [
-            ...evaluation.missingRequiredLabels,
-            ...evaluation.validationMessages
-          ]);
-
-          if (repairedKnownChoice) {
-            await writeBrowserDebug(workspacePath, "known-choice-required-repair-result", {
-              stageIndex,
-              repaired: true,
-              blockers: [
-                ...evaluation.missingRequiredLabels,
-                ...evaluation.validationMessages
-              ]
-            });
-            outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
-            validationMessages = await getVisibleValidationMessages(activePage);
-            evaluation = evaluateStageReadiness({
-              visibleFields: stageVisibleFields,
-              outstandingRequired,
-              validationMessages,
-              submitVisible: await hasFinalSubmitControl(activePage),
-              submitRequested: input.submit,
-              allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
-            });
-            recoveryPlan = classifyRecovery({
-              classification: activeClassification,
-              outstandingRequired,
-              validationMessages,
-              uploadStillPending,
-              failedFieldCount: failedRequiredAfterRetries.length
-            });
-          }
-        }
-
-        if (answerPlan && evaluation.status === "needs_user") {
-          const autocompleteRepairs = answerPlan.answers.filter((field) => {
-            const label = field.label.toLowerCase();
-            const missing = evaluation.missingRequiredLabels.some((missingLabel) => {
-              const normalizedMissing = missingLabel.toLowerCase();
-              return normalizedMissing.includes(label) || label.includes(normalizedMissing);
-            });
-
-            return missing && (
-              field.inputType === "combobox"
-              || /\b(city|location|place|residence|school|university|college)\b/i.test(`${field.label} ${field.value}`)
-            );
-          });
-
-          if (autocompleteRepairs.length > 0) {
-            await writeBrowserDebug(workspacePath, "autocomplete-required-repair-start", {
-              stageIndex,
-              missingRequiredLabels: evaluation.missingRequiredLabels,
-              fieldLabels: autocompleteRepairs.map((field) => field.label)
-            });
-
-            for (const field of autocompleteRepairs) {
-              await fillFormField(activePage, field);
-              await activePage.waitForTimeout(450).catch(() => undefined);
-            }
-
-            outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
-            validationMessages = await getVisibleValidationMessages(activePage);
-            evaluation = evaluateStageReadiness({
-              visibleFields: stageVisibleFields,
-              outstandingRequired,
-              validationMessages,
-              submitVisible,
-              submitRequested: input.submit,
-              allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
-            });
-            await writeBrowserDebug(workspacePath, "autocomplete-required-repair-result", {
-              stageIndex,
-              status: evaluation.status,
-              missingRequiredLabels: evaluation.missingRequiredLabels,
-              validationMessages: evaluation.validationMessages
-            });
-          }
-        }
-
-        if (answerPlan && (evaluation.status === "needs_user" || evaluation.status === "needs_retry")) {
-          const choiceRepairs = answerPlan.answers.filter((field) => {
-            if (field.inputType !== "radio" && field.inputType !== "checkbox") {
-              return false;
-            }
-
-            const fieldLabel = field.label.toLowerCase();
-            const blockerText = [...evaluation.missingRequiredLabels, ...evaluation.validationMessages].join(" ").toLowerCase();
-
-            return blockerText.includes(fieldLabel)
-              || fieldLabel.includes(blockerText)
-              || /\b(this field is required|there are some errors|please correct)\b/i.test(blockerText);
-          });
-
-          if (choiceRepairs.length > 0) {
-            await writeBrowserDebug(workspacePath, "choice-required-repair-start", {
-              stageIndex,
-              missingRequiredLabels: evaluation.missingRequiredLabels,
-              validationMessages: evaluation.validationMessages,
-              fieldLabels: choiceRepairs.map((field) => field.label)
-            });
-
-            for (const field of choiceRepairs) {
-              await fillFormField(activePage, field);
-              await activePage.waitForTimeout(500).catch(() => undefined);
-            }
-
-            outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
-            validationMessages = await getVisibleValidationMessages(activePage);
-
-            if (outstandingRequired.length === 0 && isStaleChoiceValidation(validationMessages, choiceRepairs)) {
-              validationMessages = [];
-            }
-
-            evaluation = evaluateStageReadiness({
-              visibleFields: stageVisibleFields,
-              outstandingRequired,
-              validationMessages,
-              submitVisible,
-              submitRequested: input.submit,
-              allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
-            });
-            await writeBrowserDebug(workspacePath, "choice-required-repair-result", {
-              stageIndex,
-              status: evaluation.status,
-              missingRequiredLabels: evaluation.missingRequiredLabels,
-              validationMessages: evaluation.validationMessages
-            });
-          }
-        }
-
-        if (answerPlan && evaluation.status === "needs_retry" && outstandingRequired.length === 0 && isStaleChoiceValidation(validationMessages, answerPlan.answers)) {
-          validationMessages = [];
-          evaluation = evaluateStageReadiness({
-            visibleFields: stageVisibleFields,
-            outstandingRequired,
-            validationMessages,
-            submitVisible,
-            submitRequested: input.submit,
-            allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
-          });
-          await writeBrowserDebug(workspacePath, "stale-choice-validation-ignored", {
-            stageIndex,
-            reason: "A required radio/checkbox answer is selected, and only a stale generic validation banner remains."
-          });
-        }
-
-        const finalGuardedReadiness = await applyCurrentPageCompletionGuard({
-          page: activePage,
-          failedFields: failedRequiredAfterRetries,
-          outstandingRequired,
-          workspacePath,
-          stageIndex
-        });
-
-        if (finalGuardedReadiness.guardLabels.length > 0 || finalGuardedReadiness.outstandingRequired.length !== outstandingRequired.length) {
-          outstandingRequired = finalGuardedReadiness.outstandingRequired;
-          completionGuardLabels = finalGuardedReadiness.guardLabels;
-          evaluation = evaluateStageReadiness({
-            visibleFields: stageVisibleFields,
-            outstandingRequired,
-            validationMessages,
-            submitVisible: await hasFinalSubmitControl(activePage),
-            submitRequested: input.submit,
-            allowExternalSubmit: process.env.BROWSER_ALLOW_EXTERNAL_SUBMIT === "true"
-          });
-        }
 
         await writeBrowserDebug(workspacePath, "stage-evaluation", {
           stageIndex,
@@ -1358,8 +562,7 @@ export class BrowserAgentEngine {
           confidence: evaluation.confidence,
           reason: evaluation.reason,
           missingRequiredLabels: evaluation.missingRequiredLabels,
-          validationMessages: evaluation.validationMessages,
-          completionGuardLabels
+          validationMessages: evaluation.validationMessages
         });
         await updateLiveBot(activePage, {
           step: `Stage ${stageIndex + 1}`,
@@ -1367,15 +570,12 @@ export class BrowserAgentEngine {
           message: evaluation.reason
         });
 
-        if (stageAction === "fill" && evaluation.status === "needs_retry") {
-          // Reflection is the last automated repair path. It gives the LLM the
-          // current blockers and attempted answers, then retries only the
-          // improved answers before asking the user.
+        if (stagePlan.action === "fill" && evaluation.status === "needs_retry") {
           const reflection = await reflectOnStageAnswers({
             job: input.job,
             student: input.student,
             memory: input.memory,
-            visibleFields: stageVisibleFields,
+            visibleFields,
             attemptedAnswers: answerPlan?.answers ?? [],
             missingRequiredLabels: evaluation.missingRequiredLabels,
             validationMessages: evaluation.validationMessages,
@@ -1422,7 +622,7 @@ export class BrowserAgentEngine {
             outstandingRequired = await getVisibleRequiredEmptyLabels(activePage);
             validationMessages = await getVisibleValidationMessages(activePage);
             evaluation = evaluateStageReadiness({
-              visibleFields: stageVisibleFields,
+              visibleFields,
               outstandingRequired,
               validationMessages,
               submitVisible: await hasFinalSubmitControl(activePage),
@@ -1710,8 +910,7 @@ export class BrowserAgentEngine {
             stageIndex
           });
         }
-        const allowApplyStart = observation.pageState === "start" && stageVisibleFields.length === 0;
-        const navigation = await clickNextStageControl(context, activePage, { allowApplyStart });
+        const navigation = await clickNextStageControl(context, activePage, { allowApplyStart: true });
 
         if (!navigation.clicked) {
           const manualAdvance = await waitForManualProgress({
@@ -1761,41 +960,6 @@ export class BrowserAgentEngine {
         }
 
         activePage = await getActivePage(context, navigation.page);
-        const nextStageSignature = await getStageSignature(activePage);
-
-        if (seenStageVisitKeys.has(stageVisitKey(nextStageSignature))) {
-          const message = "The next action returned to a previously seen application screen, so GradLaunch paused to avoid a back/forward loop.";
-          bumpPlannerRetries(planner, "retry_alternative_path", message, activePage, stageIndex);
-          await updateLiveBot(activePage, {
-            step: `Stage ${stageIndex + 1}`,
-            mood: "waiting",
-            message
-          });
-          await updateExecutionSession(this.executionSessions, executionSessionId, {
-            status: "resumable",
-            latestMessage: message,
-            planner,
-            currentUrl: activePage.url(),
-            currentStageIndex: stageIndex,
-            currentStageLabel: `Stage ${stageIndex + 1}`,
-            workspacePath,
-            lastStageSignature: nextStageSignature,
-            filledCount: filledLabels.length,
-            manualCount: skippedLabels.length
-          });
-          return {
-            status: "needs_manual_review",
-            sourceUrl: input.job.sourceUrl,
-            openedAt,
-            completedAt: nowIso(),
-            filledLabels,
-            skippedLabels,
-            screenshots,
-            message,
-            planner
-          };
-        }
-
         completePlannerStage(planner, activePage, stageIndex);
       }
 
@@ -1864,8 +1028,6 @@ export class BrowserAgentEngine {
   }
 }
 
-// Reuses an already-open page for the job URL when possible; otherwise creates
-// a new tab. This preserves context during resume/manual handoff runs.
 async function openOrResumePage(context: BrowserContext, sourceUrl: string, resumeUrl: string | undefined) {
   const candidateUrls = [resumeUrl, sourceUrl].filter((value): value is string => Boolean(value));
 
@@ -1878,245 +1040,14 @@ async function openOrResumePage(context: BrowserContext, sourceUrl: string, resu
   return context.newPage();
 }
 
-// Navigates the controlled Chrome tab to the job URL using multiple fallbacks:
-// normal goto, window.location, then address-bar typing. This fixes cases where
-// Chrome opens a blank tab but initial navigation does not commit.
-async function navigateToJobPage(page: Page, targetUrl: string, workspacePath: string) {
-  let gotoError: string | undefined;
-
-  if (!isHttpUrl(targetUrl)) {
-    throw new Error(`GradLaunch refused to navigate to a non-job browser URL: ${targetUrl}`);
-  }
-
-  await page.bringToFront().catch(() => undefined);
-  await writeBrowserDebug(workspacePath, "job-navigation-start", {
-    fromUrl: page.url(),
-    targetUrl
-  });
-
-  try {
-    await page.goto(targetUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000)
-    });
-  } catch (error) {
-    gotoError = error instanceof Error ? error.message : String(error);
-    await writeBrowserDebug(workspacePath, "job-navigation-goto-failed", {
-      currentUrl: page.url(),
-      targetUrl,
-      error: gotoError
-    });
-  }
-
-  await page.waitForLoadState("domcontentloaded", { timeout: 3000 }).catch(() => undefined);
-
-  if (!isBlankBrowserUrl(page.url())) {
-    await writeBrowserDebug(workspacePath, "job-navigation-complete", {
-      strategy: "goto",
-      currentUrl: page.url(),
-      targetUrl
-    });
-    return;
-  }
-
-  await writeBrowserDebug(workspacePath, "job-navigation-retry-location", {
-    currentUrl: page.url(),
-    targetUrl
-  });
-  await page.evaluate((url) => {
-    window.location.assign(url);
-  }, targetUrl).catch(() => undefined);
-  await page.waitForLoadState("domcontentloaded", { timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000) }).catch(() => undefined);
-
-  if (!isBlankBrowserUrl(page.url())) {
-    await writeBrowserDebug(workspacePath, "job-navigation-complete", {
-      strategy: "window-location",
-      currentUrl: page.url(),
-      targetUrl
-    });
-    return;
-  }
-
-  await writeBrowserDebug(workspacePath, "job-navigation-retry-address-bar", {
-    currentUrl: page.url(),
-    targetUrl
-  });
-  await page.bringToFront().catch(() => undefined);
-  await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+L`).catch(() => undefined);
-  await page.keyboard.type(targetUrl).catch(() => undefined);
-  await page.keyboard.press("Enter").catch(() => undefined);
-  await page.waitForLoadState("domcontentloaded", { timeout: Number(process.env.BROWSER_NAVIGATION_TIMEOUT_MS ?? 45000) }).catch(() => undefined);
-
-  if (!isBlankBrowserUrl(page.url())) {
-    await writeBrowserDebug(workspacePath, "job-navigation-complete", {
-      strategy: "address-bar",
-      currentUrl: page.url(),
-      targetUrl
-    });
-    return;
-  }
-
-  throw new Error(
-    `Chrome opened a controlled tab, but the job URL did not load and the tab stayed on ${page.url()}. ${gotoError ? `Initial navigation failed: ${gotoError}` : "Initial navigation did not change the tab URL."}`
-  );
-}
-
-// Detects browser blank/new-tab pages that mean the job URL did not actually
-// load yet.
-function isBlankBrowserUrl(value: string) {
-  return value === "about:blank" || value === "chrome://newtab/" || value.startsWith("chrome://new-tab-page");
-}
-
-// Validates that a browser navigation target is a normal HTTP/HTTPS URL.
-function isHttpUrl(value: string) {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch (_error) {
-    return false;
-  }
-}
-
-// Builds a stable visit key from the current stage signature for same-screen
-// loop detection.
-function stageVisitKey(signature: Awaited<ReturnType<typeof getStageSignature>>) {
-  return [
-    signature.url,
-    signature.progressText ?? "",
-    signature.fingerprint
-  ].join("|");
-}
-
-// Sanitizes a resume URL from a previous planner state so the bot only resumes
-// safe same-site application pages, never login/personal browsing URLs.
-function sanitizeBrowserResumeUrl(value: string | undefined, sourceUrl: string) {
-  if (!value) {
+function sanitizeBrowserResumeUrl(value: string | undefined) {
+  if (!value || value === "about:blank" || value.startsWith("chrome://newtab")) {
     return undefined;
   }
 
-  let parsed: URL;
-  let source: URL;
-
-  try {
-    parsed = new URL(value);
-    source = new URL(sourceUrl);
-  } catch (_error) {
-    return undefined;
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return undefined;
-  }
-
-  if (looksLikeLoginUrl(value) || looksLikePersonalBrowsingUrl(value)) {
-    return undefined;
-  }
-
-  if (!isSameSiteOrSubdomain(parsed.hostname, source.hostname)) {
-    return undefined;
-  }
-
-  return parsed.toString();
+  return value;
 }
 
-// Checks whether a login gate has actually cleared by waiting for load, reading
-// protected checkpoints, and confirming the observed page is no longer login.
-async function loginGateCleared(page: Page) {
-  await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => undefined);
-  await page.waitForTimeout(600).catch(() => undefined);
-
-  if (isBlankBrowserUrl(page.url()) || isGoogleAuthUrl(page.url())) {
-    return false;
-  }
-
-  const checkpoint = await detectProtectedCheckpoint(page);
-
-  if (checkpoint.blocked) {
-    return false;
-  }
-
-  const visibleFields = await discoverVisibleFields(page).catch(() => []);
-  const observation = await observeBrowserPage(page, visibleFields).catch(() => undefined);
-
-  return Boolean(observation && observation.pageState !== "login" && observation.pageState !== "account_gate");
-}
-
-// Detects whether a URL looks like a login/auth/account route.
-function looksLikeLoginUrl(value: string) {
-  try {
-    const parsed = new URL(value);
-    const haystack = `${parsed.hostname} ${parsed.pathname} ${parsed.search}`.toLowerCase();
-    return /\b(login|signin|sign-in|sign_in|auth|oauth|sso|account)\b/.test(haystack);
-  } catch (_error) {
-    return false;
-  }
-}
-
-// Detects personal browsing URLs that should never be used as resume targets
-// for a job application run.
-function looksLikePersonalBrowsingUrl(value: string) {
-  try {
-    const parsed = new URL(value);
-    const host = parsed.hostname.toLowerCase();
-    return /(^|\.)youtube\.com$/.test(host)
-      || /(^|\.)youtu\.be$/.test(host)
-      || /(^|\.)gmail\.com$/.test(host)
-      || /(^|\.)googlemail\.com$/.test(host)
-      || /(^|\.)workspace\.google\.com$/.test(host)
-      || /(^|\.)mail\.google\.com$/.test(host);
-  } catch (_error) {
-    return true;
-  }
-}
-
-// Detects Google account authentication pages during manual login handoff.
-function isGoogleAuthUrl(value: string) {
-  try {
-    const parsed = new URL(value);
-    return /(^|\.)accounts\.google\.com$/i.test(parsed.hostname);
-  } catch (_error) {
-    return false;
-  }
-}
-
-// Compares two URL strings by exact hostname.
-function sameHostname(left: string, right: string) {
-  try {
-    return new URL(left).hostname === new URL(right).hostname;
-  } catch (_error) {
-    return false;
-  }
-}
-
-// Checks whether two hosts are the same site or one is a subdomain of the
-// other, allowing safe application redirects within the same company/ATS site.
-function isSameSiteOrSubdomain(leftHost: string, rightHost: string) {
-  const left = leftHost.toLowerCase();
-  const right = rightHost.toLowerCase();
-
-  if (left === right || left.endsWith(`.${right}`) || right.endsWith(`.${left}`)) {
-    return true;
-  }
-
-  const leftSite = approximateSiteDomain(left);
-  const rightSite = approximateSiteDomain(right);
-  return Boolean(leftSite && rightSite && leftSite === rightSite);
-}
-
-// Approximates a registrable site domain by taking the last two hostname parts.
-// It is a practical fallback for same-site comparisons, not a full PSL parser.
-function approximateSiteDomain(hostname: string) {
-  const parts = hostname.split(".").filter(Boolean);
-
-  if (parts.length < 2) {
-    return hostname;
-  }
-
-  return parts.slice(-2).join(".");
-}
-
-// Updates the persisted live execution session if this run has one. Errors are
-// swallowed so UI persistence never breaks browser automation.
 async function updateExecutionSession(
   sessions: BrowserExecutionSessionService,
   sessionId: string | undefined,
@@ -2132,14 +1063,10 @@ async function updateExecutionSession(
   }).catch(() => undefined);
 }
 
-// Returns whether the Playwright browser context still has at least one open
-// page, used for graceful stop/closed-window handling.
 function hasOpenPage(context: BrowserContext) {
   return context.pages().some((page) => !page.isClosed());
 }
 
-// Saves run state and returns a resumable receipt when the user closes/stops the
-// browser or the bot must pause safely.
 async function handleGracefulStop(input: {
   reason: string;
   input: BrowserApplyInput;
@@ -2202,684 +1129,6 @@ async function handleGracefulStop(input: {
   };
 }
 
-// Waits after selecting a resume file until the upload widget finishes, a form
-// appears, or the stage signature changes. It prevents the bot from waiting
-// forever on method-choice upload screens.
-async function waitForResumeUploadCompletion(input: {
-  context: BrowserContext;
-  page: Page;
-  stageIndex: number;
-  planner: ReturnType<typeof createPlannerCheckpoint>;
-  workspacePath: string;
-  resumePath: string;
-  baselineSignature: Awaited<ReturnType<typeof getStageSignature>>;
-}) {
-  const timeoutMs = Number(process.env.BROWSER_RESUME_UPLOAD_TIMEOUT_MS ?? 30000);
-  const pollMs = Number(process.env.BROWSER_RESUME_UPLOAD_POLL_MS ?? 1000);
-  const startedAt = Date.now();
-  let activePage = input.page;
-  let lastReason = "Waiting for the upload widget to finish processing.";
-
-  while (Date.now() - startedAt < timeoutMs) {
-    await activePage.waitForLoadState("domcontentloaded", { timeout: pollMs }).catch(() => undefined);
-    await activePage.waitForTimeout(pollMs).catch(() => undefined);
-    activePage = await getActivePage(input.context, activePage);
-
-    const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
-
-    if (protectedCheckpoint.blocked) {
-      return {
-        completed: false,
-        activePage,
-        reason: protectedCheckpoint.reason ?? "A protected checkpoint appeared after selecting the resume file."
-      };
-    }
-
-    const visibleFields = await discoverVisibleFields(activePage).catch(() => []);
-    const observation = await observeBrowserPage(activePage, visibleFields).catch(() => undefined);
-
-    if (!observation) {
-      lastReason = "The page is still loading or temporarily unreadable after selecting the resume.";
-      continue;
-    }
-
-    const validationMessages = await getVisibleValidationMessages(activePage).catch(() => []);
-    const isLoading = validationMessages.some((message) => /loading|please wait|processing|uploading/i.test(message))
-      || /loading|please wait|processing|uploading/i.test(observation.pageText);
-    const methodChoiceStillVisible = isResumeMethodChoiceObservation(observation);
-
-    if (isLoading || isTransientBlankObservation(observation)) {
-      lastReason = "The portal is still processing the selected resume.";
-      continue;
-    }
-
-    if (methodChoiceStillVisible) {
-      if (await continueAfterResumeUploadIfReady(activePage, input.resumePath)) {
-        lastReason = "Clicked the resume upload Continue button and waiting for the next application step.";
-        continue;
-      }
-
-      lastReason = "The application-method choices are still visible after selecting the resume.";
-      continue;
-    }
-
-    if (visibleFields.length > 0 || isActionablePostUploadState(observation)) {
-      recordPlannerStageOutcome({
-        planner: input.planner,
-        page: activePage,
-        stageIndex: input.stageIndex,
-        outcome: "advanced",
-        filledFieldLabels: ["Resume upload"]
-      });
-      return {
-        completed: true,
-        activePage,
-        reason: `Resume upload moved the application flow to ${observation.pageState}.`
-      };
-    }
-
-    const signatureAfter = await getStageSignature(activePage, observation);
-
-    if (
-      signatureAfter.url !== input.baselineSignature.url
-      || signatureAfter.progressText !== input.baselineSignature.progressText
-      || signatureAfter.fingerprint !== input.baselineSignature.fingerprint
-    ) {
-      return {
-        completed: true,
-        activePage,
-        reason: "Resume upload changed the application stage signature."
-      };
-    }
-
-    lastReason = `Current page state is still ${observation.pageState}.`;
-  }
-
-  return {
-    completed: false,
-    activePage,
-    reason: lastReason
-  };
-}
-
-// Detects the resume upload method-selection screen where the user/site chooses
-// between upload from device, paste/copy, or apply without resume.
-function isResumeMethodChoiceObservation(observation: BrowserAgentObservation) {
-  const text = normalizeAgentText([
-    observation.title,
-    observation.pageText,
-    ...observation.controls.map((control) => `${control.text} ${control.label}`)
-  ].join(" "));
-
-  return /\b(choose an option to apply|application method|application methods|how would you like to apply|apply with)\b/.test(text)
-    && /\b(from device|from computer|upload from device|upload from computer|select from device)\b/.test(text)
-    && /\b(without resume|without cv|copy paste|copy and paste)\b/.test(text);
-}
-
-// Detects a temporarily blank/empty observation after redirects or upload
-// processing, so the engine waits instead of treating it as final failure.
-function isTransientBlankObservation(observation: BrowserAgentObservation) {
-  return observation.visibleFields.length === 0
-    && observation.controls.length === 0
-    && normalizeAgentText(observation.pageText).length < 25;
-}
-
-// Determines whether the page state after resume upload is enough to continue
-// the normal application loop.
-function isActionablePostUploadState(observation: BrowserAgentObservation) {
-  return observation.pageState === "questionnaire"
-    || observation.pageState === "consent"
-    || observation.pageState === "form_fill"
-    || observation.pageState === "review"
-    || observation.pageState === "submit"
-    || observation.pageState === "account_gate"
-    || observation.pageState === "login";
-}
-
-// Applies the final current-page guard before navigation by merging required
-// empty labels, still-empty attempted fields, and unverified critical fields.
-async function applyCurrentPageCompletionGuard(input: {
-  page: Page;
-  failedFields: BrowserFillField[];
-  outstandingRequired: string[];
-  workspacePath: string;
-  stageIndex: number;
-}) {
-  const pageRequiredLabels = await getVisibleRequiredEmptyLabels(input.page);
-  const stillEmptyAttemptedLabels = input.failedFields.length > 0
-    ? await getStillEmptyAttemptedRequiredLabels(input.page, input.failedFields)
-    : [];
-  const unverifiedCriticalLabels = input.failedFields
-    .filter((field) => field.required || isLikelyRequiredAttemptedLabel(field.label))
-    .filter((field) => !/\b(address line 2|address 2|middle name|preferred name|apt|suite)\b/i.test(field.label))
-    .map((field) => field.label);
-  const guardLabels = dedupeLabels([...stillEmptyAttemptedLabels, ...unverifiedCriticalLabels]);
-  const outstandingRequired = dedupeLabels([...input.outstandingRequired, ...pageRequiredLabels, ...guardLabels]);
-
-  const newlyGuardedLabels = dedupeLabels([...pageRequiredLabels, ...guardLabels])
-    .filter((label) => !input.outstandingRequired.some((existing) => normalizeKey(existing) === normalizeKey(label)));
-
-  if (newlyGuardedLabels.length > 0) {
-    await writeBrowserDebug(input.workspacePath, "stage-completion-guard", {
-      stageIndex: input.stageIndex,
-      guardLabels: newlyGuardedLabels,
-      reason: "Visible required or application-critical fields are still empty, so navigation is blocked for this stage."
-    });
-  }
-
-  return {
-    outstandingRequired,
-    guardLabels: dedupeLabels([...pageRequiredLabels, ...guardLabels])
-  };
-}
-
-// Re-checks failed required/critical fields against the live page to see which
-// ones are still empty after the fill/repair loop.
-async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: BrowserFillField[]) {
-  const requiredFields = failedFields.filter((field) => {
-    if (!field.required && !isLikelyRequiredAttemptedLabel(field.label)) {
-      return false;
-    }
-
-    return !/\b(address line 2|address 2|middle name|preferred name|apt|suite)\b/i.test(field.label);
-  });
-
-  if (requiredFields.length === 0) {
-    return [];
-  }
-
-  const missingLabels: string[] = [];
-
-  for (const frame of page.frames()) {
-    const frameMissing = await frame.evaluate((fields) => {
-      const searchRoots = getSearchRoots();
-      const missing: string[] = [];
-
-      for (const field of fields) {
-        const control = findBestControl(field);
-
-        if (control && isEmptyControl(control)) {
-          missing.push(field.label);
-        }
-      }
-
-      return missing;
-
-      function findBestControl(field: { label: string; inputType?: string; fieldId?: string }) {
-        const labelKey = normalize(field.label);
-        const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
-        let best: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | undefined;
-        let bestScore = 0;
-
-        for (const control of controls) {
-          if (!isUsableControl(control, field.inputType)) {
-            continue;
-          }
-
-          const descriptor = normalize([
-            control.getAttribute("aria-label"),
-            control.getAttribute("placeholder"),
-            control.getAttribute("name"),
-            control.id,
-            labelledByText(control),
-            findLabelText(control),
-            findNearbyLabelText(control),
-            compactContainerText(control)
-          ].filter(Boolean).join(" "));
-          const idMatches = Boolean(field.fieldId && control.getAttribute("data-gradlaunch-field-id") === field.fieldId);
-          const score = scoreDescriptor(descriptor, labelKey, field.inputType, control) + (idMatches ? 140 : 0);
-
-          if (score > bestScore) {
-            best = control;
-            bestScore = score;
-          }
-        }
-
-        return bestScore >= 58 ? best : undefined;
-      }
-
-      function isUsableControl(
-        control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
-        wantedType: string | undefined
-      ) {
-        if (control.disabled) {
-          return false;
-        }
-
-        if (isInactiveFormBranch(control)) {
-          return false;
-        }
-
-        if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button", "checkbox", "radio"].includes(control.type)) {
-          return false;
-        }
-
-        if ((wantedType === "select" || wantedType === "combobox") && !(control instanceof HTMLSelectElement) && !(control instanceof HTMLInputElement && isCustomSelectLike(control))) {
-          return false;
-        }
-
-        if (wantedType && wantedType !== "select" && control instanceof HTMLSelectElement) {
-          return false;
-        }
-
-        const rect = control.getBoundingClientRect();
-        const style = window.getComputedStyle(control);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
-          || control instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(control));
-      }
-
-      function isEmptyControl(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
-        if (control instanceof HTMLSelectElement) {
-          const selected = control.selectedOptions[0];
-          const selectedText = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value} ${getCustomSelectRenderedText(control)}`);
-          return isEmptySelectText(selectedText);
-        }
-
-        if (control instanceof HTMLInputElement && isCustomSelectLike(control)) {
-          const actual = normalize(control.value);
-
-          if (actual && !isEmptySelectText(actual)) {
-            return false;
-          }
-
-          const container = control.closest("[role='combobox'], [aria-haspopup='listbox'], [data-radix-select-trigger], [data-headlessui-state], [class*='select'], [class*='combobox']")
-            ?? control.parentElement;
-          const selectedText = normalize([
-            control.getAttribute("data-value"),
-            control.getAttribute("aria-valuetext"),
-            container?.getAttribute("data-value"),
-            container?.getAttribute("aria-valuetext"),
-            container?.textContent
-          ].filter(Boolean).join(" "));
-
-          return isEmptySelectText(selectedText);
-        }
-
-        return !control.value.trim();
-      }
-
-      function isEmptySelectText(value: string) {
-        return !value
-          || /^(select|select an option|choose|choose an option|please select|none selected)$/.test(value)
-          || /\b(select an option|choose an option|please select|none selected|options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
-      }
-
-      function isInactiveFormBranch(control: Element) {
-        if (control.closest(".datasetField__row--sample") || control.hasAttribute("hidden")) {
-          return true;
-        }
-
-        if (control.parentElement?.closest("[hidden], [aria-hidden='true']")) {
-          return true;
-        }
-
-        const id = control.getAttribute("id") ?? "";
-        const name = control.getAttribute("name") ?? "";
-        return /(^|-)sample($|-)/i.test(id) || /(^|-)sample($|-)/i.test(name);
-      }
-
-      function getCustomSelectRenderedText(control: HTMLSelectElement) {
-        const proxy = getVisibleCustomSelectProxy(control);
-        const rendered = control.id ? getElementById(`select2-${control.id}-container`) : null;
-        return [
-          rendered?.textContent,
-          rendered?.getAttribute("title"),
-          proxy?.textContent,
-          proxy?.getAttribute("title"),
-          proxy?.getAttribute("aria-valuetext")
-        ].filter(Boolean).join(" ");
-      }
-
-      function getVisibleCustomSelectProxy(control: HTMLSelectElement) {
-        if (!isCustomSelectElement(control)) {
-          return undefined;
-        }
-
-        const candidates = [
-          control.nextElementSibling,
-          control.parentElement?.querySelector("[role='combobox']"),
-          control.parentElement?.querySelector(".select2 [role='combobox']"),
-          control.id ? getElementById(`select2-${control.id}-container`)?.closest("[role='combobox']") : null,
-          control.id ? queryFirst(`.select2Container${CSS.escape(control.id)}`, control) : null,
-          control.id ? queryFirst(`[aria-labelledby~="${CSS.escape(`${control.id}-label`)}"][role='combobox']`, control) : null
-        ];
-
-        for (const candidate of candidates) {
-          const element = candidate instanceof HTMLElement
-            ? candidate
-            : candidate instanceof Element
-              ? candidate.querySelector("[role='combobox']") as HTMLElement | null
-              : null;
-
-          if (element && isVisibleElement(element)) {
-            return element;
-          }
-        }
-
-        return undefined;
-      }
-
-      function isCustomSelectElement(control: HTMLSelectElement) {
-        const className = String(control.getAttribute("class") ?? "");
-        return control.getAttribute("aria-hidden") === "true"
-          || /\b(select2-hidden-accessible|select2|autocomplete|combobox)\b/i.test(className)
-          || Boolean(control.parentElement?.querySelector(".select2, [role='combobox'], [aria-haspopup='true'], [aria-haspopup='listbox']"));
-      }
-
-      function isVisibleElement(element: Element) {
-        const rect = element.getBoundingClientRect();
-        const style = window.getComputedStyle(element);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-      }
-
-      function isCustomSelectLike(control: HTMLInputElement) {
-        const popup = control.getAttribute("aria-haspopup") ?? "";
-        const role = control.getAttribute("role") ?? "";
-        const expanded = control.getAttribute("aria-expanded");
-
-        if (role === "combobox" || /^(listbox|menu|dialog|tree|true)$/i.test(popup) || expanded !== null) {
-          return true;
-        }
-
-        let ancestor = control.parentElement;
-
-        for (let depth = 0; depth < 3 && ancestor; depth += 1) {
-          const ancestorRole = ancestor.getAttribute("role") ?? "";
-          const ancestorPopup = ancestor.getAttribute("aria-haspopup") ?? "";
-          const ancestorExpanded = ancestor.getAttribute("aria-expanded");
-          const className = String(ancestor.getAttribute("class") ?? "");
-
-          if (
-            ancestorRole === "combobox"
-            || /^(listbox|menu|dialog|tree|true)$/i.test(ancestorPopup)
-            || ancestorExpanded !== null
-            || ancestor.hasAttribute("data-radix-select-trigger")
-            || ancestor.hasAttribute("data-headlessui-state")
-            || /\b(combobox|select__control|select-control|select-trigger|select-input)\b/i.test(className)
-          ) {
-            return true;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return false;
-      }
-
-      function scoreDescriptor(
-        descriptor: string,
-        wantedLabel: string,
-        wantedType: string | undefined,
-        control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-      ) {
-        if (!descriptor || !wantedLabel) {
-          return 0;
-        }
-
-        let score = 0;
-
-        if (descriptor === wantedLabel) {
-          score += 150;
-        } else if (descriptor.includes(wantedLabel)) {
-          score += 118;
-        } else if (wantedLabel.includes(descriptor) && descriptor.length > 3) {
-          score += 92;
-        }
-
-        const tokens = wantedLabel
-          .split(" ")
-          .filter((token) => token.length > 1 && !/^(select|option|your|please|field|number)$/.test(token));
-        score += tokens.reduce((sum, token) => sum + (descriptor.includes(token) ? 20 : 0), 0);
-
-        if (/\b(home email|email|e mail)\b/.test(wantedLabel) && /\b(email|e mail)\b/.test(descriptor)) {
-          score = Math.max(score, 88);
-        }
-
-        if (/\b(phone|mobile|contact)\b/.test(wantedLabel) && /\b(phone|mobile|contact|telephone)\b/.test(descriptor)) {
-          score = Math.max(score, 88);
-        }
-
-        if (/\b(address line 1|street address|address)\b/.test(wantedLabel) && /\b(address|street)\b/.test(descriptor)) {
-          score = Math.max(score, 86);
-        }
-
-        if (/\bcity\b/.test(wantedLabel) && /\b(city|town|locality)\b/.test(descriptor)) {
-          score = Math.max(score, 86);
-        }
-
-        if (/\b(state|province|region)\b/.test(wantedLabel) && /\b(state|province|region)\b/.test(descriptor)) {
-          score = Math.max(score, 86);
-        }
-
-        if (/\bcountry\b/.test(wantedLabel) && /\bcountry\b/.test(descriptor)) {
-          score = Math.max(score, 86);
-        }
-
-        if (/\b(degree name|major|field of study)\b/.test(wantedLabel) && /\b(degree|major|field of study|course)\b/.test(descriptor)) {
-          score = Math.max(score, 84);
-        }
-
-        if (/\b(type of degree|degree type|education level)\b/.test(wantedLabel) && /\b(degree|education|level)\b/.test(descriptor)) {
-          score = Math.max(score, 84);
-        }
-
-        if (/\b(university|college|school|institution)\b/.test(wantedLabel) && /\b(university|college|school|institution|institute)\b/.test(descriptor)) {
-          score = Math.max(score, 86);
-        }
-
-        if (/\b(start date|from date)\b/.test(wantedLabel) && /\b(start|from|date)\b/.test(descriptor)) {
-          score = Math.max(score, 84);
-        }
-
-        if (/\b(end date|to date|completion date|graduation date)\b/.test(wantedLabel) && /\b(end|to|completion|graduation|date)\b/.test(descriptor)) {
-          score = Math.max(score, 84);
-        }
-
-        if (/\b(work experience|past working experience|professional experience)\b/.test(wantedLabel) && /\b(work|working|professional|experience)\b/.test(descriptor)) {
-          score = Math.max(score, 86);
-        }
-
-        if (wantedType === "select" && control instanceof HTMLSelectElement) {
-          score += 18;
-        }
-
-        if (wantedType && control instanceof HTMLInputElement && normalize(control.type) === normalize(wantedType)) {
-          score += 12;
-        }
-
-        return score;
-      }
-
-      function labelledByText(control: Element) {
-        const labelledBy = control.getAttribute("aria-labelledby");
-
-        if (!labelledBy) {
-          return "";
-        }
-
-        return labelledBy
-          .split(/\s+/)
-          .map((id) => getElementById(id)?.textContent ?? "")
-          .join(" ");
-      }
-
-      function findLabelText(control: Element) {
-        if (control.id) {
-          const label = queryFirst(`label[for="${CSS.escape(control.id)}"]`, control);
-
-          if (label?.textContent?.trim()) {
-            return label.textContent.trim();
-          }
-        }
-
-        return control.closest("label")?.textContent?.trim()
-          || control.closest("fieldset")?.querySelector("legend")?.textContent?.trim()
-          || "";
-      }
-
-      function findNearbyLabelText(control: Element) {
-        let ancestor: Element | null = control.parentElement;
-
-        for (let depth = 0; depth < 4 && ancestor; depth += 1) {
-          const label = Array.from(ancestor.querySelectorAll("label, legend, h1, h2, h3, h4, [class*='label'], [class*='Label']"))
-            .map((item) => clean(item.textContent ?? ""))
-            .find((text) => text && text.length <= 140);
-
-          if (label) {
-            return label;
-          }
-
-          const previous = ancestor.previousElementSibling?.textContent?.trim();
-
-          if (previous) {
-            return previous;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return "";
-      }
-
-      function compactContainerText(control: Element) {
-        const container = control.closest("label, fieldset, [role='group'], [class*='field'], [class*='input'], [class*='form'], section, article, div");
-        const text = clean(container?.textContent ?? "");
-
-        return text.length <= 220 ? text : "";
-      }
-
-      function clean(value: string | null | undefined) {
-        return (value ?? "").replace(/\s+/g, " ").replace(/\*/g, " ").trim();
-      }
-
-      function normalize(value: string | null | undefined) {
-        return clean(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      }
-
-      function queryFirst(selector: string, control: Element) {
-        const root = control.getRootNode();
-
-        if (root instanceof Document || root instanceof ShadowRoot || root instanceof Element) {
-          const match = root.querySelector(selector);
-
-          if (match) {
-            return match;
-          }
-        }
-
-        for (const searchRoot of searchRoots) {
-          const match = searchRoot.querySelector(selector);
-
-          if (match) {
-            return match;
-          }
-        }
-
-        return null;
-      }
-
-      function getElementById(id: string) {
-        for (const searchRoot of searchRoots) {
-          if ("getElementById" in searchRoot && typeof searchRoot.getElementById === "function") {
-            const match = searchRoot.getElementById(id);
-
-            if (match) {
-              return match;
-            }
-          } else {
-            const match = searchRoot.querySelector(`#${CSS.escape(id)}`);
-
-            if (match) {
-              return match;
-            }
-          }
-        }
-
-        return null;
-      }
-
-      function getSearchRoots() {
-        const roots: Array<Document | ShadowRoot> = [document];
-
-        for (let index = 0; index < roots.length; index += 1) {
-          const root = roots[index];
-          const elements = Array.from(root.querySelectorAll("*")) as HTMLElement[];
-
-          for (const element of elements) {
-            if (element.shadowRoot) {
-              roots.push(element.shadowRoot);
-            }
-          }
-        }
-
-        return roots;
-      }
-    }, requiredFields.map((field) => ({
-      label: field.label,
-      inputType: field.inputType,
-      fieldId: field.fieldId
-    }))).catch(() => []);
-
-    missingLabels.push(...frameMissing);
-  }
-
-  return dedupeLabels(missingLabels);
-}
-
-// Identifies labels that are likely required or application-critical even when
-// the DOM did not expose a reliable required attribute.
-function isLikelyRequiredAttemptedLabel(label: string) {
-  const normalized = normalizeBrowserAgentLabel(label);
-
-  return /\b(address line 1|street address|country|state|province|city|zip|postal|email|phone|mobile|degree name|type of degree|degree type|university|college|school|institution|start date|end date|graduation date|work experience|past working experience)\b/.test(normalized)
-    && !/\b(address line 2|middle name|preferred first|preferred last|preferred name)\b/.test(normalized);
-}
-
-// Detects generic stale validation banners for radio/checkbox groups after the
-// corresponding choice was already selected.
-function isStaleChoiceValidation(
-  validationMessages: string[],
-  answers: Array<{ label: string; value: string; inputType?: string }>
-) {
-  if (validationMessages.length === 0) {
-    return false;
-  }
-
-  const choiceAnswers = answers.filter((answer) => answer.inputType === "radio" || answer.inputType === "checkbox");
-
-  if (choiceAnswers.length === 0) {
-    return false;
-  }
-
-  const validationText = normalizeAgentText(validationMessages.join(" "));
-
-  if (!/\b(there are some errors|please correct|this field is required|required)\b/.test(validationText)) {
-    return false;
-  }
-
-  if (/\b(invalid|email|phone|resume|cv|upload|file|location|city|country|format|characters|max|min)\b/.test(validationText)) {
-    return false;
-  }
-
-  const choiceText = normalizeAgentText(choiceAnswers.map((answer) => `${answer.label} ${answer.value}`).join(" "));
-
-  return validationMessages.length <= 2
-    || choiceText.split(" ").some((token) => token.length > 5 && validationText.includes(token));
-}
-
-// Normalizes page/debug text for comparisons inside engine-level guards.
-function normalizeAgentText(value: string) {
-  return value.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-// Normalizes labels for engine completion guards while stripping placeholder
-// text and required asterisks.
-function normalizeBrowserAgentLabel(label: string) {
-  return normalizeKey(label.replace(/\bselect an option\b/gi, " ").replace(/\*/g, " "));
-}
-
-// Waits for a user to manually make progress on a stage, then resumes only when
-// the saved stage signature changes and the page becomes readable.
 async function waitForManualProgress(input: {
   context: BrowserContext;
   page: Page;
@@ -2924,41 +1173,10 @@ async function waitForManualProgress(input: {
       continue;
     }
 
-    const visibleFields = await discoverVisibleFields(activePage).catch(() => []);
-    const observation = await observeBrowserPage(activePage, visibleFields).catch(() => undefined);
-    const validationMessages = await getVisibleValidationMessages(activePage).catch(() => []);
-    const looksTransient = !observation
-      || isTransientBlankObservation(observation)
-      || validationMessages.some((message) => /loading|please wait|processing|uploading/i.test(message))
-      || /loading|please wait|processing|uploading/i.test(observation.pageText);
-
-    if (looksTransient) {
-      await writeBrowserDebug(input.workspacePath, "manual-stage-progress-transient", {
-        stageIndex: input.stageIndex,
-        url: activePage.url(),
-        validationMessages
-      });
-      continue;
-    }
-
     const protectedCheckpoint = await detectProtectedCheckpoint(activePage);
 
     if (protectedCheckpoint.blocked) {
-      await writeBrowserDebug(input.workspacePath, "manual-stage-protected-checkpoint", {
-        stageIndex: input.stageIndex,
-        url: activePage.url(),
-        kind: protectedCheckpoint.kind,
-        reason: protectedCheckpoint.reason
-      });
-      await updateLiveBot(activePage, {
-        step: `Stage ${input.stageIndex + 1}`,
-        mood: "waiting",
-        message: protectedCheckpoint.reason ?? "A protected login or verification step is active. Complete it manually, then use the GradLaunch continue control."
-      });
-      return {
-        resumed: false,
-        activePage
-      };
+      continue;
     }
 
     const nextSignature = await getStageSignature(activePage);
@@ -2993,128 +1211,30 @@ async function waitForManualProgress(input: {
   };
 }
 
-// Opens or attaches to the best Chrome context for the run. Preference order is
-// logged CDP, controlled logged profile, managed CDP/profile, then ephemeral
-// browser, with explicit lock handling for persistent profiles.
-async function launchContext(chromePath: string | undefined): Promise<BrowserLaunchResult> {
+async function launchContext(chromePath: string | undefined) {
+  let browser: Browser | undefined;
+  let context: BrowserContext | undefined;
+  let keepContextOpen = false;
+  let attachedToExistingBrowser = false;
   const launchOptions = {
     executablePath: chromePath,
     headless: process.env.BROWSER_HEADLESS === "true",
     args: ["--disable-blink-features=AutomationControlled"]
   };
-  const loggedCdpUrl = shouldPreferLoggedBrowser() ? await resolveLoggedChromeCdpUrl() : undefined;
-
-  if (loggedCdpUrl) {
-    return connectToChromeCdp(loggedCdpUrl, "logged_cdp");
-  }
-
-  if (shouldPreferLoggedBrowser() && process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
-    const loggedProfileDir = getLoggedBrowserProfileDir();
-
-    if (loggedProfileDir && await pathExists(loggedProfileDir)) {
-      if (await isBrowserProfileLocked(loggedProfileDir, { clearStaleGradLaunchLock: true })) {
-        const message = buildLockedLoggedProfileMessage(loggedProfileDir);
-
-        if (shouldUseLoggedProfileCloneOnLock()) {
-          const clone = await prepareLoggedRuntimeProfile(loggedProfileDir);
-          const cloneLocked = await isBrowserProfileLocked(clone.profileDir, { clearStaleGradLaunchLock: true });
-
-          if (cloneLocked) {
-            const cloneMessage = `The controlled runtime copy of the logged Chrome profile at ${clone.profileDir} is already open but cannot be attached on ${resolveLoggedChromeCdpHint()}. Close the old GradLaunch Chrome window and retry.`;
-
-            if (shouldRequireLoggedBrowser()) {
-              throw new Error(cloneMessage);
-            }
-
-            console.warn(`[GradLaunch][Browser] ${cloneMessage} Falling back to managed profile.`);
-          } else {
-            try {
-              const context = await chromium.launchPersistentContext(clone.profileDir, {
-                ...launchOptions,
-                args: [
-                  ...launchOptions.args,
-                  `--profile-directory=${clone.profileName}`,
-                  `--remote-debugging-port=${resolveLoggedChromeDebugPort()}`
-                ],
-                viewport: { width: 1280, height: 900 }
-              });
-
-              return {
-                browser: undefined,
-                context,
-                keepContextOpen: true,
-                attachedToExistingBrowser: false,
-                launchMode: "logged_profile_clone" satisfies BrowserLaunchMode
-              };
-            } catch (error) {
-              const cloneMessage = error instanceof Error ? error.message : String(error);
-
-              if (shouldRequireLoggedBrowser()) {
-                throw new Error(
-                  `GradLaunch could not launch the controlled runtime copy of the logged profile at ${clone.profileDir}. ${cloneMessage}`
-                );
-              }
-
-              console.warn(
-                `[GradLaunch][Browser] Could not launch logged runtime profile at ${clone.profileDir}; falling back to managed profile. ${cloneMessage}`
-              );
-            }
-          }
-        }
-
-        if (shouldRequireLoggedBrowser()) {
-          throw new Error(message);
-        }
-
-        if (!shouldAllowManagedFallbackOnLockedLoggedProfile()) {
-          throw new Error(message);
-        }
-
-        console.warn(`[GradLaunch][Browser] ${message} Falling back to managed persistent profile because BROWSER_ALLOW_MANAGED_FALLBACK_ON_LOCK=true.`);
-      } else {
-        try {
-          const loggedProfileName = await resolveLoggedChromeProfileName(loggedProfileDir);
-          const context = await chromium.launchPersistentContext(loggedProfileDir, {
-            ...launchOptions,
-            args: [
-              ...launchOptions.args,
-              `--profile-directory=${loggedProfileName}`,
-              `--remote-debugging-port=${resolveLoggedChromeDebugPort()}`
-            ],
-            viewport: { width: 1280, height: 900 }
-          });
-
-          return {
-            browser: undefined,
-            context,
-            keepContextOpen: true,
-            attachedToExistingBrowser: false,
-            launchMode: "logged_profile" satisfies BrowserLaunchMode
-          };
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-
-          console.warn(
-            `[GradLaunch][Browser] Could not use logged Chrome profile at ${loggedProfileDir}; falling back to managed profile. ${message}`
-          );
-        }
-      }
-    }
-  }
-
-  if (shouldPreferLoggedBrowser() && shouldRequireLoggedBrowser()) {
-    throw new Error("GradLaunch is configured to require a logged Chrome profile, but no usable logged profile could be opened or attached. Run npm run browser:prepare-logged-profile after logging into Chrome, then retry.");
-  }
-
   const cdpUrl = await resolveManagedChromeCdpUrl();
 
   if (cdpUrl) {
-    return connectToChromeCdp(cdpUrl, "managed_cdp");
-  }
+    browser = await chromium.connectOverCDP(cdpUrl);
+    context = browser.contexts()[0];
+    attachedToExistingBrowser = true;
+    keepContextOpen = true;
 
-  if (process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
+    if (!context) {
+      throw new Error("GradLaunch attached to Chrome, but no browser context was available.");
+    }
+  } else if (process.env.BROWSER_USE_PERSISTENT_PROFILE !== "false") {
     try {
-      const context = await chromium.launchPersistentContext(getManagedBrowserProfileDir(), {
+      context = await chromium.launchPersistentContext(getManagedBrowserProfileDir(), {
         ...launchOptions,
         args: [
           ...launchOptions.args,
@@ -3122,14 +1242,7 @@ async function launchContext(chromePath: string | undefined): Promise<BrowserLau
         ],
         viewport: { width: 1280, height: 900 }
       });
-
-      return {
-        browser: undefined,
-        context,
-        keepContextOpen: true,
-        attachedToExistingBrowser: false,
-        launchMode: "managed_profile" satisfies BrowserLaunchMode
-      };
+      keepContextOpen = true;
     } catch (error) {
       if (shouldFallbackFromLockedProfile(error)) {
         throw new Error(
@@ -3139,41 +1252,19 @@ async function launchContext(chromePath: string | undefined): Promise<BrowserLau
 
       throw error;
     }
-  }
-
-  const browser = await chromium.launch(launchOptions);
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-
-  return {
-    browser,
-    context,
-    keepContextOpen: false,
-    attachedToExistingBrowser: false,
-    launchMode: "ephemeral" satisfies BrowserLaunchMode
-  };
-}
-
-// Attaches to an existing Chrome instance through CDP and returns its first
-// browser context for controlled automation.
-async function connectToChromeCdp(cdpUrl: string, launchMode: Extract<BrowserLaunchMode, "logged_cdp" | "managed_cdp">): Promise<BrowserLaunchResult> {
-  const browser = await chromium.connectOverCDP(cdpUrl);
-  const context = browser.contexts()[0];
-
-  if (!context) {
-    throw new Error("GradLaunch attached to Chrome, but no browser context was available.");
+  } else {
+    browser = await chromium.launch(launchOptions);
+    context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   }
 
   return {
     browser,
     context,
-    keepContextOpen: true,
-    attachedToExistingBrowser: true,
-    launchMode
+    keepContextOpen,
+    attachedToExistingBrowser
   };
 }
 
-// Installs safety listeners on all current and future pages in a context so
-// dialogs, page errors, and crashes are recorded instead of surprising the run.
 function installContextSafety(context: BrowserContext, workspacePath: string) {
   for (const page of context.pages()) {
     installPageSafety(page, workspacePath);
@@ -3184,7 +1275,6 @@ function installContextSafety(context: BrowserContext, workspacePath: string) {
   });
 }
 
-// Installs per-page safety handlers for dialogs, page errors, and crashes.
 function installPageSafety(page: Page, workspacePath: string) {
   page.on("dialog", (dialog) => {
     void handleDialogSafely(dialog, page, workspacePath);
@@ -3205,8 +1295,6 @@ function installPageSafety(page: Page, workspacePath: string) {
   });
 }
 
-// Accepts blocking browser dialogs and writes debug traces for both successful
-// and failed dialog handling.
 async function handleDialogSafely(dialog: Dialog, page: Page, workspacePath: string) {
   const payload = {
     url: page.url(),
@@ -3234,395 +1322,11 @@ async function handleDialogSafely(dialog: Dialog, page: Page, workspacePath: str
   }
 }
 
-// Performs the explicit login handoff loop. The bot fully pauses, keeps the
-// live bot mounted, waits for user confirmation, verifies the application page
-// is visible, and only then resumes autonomous filling.
-async function waitForLoginConfirmation(input: HandoffRequest & { sourceUrl: string }) {
-  const timeoutMs = Number(process.env.BROWSER_LOGIN_HANDOFF_TIMEOUT_MS ?? process.env.BROWSER_HANDOFF_TIMEOUT_MS ?? 1800000);
-  const pollMs = Number(process.env.BROWSER_HANDOFF_POLL_MS ?? 1200);
-  const startedAt = Date.now();
-  let activePage = input.page;
-  let lastBotStateKey = "";
-  const pausedLoginMessage = `${input.reason} GradLaunch is fully paused and will not resume until you click this button.`;
-
-  await maybeKeepBrowserOpen(input.context);
-  await clearUserContinueRequest(activePage);
-  await showLoginHandoffBot(activePage, input.stageIndex, pausedLoginMessage, "I am logged in, continue");
-  lastBotStateKey = buildLoginHandoffBotStateKey(activePage, pausedLoginMessage, "I am logged in, continue");
-  await saveScreenshot(activePage, input.workspacePath, input.screenshots, "browser-login-needed.png");
-  notePlannerHandoff(input.planner, input.reason, activePage, input.stageIndex, "login");
-  await writeBrowserDebug(input.workspacePath, "login-confirmation-wait-start", {
-    stageIndex: input.stageIndex,
-    currentUrl: activePage.url(),
-    sourceUrl: input.sourceUrl
-  });
-
-  while (Date.now() - startedAt < timeoutMs) {
-    if (!hasOpenPage(input.context)) {
-      return {
-        resolved: false,
-        activePage
-      };
-    }
-
-    await activePage.waitForTimeout(pollMs).catch(() => undefined);
-    activePage = await getLoginHandoffPage(input.context, activePage, input.sourceUrl);
-
-    if (await didUserRequestStop(activePage)) {
-      return {
-        resolved: false,
-        activePage
-      };
-    }
-
-    const confirmed = await consumeUserContinueConfirmation(activePage);
-
-    let readiness = await readApplicationReadiness(activePage).catch(() => undefined);
-    const readyMessage = readiness?.ready
-      ? "Login looks complete and the application form is visible. Click Continue filling and I will resume from this exact page."
-      : pausedLoginMessage;
-    const readyLabel = readiness?.ready ? "Continue filling" : "I am logged in, continue";
-    const botStateKey = buildLoginHandoffBotStateKey(activePage, readyMessage, readyLabel);
-    const botMounted = await isLiveBotMounted(activePage);
-
-    if (!botMounted || botStateKey !== lastBotStateKey) {
-      await showLoginHandoffBot(activePage, input.stageIndex, readyMessage, readyLabel);
-      lastBotStateKey = botStateKey;
-      await writeBrowserDebug(input.workspacePath, botMounted ? "login-handoff-bot-updated" : "login-handoff-bot-reattached", {
-        stageIndex: input.stageIndex,
-        currentUrl: activePage.url(),
-        pageState: readiness?.pageState,
-        visibleFieldCount: readiness?.visibleFieldCount
-      });
-    }
-
-    if (!confirmed) {
-      continue;
-    }
-
-    const continuationReadiness = await verifyLoginContinuationReady({
-      context: input.context,
-      page: activePage,
-      sourceUrl: input.sourceUrl,
-      workspacePath: input.workspacePath
-    });
-    activePage = continuationReadiness.activePage;
-    await writeBrowserDebug(input.workspacePath, continuationReadiness.ready ? "login-confirmation-verified" : "login-confirmation-not-ready", {
-      stageIndex: input.stageIndex,
-      currentUrl: activePage.url(),
-      reason: continuationReadiness.reason,
-      pageState: continuationReadiness.pageState,
-      visibleFieldCount: continuationReadiness.visibleFieldCount
-    });
-
-    if (!continuationReadiness.ready) {
-      await showLoginHandoffBot(activePage, input.stageIndex, continuationReadiness.reason, "Check again");
-      lastBotStateKey = buildLoginHandoffBotStateKey(activePage, continuationReadiness.reason, "Check again");
-      continue;
-    }
-
-    markPlannerTask(input.planner, "authenticate_if_needed", "running", "Login confirmed and the application page is visible. Resuming autonomous execution.");
-    setPlannerStatus(input.planner, "running", "Login confirmed; GradLaunch is resuming from the current page.");
-    await updateLiveBot(activePage, {
-      step: `Stage ${input.stageIndex + 1}`,
-      mood: "thinking",
-      message: "Login confirmed. I can see the application flow now, so I am re-planning before filling."
-    });
-    return {
-      resolved: true,
-      activePage
-    };
-  }
-
-  setPlannerStatus(input.planner, "handoff_required", "Planner paused because login still needs user confirmation.");
-  await writeBrowserDebug(input.workspacePath, "login-confirmation-timeout", {
-    stageIndex: input.stageIndex,
-    currentUrl: activePage.url(),
-    timeoutMs
-  });
-  return {
-    resolved: false,
-    activePage
-  };
-}
-
-// Verifies that the user's login confirmation is actionable. If needed, it
-// reopens the original job URL in the same controlled browser and rechecks.
-async function verifyLoginContinuationReady(input: {
-  context: BrowserContext;
-  page: Page;
-  sourceUrl: string;
-  workspacePath: string;
-}) {
-  let activePage = input.page;
-  const readyPage = await findReadyApplicationPage(input.context);
-
-  if (readyPage) {
-    return readyPage;
-  }
-
-  let readiness = await readApplicationReadiness(activePage);
-
-  if (readiness.ready || readiness.blocked) {
-    return {
-      ...readiness,
-      activePage
-    };
-  }
-
-  await writeBrowserDebug(input.workspacePath, "login-confirmation-reopen-source-url", {
-    currentUrl: activePage.url(),
-    sourceUrl: input.sourceUrl,
-    reason: readiness.reason
-  });
-  await navigateToJobPage(activePage, input.sourceUrl, input.workspacePath).catch((error) => {
-    void writeBrowserDebug(input.workspacePath, "login-confirmation-reopen-source-url-failed", {
-      currentUrl: activePage.url(),
-      sourceUrl: input.sourceUrl,
-      error: error instanceof Error ? error.message : String(error)
-    });
-  });
-  readiness = await readApplicationReadiness(activePage);
-
-  return {
-    ...readiness,
-    activePage
-  };
-}
-
-// Shows the login handoff live bot message and confirmation button.
-async function showLoginHandoffBot(page: Page, stageIndex: number, message: string, label: string) {
-  await updateLiveBot(page, {
-    step: `Stage ${stageIndex + 1}`,
-    mood: "waiting",
-    message,
-    action: {
-      kind: "confirm_continue",
-      label
-    }
-  });
-}
-
-// Builds a stable key for detecting whether the login handoff bot needs to be
-// re-rendered after URL/page/message/label changes.
-function buildLoginHandoffBotStateKey(page: Page, message: string, label: string) {
-  return `${page.url()}::${page.isClosed() ? "closed" : "open"}::${message}::${label}`;
-}
-
-// Chooses the best page to monitor during login handoff, preferring a ready
-// application page, then auth/login/source-domain pages over blank tabs.
-async function getLoginHandoffPage(context: BrowserContext, fallbackPage: Page, sourceUrl: string) {
-  const readyApplicationPage = await findReadyApplicationPage(context).catch(() => undefined);
-
-  if (readyApplicationPage?.activePage) {
-    return readyApplicationPage.activePage;
-  }
-
-  const pages = context.pages().filter((page) => !page.isClosed());
-  const candidates = pages.length > 0 ? pages : [fallbackPage];
-  const scored = candidates.map((page, index) => ({
-    page,
-    score: scoreLoginHandoffPage(page.url(), sourceUrl, page === fallbackPage, index)
-  }));
-  const best = scored.sort((left, right) => right.score - left.score)[0]?.page ?? fallbackPage;
-
-  best.setDefaultTimeout(Number(process.env.BROWSER_STEP_TIMEOUT_MS ?? 2500));
-  await best.bringToFront().catch(() => undefined);
-  return best;
-}
-
-// Scores candidate pages during login handoff so the bot follows Google/auth or
-// application tabs instead of staying on a stale fallback tab.
-function scoreLoginHandoffPage(url: string, sourceUrl: string, isFallback: boolean, index: number) {
-  let score = index;
-
-  if (isGoogleAuthUrl(url)) {
-    score += 1000;
-  }
-
-  if (looksLikeLoginUrl(url)) {
-    score += 850;
-  }
-
-  if (sameHostname(url, sourceUrl)) {
-    score += 500;
-  }
-
-  if (!isBlankBrowserUrl(url)) {
-    score += 100;
-  }
-
-  if (isFallback) {
-    score += 25;
-  }
-
-  return score;
-}
-
-// Finds any open browser page that already looks like a readable application
-// stage after login/redirects.
-async function findReadyApplicationPage(context: BrowserContext) {
-  const pages = context.pages().filter((page) => !page.isClosed()).reverse();
-
-  for (const page of pages) {
-    const readiness = await readApplicationReadiness(page).catch(() => undefined);
-
-    if (readiness?.ready) {
-      await page.bringToFront().catch(() => undefined);
-      return {
-        ...readiness,
-        activePage: page
-      };
-    }
-  }
-
-  return undefined;
-}
-
-// Reads whether one page is ready for the bot to resume after login. It checks
-// blank tabs, Google auth, protected checkpoints, visible fields, upload/review
-// states, and application progress controls.
-async function readApplicationReadiness(page: Page) {
-  await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => undefined);
-  await page.waitForTimeout(700).catch(() => undefined);
-
-  if (isBlankBrowserUrl(page.url())) {
-    return {
-      ready: false,
-      blocked: false,
-      reason: "The tab is still blank. Open or reload the job page, finish login, then click Check again.",
-      visibleFieldCount: 0
-    };
-  }
-
-  if (isGoogleAuthUrl(page.url())) {
-    return {
-      ready: false,
-      blocked: true,
-      reason: "Google login is still open. Finish choosing the account/password step, then click Check again.",
-      pageState: "login",
-      visibleFieldCount: 0
-    };
-  }
-
-  const checkpoint = await detectProtectedCheckpoint(page);
-
-  if (checkpoint.blocked) {
-    return {
-      ready: false,
-      blocked: true,
-      reason: checkpoint.reason ?? "The page still looks like a protected login or verification gate. Complete it, then click Check again.",
-      pageState: checkpoint.kind ?? "login",
-      visibleFieldCount: 0
-    };
-  }
-
-  const visibleFields = await discoverVisibleFields(page).catch(() => []);
-  const observation = await observeBrowserPage(page, visibleFields).catch(() => undefined);
-  const pageState = observation?.pageState;
-
-  if (!observation) {
-    return {
-      ready: false,
-      blocked: false,
-      reason: "Login may be complete, but GradLaunch cannot read the application page yet. Keep the job page open and click Check again.",
-      visibleFieldCount: visibleFields.length
-    };
-  }
-
-  if (pageState === "login" || pageState === "account_gate") {
-    return {
-      ready: false,
-      blocked: true,
-      reason: "The portal still looks like a login/account page. Finish login in this same window, then click Check again.",
-      pageState,
-      visibleFieldCount: visibleFields.length
-    };
-  }
-
-  if (visibleFields.length > 0) {
-    return {
-      ready: true,
-      blocked: false,
-      reason: "Visible application fields were found.",
-      pageState,
-      visibleFieldCount: visibleFields.length
-    };
-  }
-
-  if (pageState === "resume_upload" && await hasFileUpload(page)) {
-    return {
-      ready: true,
-      blocked: false,
-      reason: "A resume upload step is visible.",
-      pageState,
-      visibleFieldCount: visibleFields.length
-    };
-  }
-
-  if (pageState === "review" || pageState === "submit" || pageState === "questionnaire" || pageState === "consent") {
-    return {
-      ready: true,
-      blocked: false,
-      reason: `The application flow is visible at the ${pageState} stage.`,
-      pageState,
-      visibleFieldCount: visibleFields.length
-    };
-  }
-
-  if (await hasFinalSubmitControl(page)) {
-    return {
-      ready: true,
-      blocked: false,
-      reason: "A final submit/review control is visible.",
-      pageState,
-      visibleFieldCount: visibleFields.length
-    };
-  }
-
-  if (observation.controls.some((control) => isApplicationProgressControl(control.text || control.label))) {
-    return {
-      ready: true,
-      blocked: false,
-      reason: "An application continue/apply control is visible.",
-      pageState,
-      visibleFieldCount: visibleFields.length
-    };
-  }
-
-  return {
-    ready: false,
-    blocked: false,
-    reason: "Login no longer appears blocked, but the job application form is not visible yet. Reopen the job posting in this window, then click Check again.",
-    pageState,
-    visibleFieldCount: visibleFields.length
-  };
-}
-
-// Detects controls that indicate the application can progress, while excluding
-// login/account buttons.
-function isApplicationProgressControl(value: string | undefined) {
-  const normalized = (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-
-  if (!normalized) {
-    return false;
-  }
-
-  if (/\b(sign in|signin|log in|login|google|email|password|forgot|create account|register|sign up)\b/.test(normalized)) {
-    return false;
-  }
-
-  return /\b(apply|start application|continue application|continue|next|proceed|review application|save and continue)\b/.test(normalized);
-}
-
-// Generic manual handoff loop for CAPTCHA, OTP, verification, missing data, or
-// review. It waits until the protected/missing condition clears or times out.
 async function waitForHumanIntervention(input: HandoffRequest) {
   const timeoutMs = Number(process.env.BROWSER_HANDOFF_TIMEOUT_MS ?? 180000);
   const pollMs = Number(process.env.BROWSER_HANDOFF_POLL_MS ?? 1200);
   const startedAt = Date.now();
   let activePage = input.page;
-  let lastBotTarget = "";
 
   await maybeKeepBrowserOpen(input.context);
   await updateLiveBot(activePage, {
@@ -3630,7 +1334,6 @@ async function waitForHumanIntervention(input: HandoffRequest) {
     mood: "waiting",
     message: input.reason
   });
-  lastBotTarget = buildHandoffBotTarget(activePage, input.reason);
   await saveScreenshot(activePage, input.workspacePath, input.screenshots, "browser-handoff-needed.png");
   notePlannerHandoff(input.planner, input.reason, activePage, input.stageIndex, input.handoffKind ?? "review");
 
@@ -3644,17 +1347,6 @@ async function waitForHumanIntervention(input: HandoffRequest) {
 
     await activePage.waitForTimeout(pollMs).catch(() => undefined);
     activePage = await getActivePage(input.context, activePage);
-    const botTarget = buildHandoffBotTarget(activePage, input.reason);
-
-    if (botTarget !== lastBotTarget || !await isLiveBotMounted(activePage)) {
-      await updateLiveBot(activePage, {
-        step: `Stage ${input.stageIndex + 1}`,
-        mood: "waiting",
-        message: input.reason
-      });
-      lastBotTarget = botTarget;
-    }
-
     if (await didUserRequestStop(activePage)) {
       return {
         resolved: false,
@@ -3672,16 +1364,6 @@ async function waitForHumanIntervention(input: HandoffRequest) {
       const watchSet = new Set(input.watchFields.map((label) => label.toLowerCase().trim()));
 
       if (outstanding.some((label) => watchSet.has(label.toLowerCase().trim()))) {
-        continue;
-      }
-
-      const stillEmptyWatchedFields = await getStillEmptyAttemptedRequiredLabels(activePage, input.watchFields.map((label) => ({
-        label,
-        value: "",
-        required: true
-      })));
-
-      if (stillEmptyWatchedFields.length > 0) {
         continue;
       }
     }
@@ -3706,14 +1388,6 @@ async function waitForHumanIntervention(input: HandoffRequest) {
   };
 }
 
-// Builds a stable key for detecting when the generic handoff live bot needs to
-// be reattached or updated.
-function buildHandoffBotTarget(page: Page, message: string) {
-  return `${page.url()}::${page.isClosed() ? "closed" : "open"}::${message}`;
-}
-
-// Saves a screenshot to the run workspace and records the filename in the
-// receipt, ignoring screenshot failures.
 async function saveScreenshot(page: Page, workspacePath: string, screenshots: string[], filename: string) {
   const path = join(workspacePath, filename);
 
@@ -3730,8 +1404,6 @@ async function saveScreenshot(page: Page, workspacePath: string, screenshots: st
   }
 }
 
-// Creates a blocked browser receipt when the run cannot start because of
-// invalid URL, unavailable browser, or launch/navigation failure.
 function blockedReceipt(input: BrowserApplyInput, openedAt: string, screenshots: string[], planner: ReturnType<typeof createPlannerCheckpoint>, message: string): BrowserApplyReceipt {
   return {
     status: "blocked",
@@ -3746,8 +1418,6 @@ function blockedReceipt(input: BrowserApplyInput, openedAt: string, screenshots:
   };
 }
 
-// Brings an open browser page to front when configured to keep the browser open
-// for review/manual inspection.
 async function maybeKeepBrowserOpen(context: BrowserContext) {
   if (shouldKeepBrowserOpenForReview()) {
     const pages = context.pages().filter((page) => !page.isClosed());
@@ -3756,246 +1426,30 @@ async function maybeKeepBrowserOpen(context: BrowserContext) {
   }
 }
 
-// Reads the environment flag that controls whether review-ready browser windows
-// stay open after the agent pauses.
 function shouldKeepBrowserOpenForReview() {
   return process.env.BROWSER_KEEP_OPEN_ON_REVIEW !== "false" && process.env.BROWSER_HEADLESS !== "true";
 }
 
-// Detects profile-lock errors where launching a persistent profile should fail
-// with a clearer user-facing message.
 function shouldFallbackFromLockedProfile(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return /Opening in existing browser session|profile is already in use|user data directory is already in use/i.test(message);
 }
 
-// Resolves the Chrome executable path from environment or the macOS default.
 function resolveChromePath() {
   return process.env.CHROME_EXECUTABLE_PATH ?? defaultChromePath;
 }
 
-// Reads whether GradLaunch should prefer the controlled logged Chrome profile.
-function shouldPreferLoggedBrowser() {
-  return process.env.BROWSER_PREFER_LOGGED_PROFILE !== "false";
-}
-
-// Reads whether GradLaunch should fail instead of falling back when no logged
-// profile can be controlled.
-function shouldRequireLoggedBrowser() {
-  return process.env.BROWSER_REQUIRE_LOGGED_PROFILE === "true";
-}
-
-// Reads whether GradLaunch may clone a locked logged profile into a runtime
-// copy. This is disabled unless explicitly configured.
-function shouldUseLoggedProfileCloneOnLock() {
-  return process.env.BROWSER_ALLOW_LOGGED_PROFILE_CLONE_ON_LOCK === "true";
-}
-
-// Reads whether a locked logged profile may fall back to the managed profile.
-function shouldAllowManagedFallbackOnLockedLoggedProfile() {
-  return process.env.BROWSER_ALLOW_MANAGED_FALLBACK_ON_LOCK === "true";
-}
-
-// Copies the configured logged Chrome profile into a controlled runtime profile
-// while excluding caches and singleton lock files.
-async function prepareLoggedRuntimeProfile(sourceProfileDir: string) {
-  const profileName = await resolveLoggedChromeProfileName(sourceProfileDir);
-  const runtimeProfileDir = join(getBrowserWorkspaceStorageDir(), "logged-runtime-profile");
-  const runtimeProfileExists = await pathExists(join(runtimeProfileDir, "Local State"))
-    && await pathExists(join(runtimeProfileDir, profileName));
-  const refreshRequested = process.env.BROWSER_REFRESH_LOGGED_RUNTIME_PROFILE === "true";
-
-  if (!runtimeProfileExists || refreshRequested) {
-    await rm(runtimeProfileDir, { recursive: true, force: true });
-    await mkdir(runtimeProfileDir, { recursive: true });
-    await copyIfPresent(join(sourceProfileDir, "Local State"), join(runtimeProfileDir, "Local State"));
-    await copyIfPresent(join(sourceProfileDir, "First Run"), join(runtimeProfileDir, "First Run"));
-    await cp(join(sourceProfileDir, profileName), join(runtimeProfileDir, profileName), {
-      recursive: true,
-      force: true,
-      filter: shouldCopyChromeProfilePath(join(sourceProfileDir, profileName))
-    });
-  }
-
-  await clearBrowserProfileSingletonFiles(runtimeProfileDir);
-  return {
-    profileDir: runtimeProfileDir,
-    profileName
-  };
-}
-
-// Copies a file/directory if it exists, ignoring ENOENT because Chrome profile
-// optional files vary between machines.
-async function copyIfPresent(source: string, dest: string) {
-  try {
-    await cp(source, dest, { recursive: true, force: true });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
-  }
-}
-
-// Returns a filter used while copying Chrome profiles so runtime copies exclude
-// caches and singleton lock files.
-function shouldCopyChromeProfilePath(sourceProfileDir: string) {
-  const ignoredNames = new Set([
-    "Cache",
-    "Code Cache",
-    "Crashpad",
-    "DawnGraphiteCache",
-    "DawnWebGPUCache",
-    "GPUCache",
-    "GrShaderCache",
-    "GraphiteDawnCache",
-    "ShaderCache"
-  ]);
-
-  return (source: string) => {
-    const name = basename(source);
-
-    if (name.startsWith("Singleton")) {
-      return false;
-    }
-
-    if (ignoredNames.has(name)) {
-      return false;
-    }
-
-    const parts = relative(sourceProfileDir, source).split(sep);
-    return !parts.some((part) => ignoredNames.has(part));
-  };
-}
-
-// Determines whether a Chrome profile is locked, optionally clearing stale
-// GradLaunch-owned locks when safe.
-async function isBrowserProfileLocked(profileDir: string, options: { clearStaleGradLaunchLock?: boolean } = {}) {
-  const state = await getBrowserProfileLockState(profileDir);
-
-  if (!state.locked) {
-    return false;
-  }
-
-  if (state.stale && options.clearStaleGradLaunchLock && await canClearStaleGradLaunchProfileLock(profileDir)) {
-    await clearBrowserProfileSingletonFiles(profileDir);
-    return false;
-  }
-
-  return true;
-}
-
-// Reads Chrome singleton files to determine lock status and owning process id.
-async function getBrowserProfileLockState(profileDir: string) {
-  const singletonFiles = ["SingletonLock", "SingletonSocket", "SingletonCookie"];
-  let locked = false;
-  let lockPid: number | undefined;
-
-  for (const filename of singletonFiles) {
-    try {
-      await lstat(join(profileDir, filename));
-      locked = true;
-
-      if (filename === "SingletonLock") {
-        lockPid = await readBrowserProfileLockPid(profileDir);
-      }
-    } catch (_error) {
-      // Missing singleton files mean Chrome is not currently holding this profile.
-    }
-  }
-
-  if (!locked) {
-    return {
-      locked: false,
-      stale: false,
-      lockPid
-    };
-  }
-
-  return {
-    locked: true,
-    stale: lockPid ? !isProcessRunning(lockPid) : true,
-    lockPid
-  };
-}
-
-// Reads the PID encoded in Chrome's SingletonLock symlink when available.
-async function readBrowserProfileLockPid(profileDir: string) {
-  try {
-    const target = await readlink(join(profileDir, "SingletonLock"));
-    const match = target.match(/-(\d+)$/);
-    return match ? Number(match[1]) : undefined;
-  } catch (_error) {
-    return undefined;
-  }
-}
-
-// Checks whether a process id is still alive without killing it.
-function isProcessRunning(pid: number) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    return code === "EPERM";
-  }
-}
-
-// Allows stale lock cleanup only for GradLaunch-prepared profiles and when the
-// environment flag does not disable cleanup.
-async function canClearStaleGradLaunchProfileLock(profileDir: string) {
-  return process.env.BROWSER_CLEAR_STALE_LOGGED_PROFILE_LOCKS !== "false"
-    && await pathExists(join(profileDir, ".gradlaunch-profile-source.json"));
-}
-
-// Removes Chrome singleton lock/socket/cookie files from a profile directory.
-async function clearBrowserProfileSingletonFiles(profileDir: string) {
-  for (const filename of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
-    await rm(join(profileDir, filename), { force: true }).catch(() => undefined);
-  }
-}
-
-// Builds the user-facing explanation when a logged profile is open but cannot
-// be controlled through CDP.
-function buildLockedLoggedProfileMessage(profileDir: string) {
-  return `The controlled logged Chrome profile at ${profileDir} is already open, but GradLaunch cannot safely control it because remote debugging is not available on ${resolveLoggedChromeCdpHint()}. Close that Chrome window and retry, or launch it with --remote-debugging-port=${resolveLoggedChromeDebugPort()}. GradLaunch will not clone cookies or attach to an uncontrolled browser.`;
-}
-
-// Returns the CDP URL hint shown in locked-profile setup messages.
-function resolveLoggedChromeCdpHint() {
-  return process.env.BROWSER_LOGGED_CDP_URL?.trim() || `http://127.0.0.1:${resolveLoggedChromeDebugPort()}`;
-}
-
-// Resolves and probes the logged Chrome CDP endpoint if configured/enabled.
-async function resolveLoggedChromeCdpUrl() {
-  const configuredValue = process.env.BROWSER_LOGGED_CDP_URL?.trim();
-  const candidates = configuredValue
-    ? [normalizeChromeCdpUrl(configuredValue)]
-    : process.env.BROWSER_PROBE_LOGGED_CDP === "false"
-      ? []
-      : [`http://127.0.0.1:${resolveLoggedChromeDebugPort()}`];
-
-  for (const candidate of candidates) {
-    if (candidate && await canConnectToChromeCdp(candidate)) {
-      return candidate;
-    }
-  }
-
-  return undefined;
-}
-
-// Resolves and probes the managed GradLaunch Chrome CDP endpoint.
 async function resolveManagedChromeCdpUrl() {
   const configuredValue = process.env.BROWSER_CDP_URL?.trim();
 
   if (configuredValue) {
-    return normalizeChromeCdpUrl(configuredValue);
+    return configuredValue;
   }
 
   const autoDetectUrl = `http://127.0.0.1:${resolveManagedChromeDebugPort()}`;
   return await canConnectToChromeCdp(autoDetectUrl) ? autoDetectUrl : undefined;
 }
 
-// Probes a Chrome DevTools Protocol endpoint by requesting /json/version.
 async function canConnectToChromeCdp(baseUrl: string) {
   try {
     const versionUrl = new URL("/json/version", baseUrl);
@@ -4006,7 +1460,6 @@ async function canConnectToChromeCdp(baseUrl: string) {
   }
 }
 
-// Performs a small JSON HTTP request used only for local Chrome CDP probing.
 function requestJson(url: URL): Promise<Record<string, unknown>> {
   return new Promise((resolvePromise, rejectPromise) => {
     const request = httpRequest(
@@ -4040,72 +1493,10 @@ function requestJson(url: URL): Promise<Record<string, unknown>> {
   });
 }
 
-// Reads the managed Chrome remote debugging port from environment.
 function resolveManagedChromeDebugPort() {
   return Number(process.env.BROWSER_MANAGED_DEBUG_PORT ?? 9333);
 }
 
-// Reads the logged-profile Chrome remote debugging port from environment.
-function resolveLoggedChromeDebugPort() {
-  return Number(process.env.BROWSER_LOGGED_DEBUG_PORT ?? 9222);
-}
-
-// Normalizes a CDP host/port/url value into a usable HTTP URL.
-function normalizeChromeCdpUrl(value: string) {
-  const trimmed = value.trim();
-
-  if (/^\d+$/.test(trimmed)) {
-    return `http://127.0.0.1:${trimmed}`;
-  }
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-
-  return `http://${trimmed}`;
-}
-
-// Resolves the Chrome profile directory name to launch, using configured value
-// or Chrome's Local State metadata, then falling back to Default.
-async function resolveLoggedChromeProfileName(profileDir: string) {
-  const configuredProfileName = process.env.BROWSER_LOGGED_PROFILE_NAME?.trim();
-
-  if (configuredProfileName) {
-    return configuredProfileName;
-  }
-
-  try {
-    const text = await readFile(join(profileDir, "Local State"), "utf8");
-    const localState = JSON.parse(text) as {
-      profile?: {
-        last_used?: unknown;
-        last_active_profiles?: unknown;
-      };
-    };
-    const lastUsed = localState.profile?.last_used;
-
-    if (typeof lastUsed === "string" && lastUsed.trim()) {
-      return lastUsed.trim();
-    }
-
-    const lastActiveProfiles = localState.profile?.last_active_profiles;
-
-    if (Array.isArray(lastActiveProfiles)) {
-      const firstProfile = lastActiveProfiles.find((profile): profile is string => typeof profile === "string" && profile.trim().length > 0);
-
-      if (firstProfile) {
-        return firstProfile.trim();
-      }
-    }
-  } catch (_error) {
-    // Chrome can still start its default profile if Local State cannot be read.
-  }
-
-  return "Default";
-}
-
-// Validates that the job source URL is a real web application URL GradLaunch is
-// allowed to open in the browser agent.
 function validateSourceUrl(value: string) {
   let parsed: URL;
 
@@ -4138,7 +1529,6 @@ function validateSourceUrl(value: string) {
   };
 }
 
-// Maps protected checkpoint detector kinds into user-facing handoff kinds.
 function mapCheckpointToHandoff(kind: "captcha" | "login" | "otp" | "verification" | undefined): AgentHandoffKind | undefined {
   switch (kind) {
     case "captcha":

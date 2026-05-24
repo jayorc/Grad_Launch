@@ -2,7 +2,7 @@
   "applicationId": "application_8o0vublb",
   "studentId": "student_hlnw1o55",
   "jobId": "job_url_aHR0cHM6Ly93d3cucXVhbnR1",
-  "status": "autofilled",
+  "status": "ready_for_review",
   "sourceLabel": "Pasted URL",
   "matchScore": 32,
   "generatedArtifacts": {
@@ -26,8 +26,8 @@
     "short_answers.json"
   ],
   "run": {
-    "id": "run_82c1o9is",
-    "status": "completed",
+    "id": "run_xndca3av",
+    "status": "needs_review",
     "executionMode": "browser_apply",
     "filledFields": [
       {
@@ -159,81 +159,88 @@
       "intent": "browser_fill",
       "outcome": "confirmed",
       "externalSubmitted": false,
-      "confirmation": "The form is filled across 1 stage and is ready for review or direct submit.",
-      "submittedAt": "2026-05-23T18:36:40.939Z",
+      "confirmation": "GradLaunch could not confidently find the next action on this page.",
+      "submittedAt": "2026-05-24T10:29:20.108Z",
       "email": {
         "status": "skipped",
         "provider": "outbox",
         "to": "arpitarpit2003@gmail.com",
         "subject": "GradLaunch filled Quantum Paradigm - Back-End Developer",
-        "sentAt": "2026-05-23T18:36:40.939Z",
+        "sentAt": "2026-05-24T10:29:20.108Z",
         "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
       },
       "browser": {
-        "status": "filled",
+        "status": "needs_manual_review",
         "sourceUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
-        "openedAt": "2026-05-23T18:35:52.403Z",
-        "completedAt": "2026-05-23T18:36:40.938Z",
+        "openedAt": "2026-05-24T10:28:56.929Z",
+        "completedAt": "2026-05-24T10:29:20.108Z",
         "filledLabels": [
           "Resume upload",
           "Full Name",
           "Email",
           "Phone",
-          "Cover Letter"
+          "Cover Letter",
+          "By using this form you agree with the storage and handling of your data by this website."
         ],
         "skippedLabels": [],
         "screenshots": [
           "browser-opened.png",
           "browser-stage-1-start.png",
-          "browser-filled.png"
+          "browser-filled.png",
+          "browser-stage-2-start.png"
         ],
-        "message": "The form is filled across 1 stage and is ready for review or direct submit.",
+        "message": "GradLaunch could not confidently find the next action on this page.",
         "planner": {
           "sessionId": "planner-job_url_aHR0cHM6Ly93d3cucXVhbnR1",
           "resumeToken": "job_url_aHR0cHM6Ly93d3cucXVhbnR1:2026-05-23T10:37:01.593Z",
           "goal": "Complete the Back-End Developer application at Quantum Paradigm autonomously until a protected or review checkpoint.",
-          "status": "completed",
-          "summary": "Planner completed the form fill and paused at the review gate.",
-          "formMode": "single_stage",
-          "currentStep": "stage_1",
-          "currentStageLabel": "Section 1",
-          "currentUrl": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+          "status": "needs_review",
+          "summary": "GradLaunch could not find a confident next-step control on this page.",
+          "formMode": "multi_stage",
+          "currentStep": "stage_2",
+          "currentStageLabel": "Section 2",
+          "currentUrl": "about:blank",
           "retryCount": 0,
-          "handoffCount": 0,
-          "validationErrors": [],
+          "handoffCount": 4,
+          "validationErrors": [
+            "Cover Letter",
+            "Full Name",
+            "Email",
+            "Phone"
+          ],
           "subgoals": [
             {
               "id": "open_job_page",
               "label": "Open job page",
               "status": "completed",
               "detail": "Job page opened successfully in a visible Chrome session.",
-              "attempts": 2,
-              "lastUpdatedAt": "2026-05-23T18:35:57.679Z",
-              "completedAt": "2026-05-23T18:35:57.679Z"
+              "attempts": 7,
+              "lastUpdatedAt": "2026-05-24T10:29:02.285Z",
+              "completedAt": "2026-05-24T10:29:02.285Z"
             },
             {
               "id": "authenticate_if_needed",
               "label": "Handle login if needed",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-23T10:37:01.593Z"
+              "status": "running",
+              "detail": "Protected checkpoint cleared. Resuming autonomous execution.",
+              "attempts": 8,
+              "lastUpdatedAt": "2026-05-24T10:26:35.846Z"
             },
             {
               "id": "finish_current_section",
               "label": "Finish active section",
               "status": "running",
-              "detail": "Reading Section 1 and planning the next safe action.",
-              "attempts": 2,
-              "lastUpdatedAt": "2026-05-23T18:35:58.299Z"
+              "detail": "Reading Section 2 and planning the next safe action.",
+              "attempts": 11,
+              "lastUpdatedAt": "2026-05-24T10:29:18.819Z"
             },
             {
               "id": "recover_from_validation_errors",
               "label": "Recover from validation errors",
-              "status": "pending",
-              "detail": "Waiting to start.",
-              "attempts": 0,
-              "lastUpdatedAt": "2026-05-23T10:37:01.593Z"
+              "status": "blocked",
+              "detail": "Validation or required-answer blockers were found: Cover Letter, Full Name.",
+              "attempts": 4,
+              "lastUpdatedAt": "2026-05-24T10:26:23.316Z"
             },
             {
               "id": "retry_alternative_path",
@@ -249,8 +256,8 @@
               "status": "completed",
               "detail": "Reached the review/submit checkpoint safely.",
               "attempts": 0,
-              "lastUpdatedAt": "2026-05-23T18:36:26.342Z",
-              "completedAt": "2026-05-23T18:36:26.342Z"
+              "lastUpdatedAt": "2026-05-24T10:29:12.826Z",
+              "completedAt": "2026-05-24T10:29:12.826Z"
             },
             {
               "id": "save_checkpoint",
@@ -258,30 +265,25 @@
               "status": "completed",
               "detail": "Saved checkpoint while waiting for manual stage progress.",
               "attempts": 0,
-              "lastUpdatedAt": "2026-05-23T18:36:26.675Z",
-              "completedAt": "2026-05-23T18:36:26.675Z"
+              "lastUpdatedAt": "2026-05-24T10:29:20.050Z",
+              "completedAt": "2026-05-24T10:29:20.050Z"
             }
           ],
           "lastDecision": {
-            "kind": "fill_fields",
-            "source": "llm",
-            "stageIndex": 0,
-            "stageLabel": "Section 1",
-            "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
-            "reason": "Dedicated and detail-oriented software engineer with a strong background in C/C++, Python, Java, and JavaScript. Proficient in backend development, machine learning, and data analysis. Seeking a challenging role at Quantum Paradigm to apply my skills and experience in building reliable backend systems.",
-            "fieldLabels": [
-              "Full Name",
-              "Email",
-              "Phone",
-              "Cover Letter"
-            ],
-            "createdAt": "2026-05-23T18:36:26.319Z"
+            "kind": "navigate_next",
+            "source": "heuristic",
+            "stageIndex": 1,
+            "stageLabel": "Section 2",
+            "url": "about:blank",
+            "reason": "Page classified as empty; continuing to the next logical stage.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-24T10:29:20.048Z"
           },
           "stageHistory": [
             {
               "stageIndex": 0,
               "label": "Section 1",
-              "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
+              "url": "about:blank",
               "visibleFieldLabels": [
                 "Full Name",
                 "Email",
@@ -303,37 +305,59 @@
                 "Full Name",
                 "Email",
                 "Phone",
-                "Cover Letter"
+                "Cover Letter",
+                "By using this form you agree with the storage and handling of your data by this website."
               ],
-              "outcome": "review",
+              "outcome": "advanced",
               "decision": {
                 "kind": "fill_fields",
                 "source": "llm",
                 "stageIndex": 0,
                 "stageLabel": "Section 1",
                 "url": "https://www.quantumparadigm.in/jobs/back-end-developer/",
-                "reason": "Dedicated and detail-oriented software engineer with a strong background in C/C++, Python, Java, and JavaScript. Proficient in backend development, machine learning, and data analysis. Seeking a challenging role at Quantum Paradigm to apply my skills and experience in building reliable backend systems.",
+                "reason": "Dedicated and detail-oriented software engineer with a strong background in C/C++, Python, Java, and JavaScript, seeking to leverage my skills in backend development to contribute to Quantum Paradigm's team.",
                 "fieldLabels": [
                   "Full Name",
                   "Email",
                   "Phone",
-                  "Cover Letter"
+                  "Cover Letter",
+                  "By using this form you agree with the storage and handling of your data by this website."
                 ],
-                "createdAt": "2026-05-23T18:36:26.319Z"
+                "createdAt": "2026-05-24T10:29:12.147Z"
               },
-              "lastUpdatedAt": "2026-05-23T18:36:26.342Z"
+              "lastUpdatedAt": "2026-05-24T10:29:18.408Z"
+            },
+            {
+              "stageIndex": 1,
+              "label": "Section 2",
+              "url": "about:blank",
+              "visibleFieldLabels": [],
+              "requiredFieldLabels": [],
+              "filledFieldLabels": [],
+              "outcome": "observed",
+              "decision": {
+                "kind": "navigate_next",
+                "source": "heuristic",
+                "stageIndex": 1,
+                "stageLabel": "Section 2",
+                "url": "about:blank",
+                "reason": "Page classified as empty; continuing to the next logical stage.",
+                "fieldLabels": [],
+                "createdAt": "2026-05-24T10:29:20.048Z"
+              },
+              "lastUpdatedAt": "2026-05-24T10:29:20.048Z"
             }
           ],
-          "lastUpdatedAt": "2026-05-23T18:36:26.675Z"
+          "lastUpdatedAt": "2026-05-24T10:29:20.050Z"
         }
       }
     },
     "notes": [
-      "The form is filled across 1 stage and is ready for review or direct submit.",
-      "Browser fill status: filled.",
-      "Filled fields: 5. Skipped fields: 0."
+      "GradLaunch could not confidently find the next action on this page.",
+      "Browser fill status: needs_manual_review.",
+      "Filled fields: 6. Skipped fields: 0."
     ]
   },
   "createdAt": "2026-05-23T10:37:01.590Z",
-  "updatedAt": "2026-05-23T18:36:40.939Z"
+  "updatedAt": "2026-05-24T10:29:20.108Z"
 }

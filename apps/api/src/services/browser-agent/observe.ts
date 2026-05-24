@@ -10,18 +10,9 @@ import type {
   ProtectedCheckpointDetection,
   VisibleField
 } from "./types";
-import { dedupeLabels, isTransientStatusMessage, normalizeKey, safeHostname } from "./util";
+import { dedupeLabels, normalizeKey, safeHostname } from "./util";
 
-// observe.ts is the browser agent's "eyes". It reads the current tab across
-// frames/shadow roots, tags visible controls, groups radio/checkbox options,
-// detects protected gates, and reports enough page state for the strategy and
-// fill layers to make safe decisions.
-// Selects the best active page in the browser context after redirects, login
-// flows, or new-tab opens. The agent always acts on this page instead of a
-// stale blank/new-tab page.
 export async function getActivePage(context: BrowserContext, fallbackPage: Page) {
-  // Login flows and ATS redirects often open or focus a different tab. Always
-  // pick the most meaningful non-blank page before observing or acting.
   await fallbackPage.waitForTimeout(400).catch(() => undefined);
   const pages = context.pages().filter((page) => !page.isClosed());
   const meaningfulPages = pages.filter((page) => !isBlankBrowserPage(page.url()));
@@ -40,14 +31,10 @@ export async function getActivePage(context: BrowserContext, fallbackPage: Page)
   return page;
 }
 
-// Detects browser-native blank/new-tab URLs that should not be treated as real
-// job application pages.
 function isBlankBrowserPage(url: string) {
   return !url || url === "about:blank" || url.startsWith("chrome://newtab");
 }
 
-// Safely extracts the origin from a URL so open pages can be compared without
-// throwing on invalid or browser-internal URLs.
 function safePageOrigin(url: string) {
   try {
     return new URL(url).origin;
@@ -56,67 +43,20 @@ function safePageOrigin(url: string) {
   }
 }
 
-// Clicks harmless cookie/consent/continue overlays that block observation of
-// the actual form, while avoiding the GradLaunch live bot.
 export async function clickSoftGate(page: Page) {
-  // Soft gates are low-risk cookie/consent/start overlays that block the real
-  // form. This intentionally avoids the GradLaunch live bot and only clicks
-  // simple visible controls with harmless labels.
   const labels = ["Accept", "Accept all", "Continue", "I agree"];
 
   for (const label of labels) {
-    const clicked = await page.evaluate((label) => {
-      const wanted = normalize(label);
-      const controls = Array.from(document.querySelectorAll("button, [role='button'], input[type='button'], input[type='submit'], a")) as HTMLElement[];
-
-      for (const control of controls) {
-        if (control.closest("#gradlaunch-live-bot") || !isVisible(control) || isDisabled(control)) {
-          continue;
-        }
-
-        const text = normalize([
-          control.textContent,
-          control.getAttribute("aria-label"),
-          control instanceof HTMLInputElement ? control.value : ""
-        ].filter(Boolean).join(" "));
-
-        if (text.includes(wanted)) {
-          control.click();
-          return true;
-        }
-      }
-
-      return false;
-
-      function isVisible(element: HTMLElement) {
-        const rect = element.getBoundingClientRect();
-        const style = window.getComputedStyle(element);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-      }
-
-      function isDisabled(element: HTMLElement) {
-        return (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) && element.disabled
-          || element.getAttribute("aria-disabled") === "true";
-      }
-
-      function normalize(value: string) {
-        return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      }
-    }, label).catch(() => false);
-
-    if (clicked) {
+    try {
+      await page.getByRole("button", { name: label, exact: false }).first().click({ timeout: 800 });
       return;
+    } catch (_error) {
+      // Soft gates vary across sites.
     }
   }
 }
 
-// Discovers visible fillable fields across frames and shadow roots, assigns
-// stable GradLaunch ids, groups radio buttons, and captures labels/options/
-// context needed by answer planning and filling.
 export async function discoverVisibleFields(page: Page): Promise<VisibleField[]> {
-  // Field discovery assigns stable data-gradlaunch-field-id markers to usable
-  // inputs so later answer planning and filling can target the same live DOM
-  // control even when labels are duplicated.
   const fields: VisibleField[] = [];
 
   for (const frame of page.frames()) {
@@ -124,92 +64,35 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
       const searchRoots = getSearchRoots();
       const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
       const items: VisibleField[] = [];
-      const seenRadioGroups = new Set<string>();
 
       for (const [index, control] of controls.entries()) {
         if (control instanceof HTMLInputElement && ["hidden", "submit", "button", "image", "reset"].includes(control.type)) {
           continue;
         }
 
-        if (isInactiveFormBranch(control)) {
-          continue;
-        }
-
-        const isChoiceControl = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type);
         const rect = control.getBoundingClientRect();
-        const customSelectProxy = control instanceof HTMLSelectElement ? getVisibleCustomSelectProxy(control) : undefined;
 
-        if ("disabled" in control && control.disabled) {
-          continue;
-        }
-
-        if ((rect.width <= 0 || rect.height <= 0) && !(isChoiceControl && hasVisibleChoiceTarget(control)) && !customSelectProxy) {
+        if (rect.width <= 0 || rect.height <= 0 || ("disabled" in control && control.disabled)) {
           continue;
         }
 
         const label = findFieldLabel(control);
 
-        if (!label.trim() || isNoiseField(control, label)) {
+        if (!label.trim()) {
           continue;
         }
 
-        if (control instanceof HTMLInputElement && control.type === "radio") {
-          const radioGroup = findRadioGroup(control);
-          const groupLabel = findChoiceGroupLabel(control, radioGroup) || label;
-          const groupKey = radioGroupKey(control, groupLabel, index);
-
-          if (seenRadioGroups.has(groupKey)) {
-            continue;
-          }
-
-          seenRadioGroups.add(groupKey);
-
-          const idControl = radioGroup.find((item) => isVisibleControl(item)) ?? control;
-          const id = idControl.getAttribute("data-gradlaunch-field-id") || `gl-field-${index}-${normalize(groupLabel)}`;
-          idControl.setAttribute("data-gradlaunch-field-id", id);
-
-          items.push({
-            id,
-            label: clean(groupLabel),
-            placeholder: "",
-            name: clean(control.name),
-            ariaLabel: clean(control.getAttribute("aria-label")),
-            autocomplete: clean(control.getAttribute("autocomplete")),
-            role: clean(control.getAttribute("role")),
-            required: radioGroup.some((item) => isRequired(item, groupLabel || findFieldLabel(item))),
-            tagName: control.tagName.toLowerCase(),
-            inputType: "radio",
-            options: dedupeText(radioGroup.map((item) => clean(findFieldLabel(item) || item.value)).filter(Boolean)).slice(0, 15),
-            context: clean(findChoiceGroupContext(control, groupLabel))
-          });
-          continue;
-        }
-
-        const id = control.getAttribute("data-gradlaunch-field-id")
-          || customSelectProxy?.getAttribute("data-gradlaunch-field-id")
-          || (control instanceof HTMLSelectElement && control.id ? `gl-select-${control.id}` : `gl-field-${index}-${normalize(label)}`);
+        const id = control.getAttribute("data-gradlaunch-field-id") || `gl-field-${index}-${normalize(label)}`;
         control.setAttribute("data-gradlaunch-field-id", id);
-        customSelectProxy?.setAttribute("data-gradlaunch-field-id", id);
 
         items.push({
           id,
           label: clean(label),
-          placeholder: clean(control.getAttribute("placeholder")),
-          name: clean(control.getAttribute("name")),
-          ariaLabel: clean(control.getAttribute("aria-label")),
-          autocomplete: control instanceof HTMLInputElement ? clean(control.getAttribute("autocomplete")) : "",
-          role: clean(control.getAttribute("role")),
           required: isRequired(control, label),
           tagName: control.tagName.toLowerCase(),
-          inputType: control instanceof HTMLSelectElement
-            ? customSelectProxy ? "combobox" : "select"
-            : control instanceof HTMLInputElement
-              ? getInputType(control)
-              : "textarea",
+          inputType: control instanceof HTMLInputElement ? control.type || "text" : control instanceof HTMLSelectElement ? "select" : "textarea",
           options: control instanceof HTMLSelectElement
             ? Array.from(control.options).map((option) => clean(option.textContent ?? option.value)).filter(Boolean).slice(0, 15)
-            : control instanceof HTMLInputElement && control.type === "checkbox"
-              ? [clean(label)].filter(Boolean)
             : [],
           context: clean([
             control.closest("fieldset")?.querySelector("legend")?.textContent,
@@ -229,327 +112,11 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
         return (value ?? "").replace(/\s+/g, " ").replace(/\*/g, "").trim().slice(0, 160);
       }
 
-      function getInputType(control: HTMLInputElement) {
-        if (isCustomSelectLike(control)) {
-          return "combobox";
-        }
-
-        return control.type || "text";
-      }
-
-      function findRadioGroup(control: HTMLInputElement) {
-        const root = control.getRootNode();
-
-        if (control.name) {
-          const selector = `input[type='radio'][name="${CSS.escape(control.name)}"]`;
-          const namedControls = root instanceof Document || root instanceof ShadowRoot || root instanceof Element
-            ? Array.from(root.querySelectorAll(selector)) as HTMLInputElement[]
-            : [];
-
-          if (namedControls.length > 1) {
-            return namedControls.filter((item) => isVisibleControl(item) && !item.disabled);
-          }
-        }
-
-        const ancestorGroup = findChoiceControlsInBestAncestor(control, "radio");
-
-        if (ancestorGroup.length > 1) {
-          return ancestorGroup;
-        }
-
-        const container = control.closest("fieldset, [role='radiogroup'], [role='group'], section, article, [class*='question'], [class*='field'], [class*='input']")
-          ?? control.parentElement;
-        const grouped = container
-          ? Array.from(container.querySelectorAll("input[type='radio']")) as HTMLInputElement[]
-          : [control];
-
-        return grouped.filter((item) => isVisibleControl(item) && !item.disabled);
-      }
-
-      function findChoiceControlsInBestAncestor(control: HTMLInputElement, type: "radio" | "checkbox") {
-        let best: HTMLInputElement[] = [];
-        let bestScore = Number.NEGATIVE_INFINITY;
-        let ancestor: Element | null = control.parentElement;
-
-        for (let depth = 0; depth < 10 && ancestor; depth += 1) {
-          const controls = Array.from(ancestor.querySelectorAll(`input[type='${type}']`)) as HTMLInputElement[];
-          const usable = controls.filter((item) => isVisibleControl(item) && !item.disabled);
-
-          if (usable.length < 2 || usable.length > 12) {
-            ancestor = ancestor.parentElement;
-            continue;
-          }
-
-          const text = normalize(ancestor.textContent ?? "");
-          let score = 0;
-
-          if (/\b(yes|no|no thanks|continue to apply|decline)\b/.test(text)) {
-            score += 45;
-          }
-
-          if (/\b(talent network|career opportunities|upcoming events|keep you up to date|preferred name|past working experience|work experience)\b/.test(text)) {
-            score += 90;
-          }
-
-          if (/\b(this field is required|required)\b/.test(text)) {
-            score += 20;
-          }
-
-          score += Math.min(usable.length * 8, 30);
-          score -= Math.min(text.length / 260, 55);
-          score -= depth * 2;
-
-          if (score > bestScore) {
-            bestScore = score;
-            best = usable;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return bestScore >= 20 ? best : [];
-      }
-
-      function radioGroupKey(control: HTMLInputElement, groupLabel: string, index: number) {
-        return control.name
-          ? `name:${control.name}`
-          : `label:${normalize(groupLabel) || index}`;
-      }
-
-      function findChoiceGroupLabel(control: HTMLInputElement, group: HTMLInputElement[]) {
-        const fieldsetLegend = control.closest("fieldset")?.querySelector("legend")?.textContent;
-
-        if (fieldsetLegend?.trim()) {
-          return clean(fieldsetLegend);
-        }
-
-        const radiogroup = control.closest("[role='radiogroup'], [role='group']");
-        const labelledBy = radiogroup?.getAttribute("aria-labelledby");
-
-        if (labelledBy) {
-          const labelledText = labelledBy
-            .split(/\s+/)
-            .map((id) => getElementById(id)?.textContent ?? "")
-            .join(" ");
-
-          if (labelledText.trim()) {
-            return clean(labelledText);
-          }
-        }
-
-        const groupOptions = new Set(group.map((item) => normalize(findFieldLabel(item) || item.value)).filter(Boolean));
-        let ancestor: Element | null = control.parentElement;
-
-        for (let depth = 0; depth < 8 && ancestor; depth += 1) {
-          const heading = Array.from(ancestor.querySelectorAll("legend, h1, h2, h3, h4, [aria-level], p, label"))
-            .map((element) => clean(element.textContent))
-            .find((text) => {
-              const normalized = normalize(text);
-              return normalized
-                && !groupOptions.has(normalized)
-                && normalized.length > 4
-                && !/\b(this field is required|there are some errors|show details)\b/.test(normalized);
-            });
-
-          if (heading) {
-            return heading;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return "";
-      }
-
-      function findChoiceGroupContext(control: HTMLInputElement, groupLabel: string) {
-        const container = control.closest("fieldset, [role='radiogroup'], [role='group'], section, article, [class*='question'], [class*='field'], [class*='input']");
-
-        return [
-          groupLabel,
-          container?.textContent
-        ].filter(Boolean).join(" ");
-      }
-
-      function dedupeText(values: string[]) {
-        const seen = new Set<string>();
-        const unique: string[] = [];
-
-        for (const value of values) {
-          const key = normalize(value);
-
-          if (!key || seen.has(key)) {
-            continue;
-          }
-
-          seen.add(key);
-          unique.push(value);
-        }
-
-        return unique;
-      }
-
       function isRequired(control: Element, label: string) {
-        const choiceContainer = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)
-          ? control.closest("label, fieldset, [role='group'], [role='radiogroup'], section, article, [class*='question'], [class*='field'], [class*='input']")
-          : undefined;
-
         return (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).required
           || control.getAttribute("aria-required") === "true"
           || /\*/.test(label)
-          || Boolean(choiceContainer?.textContent && /\*/.test(choiceContainer.textContent))
           || Boolean(control.closest(".required, [class*='required'], [data-required='true']"));
-      }
-
-      function isVisibleControl(control: Element) {
-        const rect = control.getBoundingClientRect();
-        const style = window.getComputedStyle(control);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
-          || control instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(control))
-          || control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type) && hasVisibleChoiceTarget(control);
-      }
-
-      function isInactiveFormBranch(control: Element) {
-        if (control.closest(".datasetField__row--sample") || control.hasAttribute("hidden")) {
-          return true;
-        }
-
-        if (control.parentElement?.closest("[hidden], [aria-hidden='true']")) {
-          return true;
-        }
-
-        const id = control.getAttribute("id") ?? "";
-        const name = control.getAttribute("name") ?? "";
-        return /(^|-)sample($|-)/i.test(id) || /(^|-)sample($|-)/i.test(name);
-      }
-
-      function getVisibleCustomSelectProxy(control: HTMLSelectElement) {
-        if (!isCustomSelectElement(control)) {
-          return undefined;
-        }
-
-        const candidates = [
-          control.nextElementSibling,
-          control.parentElement?.querySelector("[role='combobox']"),
-          control.parentElement?.querySelector(".select2 [role='combobox']"),
-          control.id ? queryFirst(`.select2Container${CSS.escape(control.id)}`, control) : null,
-          control.id ? queryFirst(`[aria-labelledby~="${CSS.escape(`${control.id}-label`)}"][role='combobox']`, control) : null,
-          control.id ? queryFirst(`#select2-${CSS.escape(control.id)}-container`, control)?.closest("[role='combobox']") : null
-        ];
-
-        for (const candidate of candidates) {
-          const element = candidate instanceof HTMLElement
-            ? candidate
-            : candidate instanceof Element
-              ? candidate.querySelector("[role='combobox']") as HTMLElement | null
-              : null;
-
-          if (element && isVisibleElement(element)) {
-            return element;
-          }
-        }
-
-        return undefined;
-      }
-
-      function isCustomSelectElement(control: HTMLSelectElement) {
-        const className = String(control.getAttribute("class") ?? "");
-        return control.getAttribute("aria-hidden") === "true"
-          || /\b(select2-hidden-accessible|select2|autocomplete|combobox)\b/i.test(className)
-          || Boolean(control.parentElement?.querySelector(".select2, [role='combobox'], [aria-haspopup='true'], [aria-haspopup='listbox']"));
-      }
-
-      function isVisibleElement(element: Element) {
-        const rect = element.getBoundingClientRect();
-        const style = window.getComputedStyle(element);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-      }
-
-      function hasVisibleChoiceTarget(control: HTMLInputElement) {
-        const target = getChoiceClickTarget(control);
-
-        if (!target) {
-          return false;
-        }
-
-        const rect = target.getBoundingClientRect();
-        const style = window.getComputedStyle(target);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-      }
-
-      function getChoiceClickTarget(control: HTMLInputElement) {
-        if (control.id) {
-          const label = queryFirst(`label[for="${CSS.escape(control.id)}"]`, control);
-
-          if (label instanceof HTMLElement) {
-            return label;
-          }
-        }
-
-        const closestLabel = control.closest("label");
-
-        if (closestLabel instanceof HTMLElement) {
-          return closestLabel;
-        }
-
-        const row = control.closest("button, [role='radio'], [role='checkbox'], [role='button'], [aria-checked], [tabindex], [class*='checkbox'], [class*='radio']");
-
-        return row instanceof HTMLElement ? row : undefined;
-      }
-
-      function isNoiseField(control: Element, label: string) {
-        const normalized = normalize(label);
-
-        if (!normalized) {
-          return true;
-        }
-
-        if (normalized.length > 140) {
-          return true;
-        }
-
-        if (/results found|no results found/.test(normalized)) {
-          return true;
-        }
-
-        if (control.closest("[role='option'], [role='listbox'], [role='menu'], [role='dialog']") && !/^location|city|country|phone|email|name/.test(normalized)) {
-          return true;
-        }
-
-        return false;
-      }
-
-      function isCustomSelectLike(control: HTMLInputElement) {
-        const popup = control.getAttribute("aria-haspopup") ?? "";
-        const role = control.getAttribute("role") ?? "";
-        const expanded = control.getAttribute("aria-expanded");
-
-        if (role === "combobox" || /^(listbox|menu|dialog|tree|true)$/i.test(popup) || expanded !== null) {
-          return true;
-        }
-
-        let ancestor = control.parentElement;
-
-        for (let depth = 0; depth < 3 && ancestor; depth += 1) {
-          const ancestorRole = ancestor.getAttribute("role") ?? "";
-          const ancestorPopup = ancestor.getAttribute("aria-haspopup") ?? "";
-          const ancestorExpanded = ancestor.getAttribute("aria-expanded");
-          const className = String(ancestor.getAttribute("class") ?? "");
-
-          if (
-            ancestorRole === "combobox"
-            || /^(listbox|menu|dialog|tree|true)$/i.test(ancestorPopup)
-            || ancestorExpanded !== null
-            || ancestor.hasAttribute("data-radix-select-trigger")
-            || ancestor.hasAttribute("data-headlessui-state")
-            || /\b(combobox|select__control|select-control|select-trigger|select-input)\b/i.test(className)
-          ) {
-            return true;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return false;
       }
 
       function findFieldLabel(control: Element) {
@@ -660,12 +227,7 @@ export async function discoverVisibleFields(page: Page): Promise<VisibleField[]>
   });
 }
 
-// Builds the full page observation used by planning: visible fields, controls,
-// text, validation messages, grouped fields, ATS adapter hint, and page state.
 export async function observeBrowserPage(page: Page, visibleFields: VisibleField[]): Promise<BrowserAgentObservation> {
-  // Observation combines structured fields with visible controls/buttons and
-  // validation text. The strategy layer uses this single object to decide
-  // whether the page is login, upload, form fill, review, submit, or unknown.
   const validationMessages = await getVisibleValidationMessages(page);
   const domObservation = await page.evaluate(() => {
     const searchRoots = getSearchRoots();
@@ -673,10 +235,6 @@ export async function observeBrowserPage(page: Page, visibleFields: VisibleField
     const controls: ObservedControl[] = [];
 
     for (const [index, element] of candidates.entries()) {
-      if (element.closest("#gradlaunch-live-bot")) {
-        continue;
-      }
-
       const rect = element.getBoundingClientRect();
 
       if (rect.width <= 0 || rect.height <= 0) {
@@ -706,14 +264,9 @@ export async function observeBrowserPage(page: Page, visibleFields: VisibleField
       });
     }
 
-    const pageText = [
-      document.body?.innerText ?? "",
-      controls.map((control) => control.text).join(" ")
-    ].filter(Boolean).join(" ").replace(/\s+/g, " ").slice(0, 3500);
-
     return {
       title: document.title,
-      pageText,
+      pageText: document.body?.innerText?.replace(/\s+/g, " ").slice(0, 3500) ?? "",
       controls
     };
 
@@ -782,11 +335,7 @@ export async function observeBrowserPage(page: Page, visibleFields: VisibleField
   };
 }
 
-// Creates a lightweight page fingerprint from URL and visible controls so the
-// engine can detect same-screen loops and failed transitions.
 export async function getPageFingerprint(page: Page) {
-  // Fingerprints are loop guards. They identify "we are still on the same
-  // screen" without depending on exact screenshots.
   return page.evaluate(() => {
     const controls = getSearchRoots().flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
     const visibleControlKeys = controls
@@ -825,8 +374,6 @@ export async function getPageFingerprint(page: Page) {
   }).catch(() => page.url());
 }
 
-// Reads progress/step indicators from the page so stage signatures can tell
-// whether a wizard advanced even if the URL stayed the same.
 export async function getProgressSnapshot(page: Page) {
   return page.evaluate(() => {
     const selectors = [
@@ -857,11 +404,7 @@ export async function getProgressSnapshot(page: Page) {
   }).catch(() => undefined);
 }
 
-// Captures the current stage signature for checkpoints, transition detection,
-// and resume-after-handoff context.
 export async function getStageSignature(page: Page, observation?: BrowserAgentObservation) {
-  // Stage signatures are saved into execution sessions so a paused/manual run
-  // can resume with context about which screen was last active.
   const nextObservation = observation ?? await observeBrowserPage(page, await discoverVisibleFields(page));
   const fingerprint = await getPageFingerprint(page);
   const progressText = await getProgressSnapshot(page);
@@ -878,8 +421,6 @@ export async function getStageSignature(page: Page, observation?: BrowserAgentOb
   };
 }
 
-// Compares the current page against a saved stage signature to decide whether a
-// paused/resumed run is still on the same application stage.
 export async function matchesSavedStageSignature(page: Page, signature: { fingerprint: string; url: string; progressText?: string }) {
   const [fingerprint, progressText] = await Promise.all([
     getPageFingerprint(page),
@@ -890,12 +431,7 @@ export async function matchesSavedStageSignature(page: Page, signature: { finger
     || (page.url() === signature.url && progressText === signature.progressText);
 }
 
-// Detects protected checkpoints such as login, CAPTCHA, OTP, or verification.
-// These always require manual handoff before the agent can continue filling.
 export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCheckpointDetection> {
-  // Protected checkpoints are intentionally detected outside normal planning.
-  // Login/CAPTCHA/MFA should always pause the bot and wait for explicit user
-  // confirmation before any filling continues.
   return page.evaluate(() => {
     function normalize(value: string) {
       return value.toLowerCase().replace(/\s+/g, " ").trim();
@@ -912,39 +448,7 @@ export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCh
     }
 
     const bodyText = normalize(document.body?.innerText ?? "");
-    const currentHost = window.location.hostname.toLowerCase();
     const visiblePasswordField = Array.from(document.querySelectorAll("input[type='password']")).some((field) => isVisible(field));
-    const visibleApplicationField = Array.from(document.querySelectorAll("input, textarea, select")).some((field) => {
-      if (!isVisible(field)) {
-        return false;
-      }
-
-      const descriptor = normalize([
-        field.getAttribute("name") ?? "",
-        field.getAttribute("id") ?? "",
-        field.getAttribute("aria-label") ?? "",
-        field.getAttribute("placeholder") ?? "",
-        field.closest("label")?.textContent ?? ""
-      ].join(" "));
-
-      return /\b(first name|last name|full name|resume|cv|phone|mobile|location|city|school|degree)\b/.test(descriptor);
-    });
-    const visibleLoginProviderControl = Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit']"))
-      .some((control) => {
-        if (!isVisible(control)) {
-          return false;
-        }
-
-        const text = normalize([
-          control.textContent ?? "",
-          control.getAttribute("aria-label") ?? "",
-          control.getAttribute("title") ?? "",
-          control instanceof HTMLInputElement ? control.value : ""
-        ].join(" "));
-
-        return /\b(sign in|signin|log in|login|continue)\b/.test(text)
-          && /\b(google|gmail|email|e mail|mail|sso|account)\b/.test(text);
-      });
     const visibleOtpField = Array.from(document.querySelectorAll("input, textarea")).some((field) => {
       if (!isVisible(field)) {
         return false;
@@ -978,43 +482,11 @@ export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCh
       };
     }
 
-    if (/(user authentication is denied|authentication is denied|log on did not complete|logon did not complete|not permitted using the selected method|chosen identity is not permitted|csiac\d+)/.test(bodyText)) {
-      return {
-        blocked: true,
-        kind: "verification" as const,
-        reason: "The job portal rejected this login method or account. Try a permitted account/login option in the open browser, then continue only after the application form is visible."
-      };
-    }
-
-    if (/(security key|passkey|touch id|use a saved passkey|use a phone or tablet|usb security key|registered security device|registered device|follow the on-screen prompt|webauthn|authenticator device|issue verifying your login|use another method)/.test(bodyText)) {
-      return {
-        blocked: true,
-        kind: "verification" as const,
-        reason: "IBM security key/passkey verification is blocking login. If Touch ID/security key fails, click 'Use another method' in IBM, complete login manually, then click the GradLaunch continue button."
-      };
-    }
-
-    if (/(^|\.)accounts\.google\.com$/.test(currentHost) && /\b(sign in|email or phone|choose an account|password|continue|verify|2-step verification)\b/.test(bodyText)) {
-      return {
-        blocked: true,
-        kind: "login" as const,
-        reason: "Google sign-in is open. Complete login manually in this controlled Chrome window, then click the GradLaunch continue button."
-      };
-    }
-
     if (visiblePasswordField && /sign in|log in|login|password|account/.test(bodyText)) {
       return {
         blocked: true,
         kind: "login" as const,
         reason: "Human intervention needed: sign in to the job portal in the open browser."
-      };
-    }
-
-    if (visibleLoginProviderControl && !visibleApplicationField && /\b(sign in|signin|log in|login|continue with google|continue with email|account)\b/.test(bodyText)) {
-      return {
-        blocked: true,
-        kind: "login" as const,
-        reason: "Login panel detected. GradLaunch is paused; choose Google/email manually in this controlled Chrome window, then click the GradLaunch continue button."
       };
     }
 
@@ -1038,8 +510,6 @@ export async function detectProtectedCheckpoint(page: Page): Promise<ProtectedCh
   }).catch(() => ({ blocked: false }));
 }
 
-// Finds visible required fields that are still empty or invalid. The engine uses
-// this as a hard guard before clicking Continue.
 export async function getVisibleRequiredEmptyLabels(page: Page) {
   const labels: string[] = [];
 
@@ -1047,489 +517,37 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
     const frameLabels = await frame.evaluate(() => {
       const searchRoots = getSearchRoots();
       const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
-      const groups = new Map<string, { label: string; satisfied: boolean; required: boolean }>();
 
-      for (const control of controls) {
-        if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button"].includes(control.type)) {
-          continue;
-        }
-
-        if (isInactiveFormBranch(control)) {
-          continue;
-        }
-
-        const isChoiceControl = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type);
-        const rect = control.getBoundingClientRect();
-        const customSelectProxy = control instanceof HTMLSelectElement ? getVisibleCustomSelectProxy(control) : undefined;
-
-        if ((rect.width <= 0 || rect.height <= 0) && !(isChoiceControl && hasVisibleChoiceTarget(control)) && !customSelectProxy) {
-          continue;
-        }
-
-        const label = findFieldLabel(control);
-        const cleanLabel = clean(label);
-
-        if (!cleanLabel || isNoiseField(control, cleanLabel)) {
-          continue;
-        }
-
-        const choiceGroupLabel = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)
-          ? findChoiceGroupLabel(control) || cleanLabel
-          : cleanLabel;
-        const hasSharedChoiceLabel = control instanceof HTMLInputElement
-          && ["checkbox", "radio"].includes(control.type)
-          && normalize(choiceGroupLabel) !== normalize(cleanLabel);
-        const key = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)
-          ? hasSharedChoiceLabel
-            ? `choice:${control.type}:${normalize(choiceGroupLabel)}`
-            : control.name
-              ? `choice:${control.type}:${control.name}`
-              : normalize(choiceGroupLabel)
-          : normalize(choiceGroupLabel);
-        const existing = groups.get(key) ?? {
-          label: choiceGroupLabel,
-          satisfied: false,
-          required: false
-        };
-
-        existing.required = existing.required || isRequired(control);
-        existing.satisfied = existing.satisfied || isSatisfied(control, searchRoots);
-        groups.set(key, existing);
-      }
-
-      for (const inferred of inferRequiredLabelControls(searchRoots)) {
-        const key = `inferred:${normalize(inferred.label)}`;
-        const existing = groups.get(key) ?? {
-          label: inferred.label,
-          satisfied: false,
-          required: true
-        };
-
-        existing.required = true;
-        existing.satisfied = existing.satisfied || inferred.satisfied;
-        groups.set(key, existing);
-      }
-
-      for (const errorLabel of findRequiredErrorLabels(searchRoots)) {
-        const key = `validation:${normalize(errorLabel)}`;
-        const existing = groups.get(key) ?? {
-          label: errorLabel,
-          satisfied: false,
-          required: true
-        };
-
-        existing.required = true;
-        existing.satisfied = existing.satisfied || false;
-        groups.set(key, existing);
-      }
-
-      return Array.from(groups.values())
-        .filter((group) => group.required && !group.satisfied)
-        .map((group) => group.label);
-
-      function isRequired(control: Element) {
-        const label = findFieldLabel(control);
-        const choiceContainer = control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)
-          ? control.closest("label, fieldset, [role='group'], [role='radiogroup'], section, article, [class*='question'], [class*='field'], [class*='input']")
-          : undefined;
-
-        return (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).required
-          || control.getAttribute("aria-required") === "true"
-          || control.getAttribute("aria-invalid") === "true"
-          || /\*/.test(label)
-          || Boolean(choiceContainer?.textContent && /\*/.test(choiceContainer.textContent))
-          || Boolean(control.closest(".required, [class*='required'], [data-required='true']"))
-          || hasNearbyRequiredError(control)
-          || isLikelyRequiredApplicationField(control, label);
-      }
-
-      function isSatisfied(
-        control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
-        roots: Array<Document | ShadowRoot>
-      ) {
-        if (control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)) {
-          const group = getChoiceGroupControls(control, roots);
-          return group.some((item) => item.checked || item.getAttribute("aria-checked") === "true");
-        }
-
-        if (control instanceof HTMLSelectElement) {
-          const selected = control.selectedOptions[0];
-          const selectedText = normalize([
-            selected?.textContent,
-            selected?.value,
-            control.value,
-            getCustomSelectRenderedText(control)
-          ].filter(Boolean).join(" "));
-
-          if (isEmptySelectText(selectedText)) {
+      return controls
+        .filter((control) => {
+          if (control instanceof HTMLInputElement && ["hidden", "file", "submit", "button"].includes(control.type)) {
             return false;
           }
 
-          return true;
-        }
+          const rect = control.getBoundingClientRect();
 
-        if (!(control instanceof HTMLElement)) {
-          return false;
-        }
-
-        if (control instanceof HTMLInputElement && isCustomSelectLike(control)) {
-          const actual = normalize(control.value);
-
-          if (actual && !isEmptySelectText(actual)) {
-            return true;
+          if (rect.width <= 0 || rect.height <= 0 || !isRequired(control)) {
+            return false;
           }
 
-          const container = control.closest("[role='combobox'], [aria-haspopup='listbox'], [data-radix-select-trigger], [data-headlessui-state], [class*='select'], [class*='combobox']")
-            ?? control.parentElement;
-          const selectedText = normalize([
-            control.getAttribute("data-value"),
-            control.getAttribute("aria-valuetext"),
-            container?.getAttribute("data-value"),
-            container?.getAttribute("aria-valuetext"),
-            container?.textContent
-          ].filter(Boolean).join(" "));
-
-          if (selectedText && !isEmptySelectText(selectedText)) {
-            return true;
+          if (control instanceof HTMLInputElement && ["checkbox", "radio"].includes(control.type)) {
+            const group = control.name
+              ? searchRoots.flatMap((root) => Array.from(root.querySelectorAll(`input[name="${CSS.escape(control.name)}"]`))) as HTMLInputElement[]
+              : [control];
+            return !group.some((item) => item.checked);
           }
 
-          return false;
-        }
-
-        if (control.value.trim()) {
-          return true;
-        }
-
-        return false;
-      }
-
-      function isLikelyRequiredApplicationField(control: Element, label: string) {
-        const descriptor = normalize([
-          label,
-          control.getAttribute("aria-label"),
-          control.getAttribute("placeholder"),
-          control.getAttribute("name"),
-          control.getAttribute("id"),
-          control.closest("label, fieldset, [role='group'], [class*='field'], [class*='input'], section, article, div")?.textContent
-        ].filter(Boolean).join(" "));
-
-        if (!descriptor || /\b(address line 2|address 2|middle name|preferred middle|apt|suite|optional)\b/.test(descriptor)) {
-          return false;
-        }
-
-        return /\b(legal first name|first name|given name|legal last name|last name|surname|family name|address line 1|street address|country|state|province|region|city|zip|postal|postcode|pin code|pincode|home email|email|phone|mobile|contact number|degree name|type of degree|degree type|education level|university|college|institution|start date|end date|graduation date|work experience|past working experience|authorized|authorization|sponsorship|visa)\b/.test(descriptor);
-      }
-
-      function isEmptySelectText(value: string) {
-        return !value
-          || /^(select|select an option|choose|choose an option|please select|none selected)$/.test(value)
-          || /\b(select an option|choose an option|please select|none selected|options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|results found|no results found)\b/.test(value);
-      }
-
-      function hasNearbyRequiredError(control: Element) {
-        const text = normalize(control.closest("label, fieldset, [role='group'], [class*='field'], [class*='input'], section, article, div")?.textContent ?? "");
-        return /\b(this field is required|required field|required|please select|please enter|cannot be blank|select an option)\b/.test(text)
-          && (control.getAttribute("aria-invalid") === "true" || /\b(this field is required|cannot be blank|required field)\b/.test(text));
-      }
-
-      function findRequiredErrorLabels(roots: Array<Document | ShadowRoot>) {
-        const labels: string[] = [];
-        const errorElements = roots.flatMap((root) => Array.from(root.querySelectorAll("[role='alert'], .error, .field-error, .validation-error, [aria-live='assertive'], [class*='error'], [class*='invalid']"))) as HTMLElement[];
-
-        for (const element of errorElements) {
-          const rect = element.getBoundingClientRect();
-          const text = normalize(element.innerText || element.textContent || "");
-
-          if (rect.width <= 0 || rect.height <= 0 || !/\b(this field is required|required|cannot be blank|please select|please enter)\b/.test(text)) {
-            continue;
-          }
-
-          if (isNearbyChoiceGroupSatisfied(element, roots)) {
-            continue;
-          }
-
-          const control = findNearestControl(element);
-          const label = control ? findFieldLabel(control) : inferLabelFromErrorElement(element);
-
-          if (label) {
-            labels.push(label);
-          }
-        }
-
-        for (const control of roots.flatMap((root) => Array.from(root.querySelectorAll("[aria-invalid='true']")))) {
-          if (!(control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement)) {
-            continue;
-          }
-
-          if (!isSatisfied(control, roots)) {
-            const label = findFieldLabel(control);
-
-            if (label) {
-              labels.push(label);
-            }
-          }
-        }
-
-        return labels;
-      }
-
-      function inferRequiredLabelControls(roots: Array<Document | ShadowRoot>) {
-        const inferred: Array<{ label: string; satisfied: boolean }> = [];
-        const labelElements = roots.flatMap((root) => Array.from(root.querySelectorAll("label, legend, [class*='label'], [class*='Label'], [aria-required='true']"))) as HTMLElement[];
-
-        for (const element of labelElements) {
-          if (!isVisibleElement(element)) {
-            continue;
-          }
-
-          const rawText = element.innerText || element.textContent || element.getAttribute("aria-label") || "";
-          const label = clean(rawText);
-          const text = normalize(rawText);
-
-          if (!label || label.length > 140 || !/(\*|\brequired\b)/i.test(rawText)) {
-            continue;
-          }
-
-          if (/\b(this field is required|there are some errors|please correct|show details|select an option|required field)\b/.test(text)) {
-            continue;
-          }
-
-          const control = findControlForLabelElement(element, roots);
-
-          if (!control || isNoiseField(control, label)) {
-            continue;
-          }
-
-          inferred.push({
-            label,
-            satisfied: isSatisfied(control, roots)
-          });
-        }
-
-        return inferred;
-      }
-
-      function findControlForLabelElement(element: HTMLElement, roots: Array<Document | ShadowRoot>) {
-        if (element instanceof HTMLLabelElement && element.htmlFor) {
-          const direct = getElementById(element.htmlFor);
-
-          if (isVisibleFillControl(direct)) {
-            return direct;
-          }
-        }
-
-        const nested = Array.from(element.querySelectorAll("input, textarea, select")).find(isVisibleFillControl);
-
-        if (nested) {
-          return nested;
-        }
-
-        let ancestor: Element | null = element;
-
-        for (let depth = 0; depth < 5 && ancestor; depth += 1) {
-          const controls = Array.from(ancestor.querySelectorAll("input, textarea, select")).filter(isVisibleFillControl);
-
-          if (controls.length === 1) {
-            return controls[0];
-          }
-
-          const afterLabel = controls.find((control) => {
-            const labelRect = element.getBoundingClientRect();
-            const controlRect = control.getBoundingClientRect();
-            return controlRect.top >= labelRect.top - 8
-              && controlRect.left >= labelRect.left - 80
-              && controlRect.top - labelRect.bottom < 140;
-          });
-
-          if (afterLabel) {
-            return afterLabel;
-          }
-
-          const nextControl = Array.from(ancestor.nextElementSibling?.querySelectorAll("input, textarea, select") ?? []).find(isVisibleFillControl);
-
-          if (nextControl) {
-            return nextControl;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        for (const root of roots) {
-          const labelledByControl = Array.from(root.querySelectorAll("input[aria-labelledby], textarea[aria-labelledby], select[aria-labelledby]")).find((control) => {
-            const ids = control.getAttribute("aria-labelledby")?.split(/\s+/) ?? [];
-            return element.id && ids.includes(element.id) && isVisibleFillControl(control);
-          });
-
-          if (labelledByControl && isVisibleFillControl(labelledByControl)) {
-            return labelledByControl;
-          }
-        }
-
-        return undefined;
-      }
-
-      function isVisibleFillControl(element: Element | null | undefined): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
-        if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) {
-          return false;
-        }
-
-        if (element instanceof HTMLInputElement && ["hidden", "file", "submit", "button", "image", "reset"].includes(element.type)) {
-          return false;
-        }
-
-        if (isInactiveFormBranch(element)) {
-          return false;
-        }
-
-        if ("disabled" in element && element.disabled) {
-          return false;
-        }
-
-        const rect = element.getBoundingClientRect();
-        const style = window.getComputedStyle(element);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
-          || element instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(element));
-      }
-
-      function isVisibleElement(element: HTMLElement) {
-        const rect = element.getBoundingClientRect();
-        const style = window.getComputedStyle(element);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-      }
-
-      function isNearbyChoiceGroupSatisfied(element: HTMLElement, roots: Array<Document | ShadowRoot>) {
-        let ancestor: Element | null = element.parentElement;
-
-        for (let depth = 0; depth < 8 && ancestor; depth += 1) {
-          const controls = Array.from(ancestor.querySelectorAll("input[type='radio'], input[type='checkbox']")) as HTMLInputElement[];
-          const visibleControls = controls.filter((control) => isChoiceControlVisible(control));
-
-          if (visibleControls.length >= 2 && visibleControls.some((control) => getChoiceGroupControls(control, roots).some((item) => item.checked || item.getAttribute("aria-checked") === "true"))) {
-            return true;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return false;
-      }
-
-      function getChoiceGroupControls(control: HTMLInputElement, roots: Array<Document | ShadowRoot>) {
-        const namedControls = control.name
-          ? roots.flatMap((root) => Array.from(root.querySelectorAll(`input[name="${CSS.escape(control.name)}"]`))) as HTMLInputElement[]
-          : [];
-        const ancestorControls = findChoiceControlsInBestAncestor(control);
-        const merged = [...namedControls, ...ancestorControls, control];
-        const seen = new Set<HTMLInputElement>();
-        const unique: HTMLInputElement[] = [];
-
-        for (const item of merged) {
-          if (seen.has(item) || item.disabled || !isChoiceControlVisible(item)) {
-            continue;
-          }
-
-          seen.add(item);
-          unique.push(item);
-        }
-
-        return unique.length > 0 ? unique : [control];
-      }
-
-      function findChoiceControlsInBestAncestor(control: HTMLInputElement) {
-        let best: HTMLInputElement[] = [];
-        let bestScore = Number.NEGATIVE_INFINITY;
-        let ancestor: Element | null = control.parentElement;
-        const type = control.type;
-
-        for (let depth = 0; depth < 9 && ancestor; depth += 1) {
-          const controls = Array.from(ancestor.querySelectorAll(`input[type='${type}']`)) as HTMLInputElement[];
-          const visibleControls = controls.filter((item) => isChoiceControlVisible(item) && !item.disabled);
-
-          if (visibleControls.length < 2 || visibleControls.length > 16) {
-            ancestor = ancestor.parentElement;
-            continue;
-          }
-
-          const text = normalize(ancestor.textContent ?? "");
-          let score = 0;
-
-          if (/\b(yes|no|no thanks|continue|decline|agree|accept)\b/.test(text)) {
-            score += 35;
-          }
-
-          if (/\b(this field is required|required|please select|please correct|question|select one)\b/.test(text)) {
-            score += 35;
-          }
-
-          if (ancestor.matches("fieldset, [role='radiogroup'], [role='group'], section, article, [class*='question'], [class*='field'], [class*='input']")) {
-            score += 30;
-          }
-
-          score += Math.min(visibleControls.length * 6, 30);
-          score -= Math.min(text.length / 250, 60);
-          score -= depth * 2;
-
-          if (score > bestScore) {
-            bestScore = score;
-            best = visibleControls;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return bestScore >= 20 ? best : [];
-      }
-
-      function isChoiceControlVisible(control: HTMLInputElement) {
-        const rect = control.getBoundingClientRect();
-
-        if (rect.width > 0 && rect.height > 0) {
-          return true;
-        }
-
-        return hasVisibleChoiceTarget(control);
-      }
-
-      function findNearestControl(element: HTMLElement) {
-        let ancestor: Element | null = element.parentElement;
-
-        for (let depth = 0; depth < 6 && ancestor; depth += 1) {
-          const controls = Array.from(ancestor.querySelectorAll("input, textarea, select")) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
-          const visibleEmpty = controls.find((control) => {
-            if (isInactiveFormBranch(control)) {
-              return false;
-            }
-
-            const rect = control.getBoundingClientRect();
-            const visible = rect.width > 0 && rect.height > 0
-              || control instanceof HTMLSelectElement && Boolean(getVisibleCustomSelectProxy(control));
-            return visible && !isSatisfied(control, searchRoots);
-          });
-
-          if (visibleEmpty) {
-            return visibleEmpty;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return undefined;
-      }
-
-      function inferLabelFromErrorElement(element: HTMLElement) {
-        let ancestor: Element | null = element.parentElement;
-
-        for (let depth = 0; depth < 5 && ancestor; depth += 1) {
-          const label = ancestor.querySelector("label, legend, h1, h2, h3, h4")?.textContent;
-
-          if (label?.trim()) {
-            return clean(label);
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return "";
+          return !control.value.trim();
+        })
+        .map((control) => findFieldLabel(control))
+        .filter(Boolean);
+
+      function isRequired(control: Element) {
+        const label = findFieldLabel(control);
+        return (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).required
+          || control.getAttribute("aria-required") === "true"
+          || /\*/.test(label)
+          || Boolean(control.closest(".required, [class*='required'], [data-required='true']"));
       }
 
       function findFieldLabel(control: Element) {
@@ -1561,250 +579,6 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
         return (value ?? "").replace(/\s+/g, " ").replace(/\*/g, "").trim().slice(0, 120);
       }
 
-      function isInactiveFormBranch(control: Element) {
-        if (control.closest(".datasetField__row--sample") || control.hasAttribute("hidden")) {
-          return true;
-        }
-
-        if (control.parentElement?.closest("[hidden], [aria-hidden='true']")) {
-          return true;
-        }
-
-        const id = control.getAttribute("id") ?? "";
-        const name = control.getAttribute("name") ?? "";
-        return /(^|-)sample($|-)/i.test(id) || /(^|-)sample($|-)/i.test(name);
-      }
-
-      function getVisibleCustomSelectProxy(control: HTMLSelectElement) {
-        if (!isCustomSelectElement(control)) {
-          return undefined;
-        }
-
-        const candidates = [
-          control.nextElementSibling,
-          control.parentElement?.querySelector("[role='combobox']"),
-          control.parentElement?.querySelector(".select2 [role='combobox']"),
-          control.id ? getElementById(`select2-${control.id}-container`)?.closest("[role='combobox']") : null,
-          control.id ? document.querySelector(`.select2Container${CSS.escape(control.id)}`) : null,
-          control.id ? document.querySelector(`[aria-labelledby~="${CSS.escape(`${control.id}-label`)}"][role='combobox']`) : null
-        ];
-
-        for (const candidate of candidates) {
-          const element = candidate instanceof HTMLElement
-            ? candidate
-            : candidate instanceof Element
-              ? candidate.querySelector("[role='combobox']") as HTMLElement | null
-              : null;
-
-          if (element && isVisibleElement(element)) {
-            return element;
-          }
-        }
-
-        return undefined;
-      }
-
-      function getCustomSelectRenderedText(control: HTMLSelectElement) {
-        const proxy = getVisibleCustomSelectProxy(control);
-        const rendered = control.id ? getElementById(`select2-${control.id}-container`) : null;
-        return [
-          rendered?.textContent,
-          proxy?.textContent,
-          proxy?.getAttribute("title"),
-          proxy?.getAttribute("aria-valuetext")
-        ].filter(Boolean).join(" ");
-      }
-
-      function isCustomSelectElement(control: HTMLSelectElement) {
-        const className = String(control.getAttribute("class") ?? "");
-        return control.getAttribute("aria-hidden") === "true"
-          || /\b(select2-hidden-accessible|select2|autocomplete|combobox)\b/i.test(className)
-          || Boolean(control.parentElement?.querySelector(".select2, [role='combobox'], [aria-haspopup='true'], [aria-haspopup='listbox']"));
-      }
-
-      function findChoiceGroupLabel(control: HTMLInputElement) {
-        const fieldsetLegend = control.closest("fieldset")?.querySelector("legend")?.textContent;
-
-        if (fieldsetLegend?.trim()) {
-          return clean(fieldsetLegend);
-        }
-
-        const group = control.closest("[role='group']");
-        const labelledBy = group?.getAttribute("aria-labelledby");
-
-        if (labelledBy) {
-          const labelledText = labelledBy
-            .split(/\s+/)
-            .map((id) => document.getElementById(id)?.textContent ?? "")
-            .join(" ");
-
-          if (labelledText.trim()) {
-            return clean(labelledText);
-          }
-        }
-
-        const container = control.closest("section, article, [class*='question'], [class*='field'], [class*='input']");
-        const heading = container?.querySelector("h1, h2, h3, h4, legend, label")?.textContent;
-
-        if (heading?.trim() && normalize(heading) !== normalize(findFieldLabel(control))) {
-          return clean(heading);
-        }
-
-        const inferredCountryQuestion = inferCountryQuestionFromAncestors(control);
-
-        if (inferredCountryQuestion) {
-          return inferredCountryQuestion;
-        }
-
-        return "";
-      }
-
-      function inferCountryQuestionFromAncestors(control: HTMLInputElement) {
-        if (!isCountryOption(findFieldLabel(control))) {
-          return "";
-        }
-
-        let ancestor: Element | null = control.parentElement;
-
-        for (let depth = 0; depth < 8 && ancestor; depth += 1) {
-          const text = clean(ancestor.textContent);
-          const normalized = normalize(text);
-
-          if (/\b(country|countries|working in|currently reside|previous response)\b/.test(normalized)) {
-            const match = text.match(/(Please select[^.?\n]*(?:country|countries)[^.?\n]*|Are you authorized[^.?\n]*previous response|Will you require[^.?\n]*previous response)/i);
-
-            if (match?.[1]) {
-              return clean(match[1]);
-            }
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return "";
-      }
-
-      function isCountryOption(value: string) {
-        return /^(australia|belgium|brazil|canada|france|germany|india|indonesia|ireland|israel|italy|japan|luxembourg|malaysia|mexico|new zealand|poland|portugal|romania|singapore|south korea|spain|sweden|switzerland|thailand|the netherlands|netherlands|uae|uk|us|united states|united kingdom)$/i.test(value.trim());
-      }
-
-      function isNoiseField(control: Element, label: string) {
-        const normalized = normalize(label);
-
-        if (!normalized) {
-          return true;
-        }
-
-        if (normalized.length > 140) {
-          return true;
-        }
-
-        if (/results found|no results found/.test(normalized)) {
-          return true;
-        }
-
-        if (control.closest("[role='option'], [role='listbox'], [role='menu'], [role='dialog']") && !/^location|city|country|phone|email|name/.test(normalized)) {
-          return true;
-        }
-
-        return false;
-      }
-
-      function isCustomSelectLike(control: HTMLElement) {
-        const popup = control.getAttribute("aria-haspopup") ?? "";
-        const role = control.getAttribute("role") ?? "";
-        const expanded = control.getAttribute("aria-expanded");
-
-        if (role === "combobox" || /^(listbox|menu|dialog|tree|true)$/i.test(popup) || expanded !== null) {
-          return true;
-        }
-
-        let ancestor = control.parentElement;
-
-        for (let depth = 0; depth < 3 && ancestor; depth += 1) {
-          const ancestorRole = ancestor.getAttribute("role") ?? "";
-          const ancestorPopup = ancestor.getAttribute("aria-haspopup") ?? "";
-          const ancestorExpanded = ancestor.getAttribute("aria-expanded");
-          const className = String(ancestor.getAttribute("class") ?? "");
-
-          if (
-            ancestorRole === "combobox"
-            || /^(listbox|menu|dialog|tree|true)$/i.test(ancestorPopup)
-            || ancestorExpanded !== null
-            || ancestor.hasAttribute("data-radix-select-trigger")
-            || ancestor.hasAttribute("data-headlessui-state")
-            || /\b(combobox|select__control|select-control|select-trigger|select-input)\b/i.test(className)
-          ) {
-            return true;
-          }
-
-          ancestor = ancestor.parentElement;
-        }
-
-        return false;
-      }
-
-      function normalize(value: string) {
-        return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      }
-
-      function hasVisibleChoiceTarget(control: HTMLInputElement) {
-        const target = getChoiceClickTarget(control);
-
-        if (!target) {
-          return false;
-        }
-
-        const rect = target.getBoundingClientRect();
-        const style = window.getComputedStyle(target);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-      }
-
-      function getChoiceClickTarget(control: HTMLInputElement) {
-        if (control.id) {
-          const root = control.getRootNode();
-          const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
-            ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`)
-            : null)
-            ?? searchRoots.map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(control.id)}"]`)).find(Boolean)
-            ?? null;
-
-          if (label instanceof HTMLElement) {
-            return label;
-          }
-        }
-
-        const closestLabel = control.closest("label");
-
-        if (closestLabel instanceof HTMLElement) {
-          return closestLabel;
-        }
-
-        const row = control.closest("button, [role='radio'], [role='checkbox'], [role='button'], [aria-checked], [tabindex], [class*='checkbox'], [class*='radio']");
-
-        return row instanceof HTMLElement ? row : undefined;
-      }
-
-      function getElementById(id: string) {
-        for (const searchRoot of searchRoots) {
-          if ("getElementById" in searchRoot && typeof searchRoot.getElementById === "function") {
-            const match = searchRoot.getElementById(id);
-
-            if (match) {
-              return match;
-            }
-          } else {
-            const match = searchRoot.querySelector(`#${CSS.escape(id)}`);
-
-            if (match) {
-              return match;
-            }
-          }
-        }
-
-        return null;
-      }
-
       function getSearchRoots() {
         const roots: Array<Document | ShadowRoot> = [document];
 
@@ -1829,8 +603,6 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
   return dedupeLabels(labels);
 }
 
-// Automatically checks safe consent/terms/declaration controls when they are
-// clearly not marketing, relocation, sponsorship, or country-selection choices.
 export async function autoResolveConsentControls(page: Page) {
   let resolvedCount = 0;
 
@@ -1840,7 +612,9 @@ export async function autoResolveConsentControls(page: Page) {
       let count = 0;
 
       for (const control of controls) {
-        if (control.disabled || control.checked || !isUsableChoice(control)) {
+        const rect = control.getBoundingClientRect();
+
+        if (rect.width <= 0 || rect.height <= 0 || control.disabled || control.checked) {
           continue;
         }
 
@@ -1849,18 +623,16 @@ export async function autoResolveConsentControls(page: Page) {
           control.getAttribute("aria-label"),
           control.getAttribute("name"),
           control.id,
-          control.closest("label, fieldset, [role='group'], [role='radiogroup'], section, article, [class*='question'], [class*='field'], [class*='input']")?.textContent
+          control.closest("label, fieldset, [role='group'], form")?.textContent
         ].filter(Boolean).join(" "));
 
         if (!/\b(terms|privacy|consent|agree|acknowledge|accept|declaration|eeo|voluntary self identification|data processing)\b/.test(descriptor)) {
           continue;
         }
 
-        if (/\b(country|countries|location|locations|remote|relocat|work permit|sponsor|sponsorship|whatsapp|sms|text messages|talent network|career opportunities|job alerts|marketing)\b/.test(descriptor)) {
-          continue;
-        }
-
-        clickChoiceControl(control);
+        control.click();
+        control.dispatchEvent(new Event("input", { bubbles: true }));
+        control.dispatchEvent(new Event("change", { bubbles: true }));
         count += 1;
       }
 
@@ -1883,88 +655,6 @@ export async function autoResolveConsentControls(page: Page) {
         return control.closest("label")?.textContent?.trim()
           || control.parentElement?.textContent?.trim()
           || "";
-      }
-
-      function isUsableChoice(control: HTMLInputElement) {
-        const target = getChoiceClickTarget(control);
-
-        if (!target) {
-          return false;
-        }
-
-        const rect = target.getBoundingClientRect();
-        const style = window.getComputedStyle(target);
-        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-      }
-
-      function clickChoiceControl(control: HTMLInputElement) {
-        const target = getChoiceClickTarget(control) ?? control;
-
-        target.scrollIntoView?.({ block: "center", inline: "center" });
-        control.focus();
-
-        try {
-          target.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, view: window }));
-          target.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, view: window }));
-        } catch (_error) {
-          target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
-          target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
-        }
-
-        target.click();
-
-        if (!control.checked) {
-          setNativeChecked(control, true);
-        }
-
-        dispatch(control);
-
-        control.blur();
-      }
-
-      function getChoiceClickTarget(control: HTMLInputElement) {
-        if (control.id) {
-          const root = control.getRootNode();
-          const label = ((root instanceof Document || root instanceof ShadowRoot || root instanceof Element)
-            ? root.querySelector(`label[for="${CSS.escape(control.id)}"]`)
-            : null)
-            ?? getSearchRoots().map((searchRoot) => searchRoot.querySelector(`label[for="${CSS.escape(control.id)}"]`)).find(Boolean)
-            ?? null;
-
-          if (label instanceof HTMLElement) {
-            return label;
-          }
-        }
-
-        const closestLabel = control.closest("label");
-
-        if (closestLabel instanceof HTMLElement) {
-          return closestLabel;
-        }
-
-        const row = control.closest("button, [role='radio'], [role='checkbox'], [role='button'], [aria-checked], [tabindex], [class*='checkbox'], [class*='radio']");
-
-        return row instanceof HTMLElement ? row : undefined;
-      }
-
-      function dispatch(element: Element) {
-        element.dispatchEvent(new Event("input", { bubbles: true }));
-        element.dispatchEvent(new Event("change", { bubbles: true }));
-        element.dispatchEvent(new Event("blur", { bubbles: true }));
-
-        if (element instanceof HTMLInputElement && element.form) {
-          element.form.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-      }
-
-      function setNativeChecked(input: HTMLInputElement, checked: boolean) {
-        const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked");
-
-        if (descriptor?.set) {
-          descriptor.set.call(input, checked);
-        } else {
-          input.checked = checked;
-        }
       }
 
       function normalize(value: string) {
@@ -1995,8 +685,6 @@ export async function autoResolveConsentControls(page: Page) {
   return resolvedCount;
 }
 
-// Reads visible validation/error messages and invalid controls from the page,
-// excluding transient loading/status messages.
 export async function getVisibleValidationMessages(page: Page) {
   const messages: string[] = [];
 
@@ -2018,11 +706,6 @@ export async function getVisibleValidationMessages(page: Page) {
 
         for (const element of elements) {
           const htmlElement = element as HTMLElement;
-
-          if (htmlElement.closest("#gradlaunch-live-bot")) {
-            continue;
-          }
-
           const rect = htmlElement.getBoundingClientRect();
           const text = element.textContent?.replace(/\s+/g, " ").trim();
 
@@ -2034,196 +717,47 @@ export async function getVisibleValidationMessages(page: Page) {
         }
       }
 
-      const invalidControls = Array.from(document.querySelectorAll("input[aria-invalid='true'], textarea[aria-invalid='true'], select[aria-invalid='true']")) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
-
-      for (const control of invalidControls) {
-        if (control.closest("#gradlaunch-live-bot")) {
-          continue;
-        }
-
-        const rect = control.getBoundingClientRect();
-
-        if (rect.width <= 0 || rect.height <= 0) {
-          continue;
-        }
-
-        const label = findFieldLabel(control);
-        const containerText = control.closest("label, fieldset, [role='group'], [class*='field'], [class*='input'], section, article, div")?.textContent?.replace(/\s+/g, " ").trim() ?? "";
-        const message = /\b(this field is required|required|cannot be blank|please select|please enter|invalid)\b/i.test(containerText)
-          ? `${label || "Field"}: ${containerText}`
-          : `${label || "Field"} is invalid or incomplete.`;
-
-        values.add(message.length > 160 ? `${message.slice(0, 157)}...` : message);
-      }
-
       return Array.from(values).slice(0, 6);
-
-      function findFieldLabel(control: Element) {
-        if (control.id) {
-          const label = document.querySelector(`label[for="${CSS.escape(control.id)}"]`);
-
-          if (label?.textContent?.trim()) {
-            return label.textContent.trim().replace(/\*/g, "").replace(/\s+/g, " ").trim();
-          }
-        }
-
-        return (
-          control.closest("label")?.textContent
-          || control.closest("fieldset")?.querySelector("legend")?.textContent
-          || control.getAttribute("aria-label")
-          || control.getAttribute("placeholder")
-          || control.getAttribute("name")
-          || ""
-        ).replace(/\*/g, "").replace(/\s+/g, " ").trim();
-      }
     }).catch(() => []);
 
     messages.push(...frameMessages);
   }
 
-  return dedupeLabels(messages).filter((message) => !isTransientStatusMessage(message));
+  return dedupeLabels(messages);
 }
 
-// Detects whether a resume/CV file upload control or upload-method trigger is
-// visible on the page.
 export async function hasFileUpload(page: Page) {
-  for (const frame of page.frames()) {
-    const found = await frame.evaluate(() => {
-      const searchRoots = getSearchRoots();
-      const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input[type='file']"))) as HTMLInputElement[];
-      if (controls.some((control) => !control.disabled)) {
-        return true;
-      }
+  return page.evaluate(() => {
+    const controls = getSearchRoots().flatMap((root) => Array.from(root.querySelectorAll("input[type='file']"))) as HTMLInputElement[];
+    if (controls.some((control) => !control.disabled)) {
+      return true;
+    }
 
-      const uploadSelectors = [
-        "button",
-        "[role='button']",
-        "label",
-        "a",
-        "div",
-        "span"
-      ];
-      const uploadElements = searchRoots.flatMap((root) => {
-        return uploadSelectors.flatMap((selector) => Array.from(root.querySelectorAll(selector)));
-      }).filter((element): element is HTMLElement => element instanceof HTMLElement && !element.closest("#gradlaunch-live-bot"));
-      const pageText = normalize([
-        document.body?.innerText ?? "",
-        document.body?.textContent ?? "",
-        ...uploadElements.map((element) => element.innerText || element.textContent || "")
-      ].join(" "));
+    const uploadSelectors = [
+      "button",
+      "[role='button']",
+      "label",
+      "a",
+      "div",
+      "span"
+    ];
 
-      return uploadElements.some((element) => {
+    return uploadSelectors.some((selector) => {
+      return Array.from(document.querySelectorAll(selector)).some((element) => {
+        if (!(element instanceof HTMLElement)) {
+          return false;
+        }
+
         const rect = element.getBoundingClientRect();
 
         if (rect.width <= 0 || rect.height <= 0) {
           return false;
         }
 
-        const ownText = normalize(`${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`);
-        const nearbyText = normalize(findNearbyUploadLabel(element));
-        const sectionText = normalize(findUploadSectionText(element));
-
-        return /\b(upload resume|attach resume|drag and drop your resume|browse file|choose(?: a)? file|select file|drop (?:it|file|resume|cv) here|drag and drop)\b/.test(ownText)
-          || (looksLikeResumeMethodChoice(`${sectionText} ${pageText}`) && /\b(from device|upload from device|upload from computer|from computer|from my device|select from device)\b/.test(ownText) && !/\b(without resume|without cv|copy paste|copy and paste|paste|manual)\b/.test(ownText))
-          || (
-            /\b(attach|upload|browse|choose(?: a)? file|select file|drop (?:it|file|resume|cv) here|drag and drop)\b/.test(ownText)
-            && (/\b(resume|cv|curriculum vitae|resume cv)\b/.test(nearbyText) || /\b(resume|cv|curriculum vitae|resume cv)\b/.test(sectionText))
-            && !(/\bcover letter\b/.test(nearbyText) && !/\b(resume|cv|curriculum vitae)\b/.test(nearbyText))
-          );
+        const text = `${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`.toLowerCase().replace(/\s+/g, " ").trim();
+        return /\b(upload resume|attach resume|drag and drop your resume|browse file|choose file|select file)\b/.test(text);
       });
-
-    function findUploadSectionText(element: HTMLElement) {
-      let ancestor: Element | null = element;
-      let best = "";
-      let bestScore = Number.NEGATIVE_INFINITY;
-
-      for (let depth = 0; depth < 8 && ancestor; depth += 1) {
-        const text = normalize(ancestor.textContent ?? "");
-        let score = 0;
-
-        if (/\b(resume|cv|curriculum vitae|resume cv)\b/.test(text)) {
-          score += 120;
-        }
-
-        if (/\bcover letter\b/.test(text)) {
-          score -= 90;
-        }
-
-        score -= Math.min(text.length / 100, 40);
-        score -= depth * 3;
-
-        if (score > bestScore) {
-          bestScore = score;
-          best = text;
-        }
-
-        ancestor = ancestor.parentElement;
-      }
-
-      return best;
-    }
-
-    function findNearbyUploadLabel(element: HTMLElement) {
-      const targetRect = element.getBoundingClientRect();
-      const candidates = Array.from(document.querySelectorAll("label, legend, h1, h2, h3, h4, p, span, div")) as HTMLElement[];
-      let best = "";
-      let bestScore = Number.NEGATIVE_INFINITY;
-
-      for (const candidate of candidates) {
-        if (candidate === element) {
-          continue;
-        }
-
-        const rect = candidate.getBoundingClientRect();
-
-        if (rect.width <= 0 || rect.height <= 0) {
-          continue;
-        }
-
-        const text = normalize(candidate.innerText || candidate.textContent || "");
-
-        if (!/\b(resume|cv|curriculum vitae|cover letter)\b/.test(text)) {
-          continue;
-        }
-
-        const verticalDistance = Math.max(0, targetRect.top - rect.bottom);
-        const overlapsHorizontally = rect.right >= targetRect.left - 40 && rect.left <= targetRect.right + 40;
-
-        if (verticalDistance > 260 || (!overlapsHorizontally && verticalDistance > 80)) {
-          continue;
-        }
-
-        let score = 120 - verticalDistance;
-
-        if (overlapsHorizontally) {
-          score += 50;
-        }
-
-        if (/\b(resume|cv|curriculum vitae|resume cv)\b/.test(text)) {
-          score += 120;
-        }
-
-        if (/\bcover letter\b/.test(text)) {
-          score -= 140;
-        }
-
-        if (score > bestScore) {
-          bestScore = score;
-          best = text;
-        }
-      }
-
-      return best;
-    }
-
-    function normalize(value: string) {
-      return value.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    }
-
-    function looksLikeResumeMethodChoice(value: string) {
-      return /\b(choose an option to apply|application method|application methods|how would you like to apply|apply with)\b/.test(value)
-        && /\b(without resume|without cv|copy paste|copy and paste|from device|from computer|upload from device|upload resume|resume)\b/.test(value);
-    }
+    });
 
     function getSearchRoots() {
       const roots: Array<Document | ShadowRoot> = [document];
@@ -2241,18 +775,9 @@ export async function hasFileUpload(page: Page) {
 
       return roots;
     }
-    }).catch(() => false);
-
-    if (found) {
-      return true;
-    }
-  }
-
-  return false;
+  }).catch(() => false);
 }
 
-// Detects final submit controls while ignoring pages still blocked by login or
-// verification gates.
 export async function hasFinalSubmitControl(page: Page) {
   const checkpoint = await detectProtectedCheckpoint(page);
 
@@ -2296,8 +821,6 @@ export async function hasFinalSubmitControl(page: Page) {
   }).catch(() => false);
 }
 
-// Scores visible controls that can move the application forward, excluding back,
-// cancel, add, final submit, and unsafe apply-start controls when not allowed.
 export async function detectNavigationCandidates(
   page: Page,
   observation: BrowserAgentObservation,
@@ -2307,7 +830,6 @@ export async function detectNavigationCandidates(
 
   return observation.controls
     .filter((control) => !control.disabled)
-    .filter((control) => !isBackwardNavigationControl(control))
     .map((control) => {
       const text = normalizeKey(`${control.text} ${control.label}`);
       let score = 0;
@@ -2348,13 +870,11 @@ export async function detectNavigationCandidates(
         strategy: "dom_control" as const
       };
     })
-    .filter((candidate) => candidate.score >= 65)
+    .filter((candidate) => candidate.score > 0)
     .sort((left, right) => right.score - left.score)
     .slice(0, 8);
 }
 
-// After a navigation click, polls until the page URL, fingerprint, progress, or
-// state changes, then reports whether the stage advanced.
 export async function waitForStageTransition(
   context: BrowserContext,
   page: Page,
@@ -2375,17 +895,6 @@ export async function waitForStageTransition(
     const signatureAfter = await getStageSignature(activePage, observation);
 
     if (signatureAfter.fingerprint !== signatureBefore.fingerprint || signatureAfter.progressText !== signatureBefore.progressText || signatureAfter.url !== signatureBefore.url) {
-      if (isBackwardStageTransition(signatureBefore.progressText, signatureAfter.progressText)) {
-        return {
-          changed: false,
-          activePage,
-          reason: "The click moved to an earlier wizard step, so GradLaunch stopped instead of treating it as progress.",
-          signatureBefore,
-          signatureAfter,
-          outcome: "same_stage"
-        };
-      }
-
       const outcome = observation.pageState === "submit"
         ? "submit_ready"
         : observation.pageState === "review"
@@ -2416,31 +925,6 @@ export async function waitForStageTransition(
   };
 }
 
-function isBackwardStageTransition(before?: string, after?: string) {
-  const beforeStep = extractProgressStep(before);
-  const afterStep = extractProgressStep(after);
-
-  return beforeStep !== undefined && afterStep !== undefined && afterStep < beforeStep;
-}
-
-function extractProgressStep(value?: string) {
-  if (!value) {
-    return undefined;
-  }
-
-  const normalized = value.toLowerCase();
-  const explicit = normalized.match(/\bstep\s+(\d+)\b/) ?? normalized.match(/\b(\d+)\s+of\s+\d+\b/);
-
-  if (!explicit?.[1]) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(explicit[1], 10);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-// Clicks a final submit control when external submit is explicitly allowed by
-// configuration and the engine has reached ready_to_submit.
 export async function clickFinalSubmit(page: Page) {
   const labels = ["Submit application", "Submit Application", "Submit", "Apply"];
 
@@ -2469,18 +953,7 @@ export async function clickFinalSubmit(page: Page) {
   }).catch(() => false);
 }
 
-// Chooses and clicks the best next/continue/review control for the current
-// stage, then verifies that the click actually caused a stage transition.
 export async function clickNextStageControl(context: BrowserContext, page: Page, options: { allowApplyStart: boolean }) {
-  const outstandingRequired = await getVisibleRequiredEmptyLabels(page);
-
-  if (outstandingRequired.length > 0) {
-    return {
-      clicked: false,
-      page
-    };
-  }
-
   const observation = await observeBrowserPage(page, await discoverVisibleFields(page));
   const signatureBefore = await getStageSignature(page, observation);
   const candidates = await detectNavigationCandidates(page, observation, options);
@@ -2508,20 +981,6 @@ export async function clickNextStageControl(context: BrowserContext, page: Page,
   };
 }
 
-function isBackwardNavigationControl(control: ObservedControl) {
-  const text = normalizeKey(`${control.text} ${control.label}`);
-
-  if (!text) {
-    return false;
-  }
-
-  return /(^| )(back|previous|prev|return|cancel|close|discard|remove|add another|add)( |$)/.test(text)
-    || /^<\s*back\b/.test(control.text.trim().toLowerCase())
-    || /^‹\s*back\b/.test(control.text.trim().toLowerCase());
-}
-
-// Clicks a previously observed control by its injected GradLaunch control id,
-// returning a newly opened page if the click spawned one.
 async function clickObservedControl(context: BrowserContext, page: Page, controlId: string) {
   for (const frame of page.frames()) {
     const nextPagePromise = context.waitForEvent("page", { timeout: 1500 }).catch(() => undefined);
@@ -2545,8 +1004,6 @@ async function clickObservedControl(context: BrowserContext, page: Page, control
   return undefined;
 }
 
-// Detects the ATS platform from the hostname so platform-specific scoring hints
-// can be applied without hardcoding a whole site adapter.
 function resolveAtsAdapter(url: string): AtsAdapterHint | undefined {
   const hostname = safeHostname(url);
 
@@ -2573,8 +1030,6 @@ function resolveAtsAdapter(url: string): AtsAdapterHint | undefined {
   return undefined;
 }
 
-// Groups fields that belong to the same question/section, mainly for
-// radio/checkbox groups and questionnaire-style pages.
 function groupVisibleFields(visibleFields: VisibleField[]): BrowserFieldGroup[] {
   const groups = new Map<string, BrowserFieldGroup>();
 
@@ -2608,7 +1063,6 @@ function groupVisibleFields(visibleFields: VisibleField[]): BrowserFieldGroup[] 
     .slice(0, 8);
 }
 
-// Derives a readable group label from field context or the field label itself.
 function deriveFieldGroupLabel(field: VisibleField) {
   const context = field.context.replace(/\s+/g, " ").trim();
 
@@ -2624,32 +1078,20 @@ function deriveFieldGroupLabel(field: VisibleField) {
   return (label.split(":")[0]?.trim() ?? label).slice(0, 120);
 }
 
-// Classifies the observed browser page into a coarse state used by the strategy
-// layer: login, captcha, loading, resume upload, form fill, review, submit, etc.
 function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageState">): BrowserPageState {
   const text = normalizeKey([
     input.title,
     input.pageText,
-    ...input.controls.map((control) => `${control.text} ${control.label}`),
     ...input.validationMessages
   ].join(" "));
   const hasVisibleFields = input.visibleFields.length > 0;
   const hasPasswordField = input.visibleFields.some((field) => field.inputType === "password" || /\bpassword\b/i.test(field.label));
-  const visibleFieldText = normalizeKey(input.visibleFields.map((field) => `${field.label} ${field.placeholder ?? ""} ${field.name ?? ""} ${field.ariaLabel ?? ""} ${field.context}`).join(" "));
-  const hasResumeMethodChoice = /\b(choose an option to apply|application method|application methods|how would you like to apply|apply with)\b/.test(text)
-    && /\b(without resume|without cv|copy paste|copy and paste|from device|from computer|upload from device|upload resume|resume)\b/.test(text);
+  const visibleFieldText = normalizeKey(input.visibleFields.map((field) => `${field.label} ${field.context}`).join(" "));
   const hasResumeUploadField = input.visibleFields.some((field) => field.inputType === "file")
-    || input.controls.some((control) => /upload resume|upload cv|attach resume|choose(?: a)? file|select resume|autofill with resume/.test(normalizeKey(`${control.text} ${control.label}`)))
-    || (hasResumeMethodChoice && input.controls.some((control) => {
-      const controlText = normalizeKey(`${control.text} ${control.label}`);
-      return /\b(from device|upload from device|from computer|upload from computer|from my device|select from device)\b/.test(controlText)
-        && !/\b(without resume|without cv|copy paste|copy and paste|paste|manual)\b/.test(controlText);
-    }));
+    || input.controls.some((control) => /upload resume|upload cv|attach resume|choose file|select resume|autofill with resume/.test(normalizeKey(`${control.text} ${control.label}`)));
   const hasConsentLanguage = /\b(privacy|terms|consent|agree|acknowledge|declaration|data processing|equal opportunity|eeo|voluntary self identification)\b/.test(text);
   const hasReviewLanguage = /\b(review your application|review application|application review|preview)\b/.test(text);
   const hasSubmitLanguage = /\b(submit application|submit my application|send application|complete application)\b/.test(text);
-  const hasCaptchaLanguage = /\b(captcha|verify you are human|human verification|security check|i am not a robot|cloudflare challenge)\b/.test(text);
-  const hasLoadingLanguage = /\b(active loading indicator|loading|please wait|processing|uploading|saving|submitting|one moment)\b/.test(text);
   const hasApplyStart = input.controls.some((control) => isApplyStartText(`${control.text} ${control.label}`));
   const hasQuestionnaireHints = input.groupedFields.length > 0
     || input.visibleFields.some((field) => field.options.length > 0 || field.inputType === "radio" || field.inputType === "checkbox")
@@ -2662,18 +1104,6 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
 
   if (looksLikeLogin) {
     return "login";
-  }
-
-  if (hasCaptchaLanguage) {
-    return "captcha";
-  }
-
-  if (input.validationMessages.length > 0) {
-    return "validation_error";
-  }
-
-  if (hasLoadingLanguage && !hasVisibleFields && !hasResumeUploadField) {
-    return "loading";
   }
 
   if (hasResumeUploadField && !hasVisibleFields) {
@@ -2701,7 +1131,7 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
   }
 
   if (hasVisibleFields) {
-    return "form_fill";
+    return "account_gate";
   }
 
   if (!text && input.controls.length === 0) {
@@ -2711,12 +1141,10 @@ function classifyBrowserPageState(input: Omit<BrowserAgentObservation, "pageStat
   return "unknown";
 }
 
-// Detects text that represents a final submit/send-application action.
 function isFinalSubmitText(value: string) {
   return /\b(submit application|submit my application|submit|send application|send my application)\b/i.test(value);
 }
 
-// Detects text that represents an initial apply/start-application action.
 function isApplyStartText(value: string) {
   return /\bapply\b|apply now|apply for this job|apply for this position/i.test(value);
 }

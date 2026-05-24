@@ -1,7 +1,6 @@
 import type { BrowserContext, Page } from "playwright-core";
 
 type BotMood = "thinking" | "acting" | "waiting" | "done";
-type BotAction = { kind: "confirm_continue"; label?: string };
 type BotPosition = { left: number; top: number };
 type BotState = {
   dragging: boolean;
@@ -10,14 +9,10 @@ type BotState = {
   offsetY: number;
   position: BotPosition | null;
   stopRequested: boolean;
-  continueRequested: boolean;
 };
 
 const stopRequestedContexts = new WeakSet<BrowserContext>();
-const continueRequestedContexts = new WeakSet<BrowserContext>();
 
-// Clears a previous Quit/stop request from the browser context and live bot DOM
-// so a resumed run does not immediately stop because of stale UI state.
 export async function clearUserStopRequest(page: Page) {
   stopRequestedContexts.delete(page.context());
 
@@ -38,33 +33,6 @@ export async function clearUserStopRequest(page: Page) {
   }).catch(() => undefined);
 }
 
-// Clears a previous "continue" confirmation from every open page in the context
-// before a new manual handoff starts.
-export async function clearUserContinueRequest(page: Page) {
-  continueRequestedContexts.delete(page.context());
-
-  await Promise.all(page.context().pages().filter((candidate) => !candidate.isClosed()).map((candidate) => {
-    return candidate.evaluate(() => {
-      const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
-        __gradlaunchBotState?: { continueRequested?: boolean };
-      }) | null;
-
-      if (!root) {
-        return;
-      }
-
-      root.removeAttribute("data-gradlaunch-continue-requested");
-
-      if (root.__gradlaunchBotState) {
-        root.__gradlaunchBotState.continueRequested = false;
-      }
-    }).catch(() => undefined);
-  }));
-}
-
-// Injects or updates the draggable GradLaunch live bot panel inside the current
-// browser page. It displays status, optional action buttons, and exposes stop /
-// continue callbacks back to the Playwright process.
 export async function updateLiveBot(
   page: Page,
   input: {
@@ -72,7 +40,6 @@ export async function updateLiveBot(
     message: string;
     mood: BotMood;
     step?: string;
-    action?: BotAction;
   }
 ) {
   await page.exposeFunction("__gradlaunchRequestStop", () => {
@@ -80,12 +47,7 @@ export async function updateLiveBot(
     return true;
   }).catch(() => undefined);
 
-  await page.exposeFunction("__gradlaunchConfirmContinue", () => {
-    continueRequestedContexts.add(page.context());
-    return true;
-  }).catch(() => undefined);
-
-  await page.evaluate(({ title, message, mood, step, action }) => {
+  await page.evaluate(({ title, message, mood, step }) => {
     const rootId = "gradlaunch-live-bot";
     const existing = document.getElementById(rootId);
     const root = existing ?? document.createElement("div");
@@ -98,8 +60,7 @@ export async function updateLiveBot(
       offsetX: 0,
       offsetY: 0,
       position: null,
-      stopRequested: false,
-      continueRequested: false
+      stopRequested: false
     };
     botRoot.__gradlaunchBotState = state;
 
@@ -200,28 +161,6 @@ export async function updateLiveBot(
       }
       #${rootId} .gl-stop:disabled {
         opacity: 0.82;
-        cursor: default;
-      }
-      #${rootId} .gl-actions {
-        display: grid;
-        gap: 6px;
-        margin-top: 10px;
-        padding-right: 4px;
-      }
-      #${rootId} .gl-confirm {
-        border: 0;
-        border-radius: 999px;
-        background: linear-gradient(180deg, #16a34a, #15803d);
-        color: #fff;
-        font-size: 10px;
-        font-weight: 900;
-        line-height: 1.2;
-        padding: 8px 10px;
-        cursor: pointer;
-        box-shadow: 0 10px 20px rgba(21, 128, 61, 0.24);
-      }
-      #${rootId} .gl-confirm:disabled {
-        opacity: 0.84;
         cursor: default;
       }
       #${rootId} .gl-body {
@@ -374,28 +313,6 @@ export async function updateLiveBot(
     text.textContent = message;
     cloud.appendChild(text);
 
-    if (action?.kind === "confirm_continue") {
-      const actions = document.createElement("div");
-      actions.className = "gl-actions";
-
-      const confirm = document.createElement("button");
-      confirm.className = "gl-confirm";
-      confirm.textContent = action.label ?? "I am logged in, continue";
-      confirm.type = "button";
-      confirm.onclick = () => {
-        state.continueRequested = true;
-        root.setAttribute("data-gradlaunch-continue-requested", "true");
-        confirm.textContent = "Checking...";
-        confirm.disabled = true;
-        void (window as typeof window & {
-          __gradlaunchConfirmContinue?: () => Promise<boolean>;
-        }).__gradlaunchConfirmContinue?.();
-      };
-
-      actions.appendChild(confirm);
-      cloud.appendChild(actions);
-    }
-
     const stop = document.createElement("button");
     stop.className = "gl-stop";
     stop.textContent = "Quit";
@@ -513,8 +430,6 @@ export async function updateLiveBot(
   }, input).catch(() => undefined);
 }
 
-// Checks whether the user clicked Quit in the live bot. The WeakSet catches
-// callback-based requests even if the page DOM later changes.
 export async function didUserRequestStop(page: Page) {
   if (stopRequestedContexts.has(page.context())) {
     return true;
@@ -527,47 +442,4 @@ export async function didUserRequestStop(page: Page) {
 
     return root?.dataset.gradlaunchStopRequested === "true" || root?.__gradlaunchBotState?.stopRequested === true;
   }).catch(() => false);
-}
-
-// Verifies that the live bot panel is still mounted and visible on the current
-// page, so handoff loops can re-inject it after navigation or redirects.
-export async function isLiveBotMounted(page: Page) {
-  return page.evaluate(() => {
-    const root = document.getElementById("gradlaunch-live-bot");
-
-    if (!(root instanceof HTMLElement) || !root.isConnected) {
-      return false;
-    }
-
-    const style = window.getComputedStyle(root);
-    const rect = root.getBoundingClientRect();
-
-    return style.display !== "none"
-      && style.visibility !== "hidden"
-      && Number(style.opacity || "1") > 0
-      && rect.width > 0
-      && rect.height > 0;
-  }).catch(() => false);
-}
-
-// Reads and consumes the user's explicit "I am logged in, continue" confirmation
-// across all pages in the browser context.
-export async function consumeUserContinueConfirmation(page: Page) {
-  const contextConfirmed = continueRequestedContexts.has(page.context());
-  const pageConfirmations = await Promise.all(page.context().pages().filter((candidate) => !candidate.isClosed()).map((candidate) => {
-    return candidate.evaluate(() => {
-      const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
-        __gradlaunchBotState?: { continueRequested?: boolean };
-      }) | null;
-
-      return root?.dataset.gradlaunchContinueRequested === "true" || root?.__gradlaunchBotState?.continueRequested === true;
-    }).catch(() => false);
-  }));
-  const confirmed = contextConfirmed || pageConfirmations.some(Boolean);
-
-  if (confirmed) {
-    await clearUserContinueRequest(page);
-  }
-
-  return confirmed;
 }

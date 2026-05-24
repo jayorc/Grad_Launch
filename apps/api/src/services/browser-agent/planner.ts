@@ -13,9 +13,6 @@ import type { Page } from "playwright-core";
 import { nowIso } from "../../lib/time";
 import { dedupeLabels } from "./util";
 
-// Creates a fresh planner checkpoint or safely clones an existing one for a
-// resumed run. The planner is the durable explanation of the browser agent's
-// goal, current stage, retries, handoffs, decisions, and validation blockers.
 export function createPlannerCheckpoint(job: Job, existing?: PlannerCheckpoint): PlannerCheckpoint {
   if (existing) {
     return {
@@ -53,8 +50,6 @@ export function createPlannerCheckpoint(job: Job, existing?: PlannerCheckpoint):
   };
 }
 
-// Updates one planner subgoal with status, detail, attempts, and completion
-// time. The engine calls this whenever a major browser task starts or finishes.
 export function markPlannerTask(planner: PlannerCheckpoint, id: string, status: PlannerTask["status"], detail: string) {
   const now = nowIso();
   const task = planner.subgoals.find((item) => item.id === id);
@@ -78,16 +73,12 @@ export function markPlannerTask(planner: PlannerCheckpoint, id: string, status: 
   planner.lastUpdatedAt = now;
 }
 
-// Sets the high-level planner status/summary shown in receipts, saved sessions,
-// and live UI state.
 export function setPlannerStatus(planner: PlannerCheckpoint, status: PlannerCheckpoint["status"], summary: string) {
   planner.status = status;
   planner.summary = summary;
   planner.lastUpdatedAt = nowIso();
 }
 
-// Marks the beginning of a form stage and ensures the stage has a history entry
-// before observation/fill decisions are recorded.
 export function plannerEnterStage(planner: PlannerCheckpoint, page: Page, stageIndex: number) {
   planner.currentStep = `stage_${stageIndex + 1}`;
   planner.currentStageLabel = `Section ${stageIndex + 1}`;
@@ -99,8 +90,6 @@ export function plannerEnterStage(planner: PlannerCheckpoint, page: Page, stageI
   setPlannerStatus(planner, "running", `Planner is working through ${planner.currentStageLabel}.`);
 }
 
-// Records that the current section advanced successfully and updates planner
-// state so the next loop iteration starts on the following stage.
 export function completePlannerStage(planner: PlannerCheckpoint, page: Page, stageIndex: number) {
   recordPlannerStageOutcome({
     planner,
@@ -117,8 +106,6 @@ export function completePlannerStage(planner: PlannerCheckpoint, page: Page, sta
   setPlannerStatus(planner, "running", `Section ${stageIndex + 1} completed. Moving to the next stage.`);
 }
 
-// Saves the visible and required field labels seen on the current page. This is
-// the trace used to understand what the agent thought was fillable.
 export function recordPlannerObservation(input: {
   planner: PlannerCheckpoint;
   page: Page;
@@ -135,8 +122,6 @@ export function recordPlannerObservation(input: {
   input.planner.lastUpdatedAt = stage.lastUpdatedAt;
 }
 
-// Stores the selected action, source, reason, and affected fields for a stage.
-// This answers "why did the bot choose this action?" in debug output.
 export function recordPlannerDecision(input: {
   planner: PlannerCheckpoint;
   page: Page;
@@ -166,8 +151,6 @@ export function recordPlannerDecision(input: {
   input.planner.lastUpdatedAt = decision.createdAt;
 }
 
-// Records the result of a stage such as advanced, review, submit, or handoff,
-// including fields that were filled or still required.
 export function recordPlannerStageOutcome(input: {
   planner: PlannerCheckpoint;
   page: Page;
@@ -185,8 +168,6 @@ export function recordPlannerStageOutcome(input: {
   input.planner.lastUpdatedAt = stage.lastUpdatedAt;
 }
 
-// Records a manual handoff event and updates planner status/tasks so the run is
-// resumable after login, CAPTCHA, OTP, missing data, or review.
 export function notePlannerHandoff(
   planner: PlannerCheckpoint,
   reason: string,
@@ -216,8 +197,6 @@ export function notePlannerHandoff(
   setPlannerStatus(planner, "handoff_required", reason);
 }
 
-// Records unresolved required/validation labels and marks the planner as
-// needing review instead of allowing blind navigation.
 export function recordPlannerValidation(planner: PlannerCheckpoint, labels: string[]) {
   planner.validationErrors = dedupeLabels([...planner.validationErrors, ...labels]);
   markPlannerTask(
@@ -229,8 +208,6 @@ export function recordPlannerValidation(planner: PlannerCheckpoint, labels: stri
   setPlannerStatus(planner, "needs_review", `Planner stopped because required inputs still need attention: ${labels.join(", ")}.`);
 }
 
-// Increments retry counters and records the reason an alternative path or
-// validation-recovery attempt was needed.
 export function bumpPlannerRetries(planner: PlannerCheckpoint, taskId: string, detail: string, page?: Page, stageIndex?: number) {
   planner.retryCount += 1;
   markPlannerTask(planner, taskId, "retrying", detail);
@@ -249,8 +226,6 @@ export function bumpPlannerRetries(planner: PlannerCheckpoint, taskId: string, d
   setPlannerStatus(planner, "running", detail);
 }
 
-// Maps a UI/user handoff type into the planner action taxonomy used for stage
-// decisions and saved trace data.
 export function plannerActionFromHandoffKind(kind: AgentHandoffKind): PlannerActionKind {
   switch (kind) {
     case "login":
@@ -271,8 +246,6 @@ export function plannerActionFromHandoffKind(kind: AgentHandoffKind): PlannerAct
   }
 }
 
-// Maps browser execution actions into planner action names so strategy output,
-// debug logs, and planner history use one consistent vocabulary.
 export function plannerActionFromBrowserAction(kind: "fill" | "click_next" | "upload_resume" | "submit" | "ask_user" | "stop"): PlannerActionKind {
   switch (kind) {
     case "fill":
@@ -291,8 +264,6 @@ export function plannerActionFromBrowserAction(kind: "fill" | "click_next" | "up
   }
 }
 
-// Creates one initial planner task with pending status for the checkpoint's
-// fixed set of subgoals.
 function createPlannerTask(id: string, label: string, timestamp: string): PlannerTask {
   return {
     id,
@@ -304,7 +275,6 @@ function createPlannerTask(id: string, label: string, timestamp: string): Planne
   };
 }
 
-// Finds or creates the stage-history row for the current browser stage.
 function ensurePlannerStage(planner: PlannerCheckpoint, page: Page, stageIndex: number) {
   const label = `Section ${stageIndex + 1}`;
   const existingStage = planner.stageHistory.find((stage) => stage.stageIndex === stageIndex);
@@ -331,8 +301,6 @@ function ensurePlannerStage(planner: PlannerCheckpoint, page: Page, stageIndex: 
   return stage;
 }
 
-// Updates the planner's single-stage/multi-stage hint based on how many stages
-// the engine has visited.
 function updatePlannerFormMode(planner: PlannerCheckpoint, stageIndex: number) {
   if (stageIndex > 0) {
     planner.formMode = "multi_stage";
@@ -341,8 +309,6 @@ function updatePlannerFormMode(planner: PlannerCheckpoint, stageIndex: number) {
   }
 }
 
-// Deep-clones a planner decision so resumed runs do not mutate old checkpoint
-// objects by reference.
 function clonePlannerDecision(decision: PlannerDecision): PlannerDecision {
   return {
     ...decision,
@@ -350,8 +316,6 @@ function clonePlannerDecision(decision: PlannerDecision): PlannerDecision {
   };
 }
 
-// Deep-clones a planner stage snapshot, including its nested decision object,
-// for safe reuse in resumed checkpoints.
 function clonePlannerStage(stage: PlannerStageSnapshot): PlannerStageSnapshot {
   return {
     ...stage,

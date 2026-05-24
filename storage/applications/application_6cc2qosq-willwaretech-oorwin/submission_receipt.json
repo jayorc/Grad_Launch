@@ -1,85 +1,86 @@
 {
   "intent": "browser_fill",
-  "outcome": "confirmed",
+  "outcome": "blocked",
   "externalSubmitted": false,
-  "confirmation": "The form is filled across 1 stage and is ready for review or direct submit.",
-  "submittedAt": "2026-05-23T18:37:27.939Z",
+  "confirmation": "GradLaunch paused because this screen still needs manual answers: Email, City.",
+  "submittedAt": "2026-05-24T10:16:18.682Z",
   "email": {
     "status": "skipped",
     "provider": "outbox",
     "to": "arpitarpit2003@gmail.com",
     "subject": "GradLaunch filled Willwaretech - Oorwin",
-    "sentAt": "2026-05-23T18:37:27.939Z",
+    "sentAt": "2026-05-24T10:16:18.682Z",
     "message": "Email is skipped for fill-only mode. Final submit will send the student confirmation."
   },
   "browser": {
-    "status": "filled",
+    "status": "handoff_required",
     "sourceUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-    "openedAt": "2026-05-23T18:36:44.647Z",
-    "completedAt": "2026-05-23T18:37:27.939Z",
+    "openedAt": "2026-05-24T10:14:01.191Z",
+    "completedAt": "2026-05-24T10:16:18.681Z",
     "filledLabels": [
-      "Last Name",
+      "Last Name"
+    ],
+    "skippedLabels": [
       "First Name",
       "Email",
-      "+1",
       "Years of Experience",
       "City",
-      "Current CTC",
-      "Resume upload"
+      "Current CTC"
     ],
-    "skippedLabels": [],
     "screenshots": [
       "browser-opened.png",
-      "browser-stage-1-start.png",
-      "browser-filled.png"
+      "browser-stage-1-start.png"
     ],
-    "message": "The form is filled across 1 stage and is ready for review or direct submit.",
+    "message": "GradLaunch paused because this screen still needs manual answers: Email, City.",
     "planner": {
       "sessionId": "planner-job_url_aHR0cHM6Ly93aWxsd2FyZXRl",
       "resumeToken": "job_url_aHR0cHM6Ly93aWxsd2FyZXRl:2026-05-23T10:38:02.132Z",
       "goal": "Complete the Oorwin application at Willwaretech autonomously until a protected or review checkpoint.",
-      "status": "completed",
-      "summary": "Planner completed the form fill and paused at the review gate.",
-      "formMode": "single_stage",
+      "status": "handoff_required",
+      "summary": "GradLaunch needs your help with required answers on this screen: Email, City.",
+      "formMode": "multi_stage",
       "currentStep": "stage_1",
       "currentStageLabel": "Section 1",
       "currentUrl": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
       "retryCount": 0,
-      "handoffCount": 0,
-      "validationErrors": [],
+      "handoffCount": 2,
+      "validationErrors": [
+        "Email",
+        "City"
+      ],
       "subgoals": [
         {
           "id": "open_job_page",
           "label": "Open job page",
           "status": "completed",
           "detail": "Job page opened successfully in a visible Chrome session.",
-          "attempts": 2,
-          "lastUpdatedAt": "2026-05-23T18:36:46.102Z",
-          "completedAt": "2026-05-23T18:36:46.102Z"
+          "attempts": 4,
+          "lastUpdatedAt": "2026-05-24T10:14:02.413Z",
+          "completedAt": "2026-05-24T10:14:02.413Z"
         },
         {
           "id": "authenticate_if_needed",
           "label": "Handle login if needed",
-          "status": "pending",
-          "detail": "Waiting to start.",
-          "attempts": 0,
-          "lastUpdatedAt": "2026-05-23T10:38:02.132Z"
+          "status": "needs_user",
+          "detail": "GradLaunch needs your help with required answers on this screen: Email, City.",
+          "attempts": 3,
+          "lastUpdatedAt": "2026-05-24T10:16:18.616Z"
         },
         {
           "id": "finish_current_section",
           "label": "Finish active section",
           "status": "running",
           "detail": "Reading Section 1 and planning the next safe action.",
-          "attempts": 2,
-          "lastUpdatedAt": "2026-05-23T18:36:47.023Z"
+          "attempts": 5,
+          "lastUpdatedAt": "2026-05-24T10:14:03.406Z"
         },
         {
           "id": "recover_from_validation_errors",
           "label": "Recover from validation errors",
-          "status": "pending",
-          "detail": "Waiting to start.",
-          "attempts": 0,
-          "lastUpdatedAt": "2026-05-23T10:38:02.132Z"
+          "status": "blocked",
+          "detail": "Validation or required-answer blockers were found: Email, City.",
+          "attempts": 2,
+          "lastUpdatedAt": "2026-05-24T10:16:18.552Z"
         },
         {
           "id": "retry_alternative_path",
@@ -102,29 +103,21 @@
           "id": "save_checkpoint",
           "label": "Save checkpoint",
           "status": "completed",
-          "detail": "Saved checkpoint while waiting for manual stage progress.",
+          "detail": "Saved checkpoint before handing control to the student.",
           "attempts": 0,
-          "lastUpdatedAt": "2026-05-23T18:37:17.628Z",
-          "completedAt": "2026-05-23T18:37:17.628Z"
+          "lastUpdatedAt": "2026-05-24T10:16:18.616Z",
+          "completedAt": "2026-05-24T10:16:18.616Z"
         }
       ],
       "lastDecision": {
-        "kind": "fill_fields",
-        "source": "llm",
+        "kind": "wait_for_user_input",
+        "source": "system",
         "stageIndex": 0,
         "stageLabel": "Section 1",
         "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-        "reason": "Software developer with a strong background in programming and machine learning, seeking a role at Willwaretech.",
-        "fieldLabels": [
-          "Last Name",
-          "First Name",
-          "Email",
-          "+1",
-          "Years of Experience",
-          "City",
-          "Current CTC"
-        ],
-        "createdAt": "2026-05-23T18:37:16.392Z"
+        "reason": "GradLaunch needs your help with required answers on this screen: Email, City.",
+        "fieldLabels": [],
+        "createdAt": "2026-05-24T10:16:18.616Z"
       },
       "stageHistory": [
         {
@@ -147,29 +140,31 @@
             "+1",
             "City"
           ],
-          "outcome": "review",
+          "outcome": "handoff",
           "decision": {
-            "kind": "fill_fields",
-            "source": "llm",
+            "kind": "wait_for_user_input",
+            "source": "system",
             "stageIndex": 0,
             "stageLabel": "Section 1",
             "url": "https://willwaretech.oorwin.ai/#/careers/index.html/job/63843e04b0f7a32d94539cf328ed335d39085a56?source=linkedin_free&postedby=9",
-            "reason": "Software developer with a strong background in programming and machine learning, seeking a role at Willwaretech.",
-            "fieldLabels": [
-              "Last Name",
-              "First Name",
-              "Email",
-              "+1",
-              "Years of Experience",
-              "City",
-              "Current CTC"
-            ],
-            "createdAt": "2026-05-23T18:37:16.392Z"
+            "reason": "GradLaunch needs your help with required answers on this screen: Email, City.",
+            "fieldLabels": [],
+            "createdAt": "2026-05-24T10:16:18.616Z"
           },
-          "lastUpdatedAt": "2026-05-23T18:37:17.457Z"
+          "lastUpdatedAt": "2026-05-24T10:16:18.616Z"
+        },
+        {
+          "stageIndex": 1,
+          "label": "Section 2",
+          "url": "about:blank",
+          "visibleFieldLabels": [],
+          "requiredFieldLabels": [],
+          "filledFieldLabels": [],
+          "outcome": "observed",
+          "lastUpdatedAt": "2026-05-24T10:13:58.134Z"
         }
       ],
-      "lastUpdatedAt": "2026-05-23T18:37:17.628Z"
+      "lastUpdatedAt": "2026-05-24T10:16:18.616Z"
     }
   }
 }

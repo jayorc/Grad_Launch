@@ -1,5 +1,4 @@
 import type { Job, StudentProfile } from "@gradlaunch/shared";
-import { fieldSemanticText, semanticKey, semanticSimilarity } from "./semantic-nlp";
 import type { VisibleField } from "./types";
 import { normalizeKey } from "./util";
 
@@ -8,15 +7,12 @@ type ProfileKnowledgeEntry = {
   terms: string[];
 };
 
-// Looks up a deterministic profile fact for one visible field by comparing the
-// field label/context/options against a curated list of aliases. This is the
-// safe fallback when direct prepared fields do not contain an answer.
 export function retrieveProfileAnswer(field: VisibleField, student: StudentProfile | undefined, job: Job) {
   if (!student) {
     return undefined;
   }
 
-  const query = semanticKey(fieldSemanticText(field));
+  const query = normalizeKey([field.label, field.context, field.options.join(" ")].join(" "));
   const entries = buildProfileKnowledgeEntries(student, job);
   let best: { score: number; value: string } | undefined;
 
@@ -31,9 +27,6 @@ export function retrieveProfileAnswer(field: VisibleField, student: StudentProfi
   return best && best.score >= 18 ? best.value : undefined;
 }
 
-// Builds the compact student summary sent to LLM answer planning. It includes
-// enough profile context for semantic matching without exposing unrelated
-// internal objects.
 export function createStudentProfileSummary(student: StudentProfile | undefined) {
   if (!student) {
     return undefined;
@@ -55,9 +48,6 @@ export function createStudentProfileSummary(student: StudentProfile | undefined)
   };
 }
 
-// Converts a full student profile and current job into searchable knowledge
-// entries. Each entry pairs one trusted value with multiple phrases that forms
-// commonly use for the same concept.
 function buildProfileKnowledgeEntries(student: StudentProfile, job: Job): ProfileKnowledgeEntry[] {
   const details = student.completeProfile;
   const entries: ProfileKnowledgeEntry[] = [];
@@ -81,17 +71,17 @@ function buildProfileKnowledgeEntries(student: StudentProfile, job: Job): Profil
   push(entries, details?.leetcodeUrl, ["leetcode", "leetcode profile"]);
   push(entries, details?.kaggleUrl, ["kaggle", "kaggle profile"]);
   push(entries, [details?.addressLine1, details?.addressLine2].filter(Boolean).join(", "), ["address", "street address", "address line"]);
-  push(entries, details?.city ?? student.preferredLocations[0], ["city", "current city", "location city", "location", "location city", "current location"]);
+  push(entries, details?.city ?? student.preferredLocations[0], ["city", "current city", "location city"]);
   push(entries, details?.state, ["state", "province", "region"]);
-  push(entries, details?.country, ["country", "current country", "location country", "country where you currently reside", "currently reside"]);
+  push(entries, details?.country, ["country", "current country", "location country"]);
   push(entries, details?.postalCode, ["postal code", "zip code", "pincode"]);
   push(entries, student.degree, ["degree", "highest degree", "education degree"]);
-  push(entries, primaryEducation?.school, ["college", "university", "school", "institution", "most recent school you attended", "recent school"]);
+  push(entries, primaryEducation?.school, ["college", "university", "school", "institution"]);
   push(entries, primaryEducation?.fieldOfStudy, ["field of study", "major", "specialization", "branch"]);
   push(entries, primaryEducation?.grade, ["grade", "cgpa", "gpa", "percentage"]);
   push(entries, student.graduationYear ? String(student.graduationYear) : undefined, ["graduation year", "passing year", "year of graduation"]);
-  push(entries, currentEmployment?.company ?? details?.currentCompany, ["current company", "company", "current organization", "employer", "current employer", "previous employer", "current or previous employer", "most recent employer"]);
-  push(entries, currentEmployment?.title ?? details?.currentTitle, ["current title", "designation", "job title", "current designation", "current or previous job title", "previous job title", "most recent job title"]);
+  push(entries, currentEmployment?.company ?? details?.currentCompany, ["current company", "company", "current organization", "employer"]);
+  push(entries, currentEmployment?.title ?? details?.currentTitle, ["current title", "designation", "job title", "current designation"]);
   push(entries, details?.totalExperienceYears !== undefined ? String(details.totalExperienceYears) : undefined, ["years of experience", "experience", "total experience"]);
   push(entries, details?.noticePeriodDays !== undefined ? String(details.noticePeriodDays) : undefined, ["notice period", "notice period days", "joining period"]);
   push(entries, details?.currentSalaryLpa !== undefined ? String(details.currentSalaryLpa) : undefined, ["current ctc", "current salary", "present ctc", "current compensation"]);
@@ -133,8 +123,6 @@ function buildProfileKnowledgeEntries(student: StudentProfile, job: Job): Profil
   return entries;
 }
 
-// Adds one trusted value to the knowledge base if it exists, normalizing all of
-// its aliases for later matching.
 function push(entries: ProfileKnowledgeEntry[], value: string | undefined, aliases: string[]) {
   const cleanValue = value?.trim();
 
@@ -143,7 +131,7 @@ function push(entries: ProfileKnowledgeEntry[], value: string | undefined, alias
   }
 
   const terms = aliases
-    .map((alias) => semanticKey(alias))
+    .map((alias) => normalizeKey(alias))
     .filter(Boolean);
 
   entries.push({
@@ -152,8 +140,6 @@ function push(entries: ProfileKnowledgeEntry[], value: string | undefined, alias
   });
 }
 
-// Scores how strongly a field query matches a set of aliases. Exact phrase
-// containment wins, with token overlap as a softer fallback.
 function scoreKnowledgeMatch(query: string, terms: string[]) {
   let score = 0;
 
@@ -172,14 +158,11 @@ function scoreKnowledgeMatch(query: string, terms: string[]) {
     const overlap = termTokens.filter((token) => queryTokens.has(token)).length;
 
     score += overlap * 6;
-    score += Math.round(semanticSimilarity(query, term) * 12);
   }
 
   return score;
 }
 
-// Converts a stored profile value into an option-compatible value when the
-// target field exposes dropdown/radio options.
 function coerceToFieldValue(value: string, field: VisibleField) {
   if (field.options.length === 0) {
     return value;
@@ -200,8 +183,6 @@ function coerceToFieldValue(value: string, field: VisibleField) {
   return fuzzy ?? value;
 }
 
-// Converts optional booleans into the Yes/No strings expected by most
-// application forms while preserving undefined as "no answer available".
 function yesNo(value: boolean | undefined) {
   if (value === undefined) {
     return undefined;
