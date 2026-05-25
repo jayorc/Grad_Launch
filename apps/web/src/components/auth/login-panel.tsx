@@ -158,7 +158,7 @@ export function LoginPanel() {
           <div>
             <p className="eyebrow">{mode === "login" ? "Welcome back" : "Create account"}</p>
             <h2 className="auth-title">
-              {mode === "login" ? "Access your GradLaunch workspace" : "Set up your GradLaunch profile"}
+              {mode === "login" ? "Access your GradLaunch account" : "Set up your GradLaunch profile"}
             </h2>
             <p className="muted auth-copy">
               {mode === "login"

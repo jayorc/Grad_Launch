@@ -23,12 +23,12 @@ export function ApplyActions({ token, jobId }: ApplyActionsProps) {
     setPendingSteps(steps);
     beginExecution({
       mode,
-      title: mode === "autopilot" ? "Launching background autopilot" : mode === "autofill" ? "Preparing autofill workspace" : "Preparing draft workspace",
+      title: mode === "autopilot" ? "Launching background autopilot" : mode === "autofill" ? "Preparing autofill context" : "Preparing draft context",
       message: mode === "autopilot"
-        ? "The agent is collecting profile context, building the application package, and handing it to the background browser worker."
+        ? "The agent is collecting profile context and handing it to the background browser worker."
         : mode === "autofill"
-          ? "The agent is collecting profile context, mapping reusable answers, and preparing a review-first application package."
-          : "The agent is packaging a readable draft workspace with tailored answers and saved artifacts.",
+          ? "The agent is collecting profile context, mapping reusable answers, and preparing a review-first application record."
+          : "The agent is preparing readable draft answers from profile and job data.",
       steps
     });
 
@@ -36,14 +36,14 @@ export function ApplyActions({ token, jobId }: ApplyActionsProps) {
       const result = await createApplicationRequest(token, jobId, mode);
       const successMessage =
         mode === "autopilot"
-          ? "Autopilot started. GradLaunch will keep working in the background and update the application workspace as the browser agent progresses."
+          ? "Autopilot started. GradLaunch will keep working in the background and update the application run as the browser agent progresses."
           : mode === "autofill"
           ? "Autofill data was prepared and paused at the review gate before any final submit."
-          : "Draft package was created and saved to the application workspace.";
+          : "Draft context was created and saved to the application record.";
       setMessage(successMessage);
       completeExecution({
         mode,
-        title: mode === "autopilot" ? "Autopilot launched" : mode === "autofill" ? "Autofill workspace ready" : "Draft workspace ready",
+        title: mode === "autopilot" ? "Autopilot launched" : mode === "autofill" ? "Autofill context ready" : "Draft context ready",
         message: successMessage,
         run: result.run,
         steps: result.run.timeline,
@@ -54,12 +54,12 @@ export function ApplyActions({ token, jobId }: ApplyActionsProps) {
       const variant = nextMessage.includes("already exists") ? "duplicate" : "error";
       const userMessage =
         variant === "duplicate"
-          ? "This job already has an application workspace. Open Saved Applications to continue from there."
+          ? "This job already has an application record. Open Saved Applications to continue from there."
           : nextMessage
       setMessage(userMessage);
       completeExecution({
         mode,
-        title: variant === "duplicate" ? "Workspace already exists" : "Application setup needs attention",
+        title: variant === "duplicate" ? "Application already exists" : "Application setup needs attention",
         message: userMessage,
         run: null,
         steps,
@@ -99,7 +99,7 @@ export function ApplyActions({ token, jobId }: ApplyActionsProps) {
           {loadingMode === "autofill" ? "Starting..." : "Prepare Review Fill"}
         </button>
       </div>
-      {pendingSteps ? <p className="action-inline-status">Agent is preparing your workspace. Follow the live companion in the corner.</p> : null}
+      {pendingSteps ? <p className="action-inline-status">Agent is preparing your application context. Follow the live companion in the corner.</p> : null}
       {message && !pendingSteps ? <p className="action-inline-status">{message}</p> : null}
     </div>
   );
@@ -123,10 +123,10 @@ function createPendingSteps(mode: "draft" | "autofill" | "autopilot"): AgentTime
     },
     {
       id: "artifacts",
-      label: mode === "autopilot" ? "Preparing autopilot package" : mode === "autofill" ? "Preparing review package" : "Preparing draft package",
+      label: mode === "autopilot" ? "Preparing autopilot run" : mode === "autofill" ? "Preparing review run" : "Preparing draft",
       detail: mode === "autopilot"
-        ? "Generating reusable answers, a structured application record, and the background execution handoff."
-        : "Generating reusable answers and a structured application record.",
+        ? "Generating reusable answers and the background execution handoff."
+        : "Generating reusable answers from your saved profile context.",
       state: "queued",
       source: "gradlaunch"
     },
@@ -141,8 +141,8 @@ function createPendingSteps(mode: "draft" | "autofill" | "autopilot"): AgentTime
       id: "launch",
       label: mode === "autopilot" ? "Launch background agent" : "Hold for next action",
       detail: mode === "autopilot"
-        ? "Persisting the application workspace and starting the autonomous browser worker behind the scenes."
-        : "The workspace will be ready for the next manual or guided step.",
+        ? "Saving the application run and starting the autonomous browser worker behind the scenes."
+        : "The application record will be ready for the next manual or guided step.",
       state: "queued",
       source: "gradlaunch"
     }

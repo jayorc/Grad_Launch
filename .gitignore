@@ -9,9 +9,7 @@ coverage
 # TypeScript build cache files are generated locally.
 *.tsbuildinfo
 
-# Runtime browser/application artifacts. These can contain cookies, screenshots,
-# temporary resumes, and portal state, so they should not be added to source.
-apps/api/src/storage/
-storage/browser/
-storage/browser-profile/
-storage/logged-browser-profile
+# Runtime artifacts. These can contain cookies, resumes, screenshots, portal
+# state, or local email receipts, so never add them to source.
+storage/
+apps/api/storage/

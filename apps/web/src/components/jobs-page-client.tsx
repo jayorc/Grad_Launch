@@ -53,7 +53,7 @@ export function JobsPageClient() {
         title="Automation Capabilities"
         description="GradLaunch checks the local browser runtime here so you can see whether the next step can be a real autonomous browser action or only a review-first package."
       />
-      <SectionCard title="Add Job from Link" description="Paste any real company job URL and GradLaunch will normalize it into a clean workspace card.">
+      <SectionCard title="Add Job from Link" description="Paste any real company job URL and GradLaunch will normalize it into a clean application card.">
         {session ? <JobIntakeForm onJobCreated={handleJobCreated} token={session.token} /> : null}
       </SectionCard>
       <SectionCard title="Available Openings" description="The clutter is removed here: job details first, actions second, live execution in the floating companion.">

@@ -2,7 +2,7 @@
 
 ## WhatsApp Short Version
 
-GradLaunch takes a pasted job URL, saves it as a `Job`, creates or reuses an `Application`, opens the real job page in Chrome, scans the visible fields, prepares answers from profile + resume + memory, optionally asks the LLM for better field matching, fills the form, uploads resume when a resume input is detected, pauses for login/captcha/manual questions, and saves screenshots/debug logs/receipt for review.
+GradLaunch takes a pasted job URL, saves it as a `Job`, creates or reuses an `Application`, opens the real job page in Chrome, scans the visible fields, prepares answers from profile + resume + memory, optionally asks the LLM for better field matching, fills the form, uploads resume when a resume input is detected, pauses for login/captcha/manual questions, and records a compact receipt in the application run.
 
 Main flow:
 
@@ -18,7 +18,7 @@ Paste job URL
   -> LLM + deterministic answers
   -> Fill fields and upload resume
   -> Validate required fields
-  -> Continue, pause, submit, or save receipt
+  -> Continue, pause, submit, or record receipt
 ```
 
 ## Folder Structure Snapshot
@@ -34,8 +34,7 @@ gradlaunch/
   apps/api/src/services/
     job-intake-service.ts          # Validates/saves pasted job URL
     application-service.ts         # Builds Application + prepared fields
-    aihawk-adapter-service.ts      # Hands browser work to BrowserApplyService
-    browser-apply-service.ts       # Thin wrapper around BrowserAgentEngine
+    browser-agent-adapter-service.ts # Hands browser work to BrowserAgentEngine
 
     browser-agent/
       engine.ts                    # Main browser loop/orchestrator
@@ -50,21 +49,7 @@ gradlaunch/
       util.ts                      # Debug logging + helpers
 
   apps/api/src/config/
-    storage.ts                     # storage/applications, storage/browser, profiles
-
-  storage/
-    resumes/                       # Uploaded resume files
-    applications/<application-id>-<company>-<role>/
-      browser-agent-debug.log      # Step-by-step debug events
-      browser-opened.png           # Screenshots from the run
-      browser-*.png
-      run_trace.json               # Final trace package
-      planner_checkpoint.json      # Planner state/checkpoint
-      submission_receipt.json      # Saved receipt when available
-
-    browser/                       # Browser workspace if no app workspace passed
-    browser-profile/               # Managed GradLaunch Chrome profile
-    logged-browser-profile/        # GradLaunch-controlled persistent login profile
+    storage.ts                     # Runtime paths; defaults point to OS temp, not repo storage
 ```
 
 ## High-Level Dry Run
@@ -76,9 +61,8 @@ gradlaunch/
 5. API receives `POST /jobs/:jobId/fill-browser` in `apps/api/src/routes/application-routes.ts`.
 6. `ApplicationService.fillJobInBrowser()` loads student, job, existing application, resume, memory, and browser capability.
 7. `buildFilledFields()` prepares known values like name, email, phone, city, location, country, LinkedIn, salary, authorization, and short answers.
-8. `AihawkAdapterService.applyWithBrowser()` passes the package into the browser worker.
-9. `BrowserApplyService.apply()` delegates to `BrowserAgentEngine.apply()`.
-10. `BrowserAgentEngine` checks Chrome availability, creates the workspace folder, launches or attaches Chrome, and opens the job `sourceUrl`.
+8. `BrowserAgentAdapterService.applyWithBrowser()` passes the package into the browser worker.
+9. `BrowserAgentEngine` checks Chrome availability, launches or attaches Chrome, and opens the job `sourceUrl`.
 11. On every stage, it scans visible fields with `discoverVisibleFields()` and builds a page observation with `observeBrowserPage()`.
 12. `classifyPage()` and `rankActions()` score the page as login, captcha, resume upload, form fill, validation error, loading, review, submit, start, or unknown.
 13. `buildStageExecutionPlan()` chooses the safest action from those scores: ask user, wait, explore, upload resume, fill, click next, stop, or submit.
@@ -105,10 +89,8 @@ POST /jobs/:jobId/fill-browser
        apps/api/src/services/application-service.ts:154
        -> buildFilledFields()
           apps/api/src/services/application-service.ts:791
-       -> AihawkAdapterService.applyWithBrowser()
-          apps/api/src/services/aihawk-adapter-service.ts:184
-       -> BrowserApplyService.apply()
-          apps/api/src/services/browser-apply-service.ts:196
+       -> BrowserAgentAdapterService.applyWithBrowser()
+          apps/api/src/services/browser-agent-adapter-service.ts
        -> BrowserAgentEngine.apply()
           apps/api/src/services/browser-agent/engine.ts:133
 ```
@@ -168,10 +150,10 @@ Verifier + Repair
   -> Retries failed known fields before navigation
 
 Engine
-  -> Owns Chrome/session/workspace
+  -> Owns Chrome/session/runtime
   -> Pauses on login/CAPTCHA
   -> Runs one stage at a time
-  -> Saves screenshots, debug logs, planner checkpoint, and receipt
+  -> Records planner checkpoint and compact receipt
 ```
 
 ## Field Filling Strategy
@@ -264,22 +246,6 @@ Login panels are treated as protected checkpoints before filling starts. GradLau
 
 GradLaunch cannot reuse the app website's own Google sign-in session for external job portals because those OAuth cookies are scoped to Google/the portal domains, not the GradLaunch domain. The safe reusable path is the controlled logged Chrome profile, which preserves Google cookies for third-party `Sign in with Google` flows.
 
-## Runtime Artifacts To Check
+## Runtime Artifacts
 
-When debugging a run, first check the application workspace:
-
-```text
-storage/applications/<application-id>-<company>-<role>/
-```
-
-Useful files:
-
-```text
-browser-agent-debug.log      # best file for why a field was/was not filled
-planner_checkpoint.json      # current planner state
-run_trace.json               # final packaged execution trace
-submission_receipt.json      # final result when saved
-browser-*.png                # screenshots at important stages
-```
-
-Do not share `.env`, API keys, resume files, or full storage folders externally. For WhatsApp sharing, this doc and sanitized screenshots/log snippets are safe.
+By default, application runs do not write repo-local artifacts. Debug logs and screenshots are opt-in only with `BROWSER_AGENT_DEBUG=true` or `BROWSER_SAVE_SCREENSHOTS=true`, and runtime paths default to OS temp.

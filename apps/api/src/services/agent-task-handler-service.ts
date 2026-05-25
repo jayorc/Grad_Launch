@@ -5,7 +5,7 @@ import { JobRepository } from "../repositories/job-repository";
 import { ResumeRepository } from "../repositories/resume-repository";
 import { StudentRepository } from "../repositories/student-repository";
 import { MatchingService } from "./matching-service";
-import { AIHawkAdapterService } from "./aihawk-adapter-service";
+import { BrowserAgentAdapterService } from "./browser-agent-adapter-service";
 import { AgentOrchestratorService } from "./agent-orchestrator-service";
 import { PolicyEngineService } from "./policy-engine-service";
 import { StudentMemoryService } from "./student-memory-service";
@@ -25,7 +25,7 @@ export class AgentTaskHandlerService {
     private readonly applications = new ApplicationRepository(),
     private readonly resumes = new ResumeRepository(),
     private readonly matching = new MatchingService(),
-    private readonly aihawk = new AIHawkAdapterService(),
+    private readonly browserAgent = new BrowserAgentAdapterService(),
     private readonly orchestrator = new AgentOrchestratorService(),
     private readonly policy = new PolicyEngineService(),
     private readonly memory = new StudentMemoryService()
@@ -143,7 +143,7 @@ export class AgentTaskHandlerService {
 
   private async handlePlanning(task: AgentTask): Promise<TaskExecutionResult> {
     const context = await this.getApplicationContext(task);
-    const capabilities = await this.aihawk.getCapabilities();
+    const capabilities = await this.browserAgent.getCapabilities();
     const runs = await this.applications.listRunsByApplication(context.application.id);
     const latestRun = runs[0];
     const memory = await this.memory.get(context.student.id);

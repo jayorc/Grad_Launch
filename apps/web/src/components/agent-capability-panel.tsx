@@ -7,6 +7,9 @@ type AgentCapabilityPanelProps = {
 };
 
 export function AgentCapabilityPanel({ capabilities, title, description }: AgentCapabilityPanelProps) {
+  const browserCapability = capabilities?.capabilities.find((capability) => capability.id === "browser_apply");
+  const browserReady = browserCapability?.status === "available" || browserCapability?.status === "partial";
+
   return (
     <section className="card section-card capability-card">
       <div className="section-header">
@@ -18,15 +21,14 @@ export function AgentCapabilityPanel({ capabilities, title, description }: Agent
           <span
             className={`capability-chip ${
               capabilities
-                ? capabilities.repoDetected
+                ? browserReady
                   ? "capability-chip-available"
                   : "capability-chip-partial"
                 : "capability-chip-subtle"
             }`}
           >
-            {capabilities ? (capabilities.repoDetected ? "Browser runtime connected" : "Fallback mode") : "Checking runtime"}
+            {capabilities ? (browserReady ? "Browser runtime connected" : "Browser runtime unavailable") : "Checking runtime"}
           </span>
-          {capabilities?.pythonAvailable ? <span className="capability-chip capability-chip-subtle">Python ready</span> : null}
         </div>
       </div>
 

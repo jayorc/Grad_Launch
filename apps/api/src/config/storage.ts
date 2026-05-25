@@ -1,38 +1,33 @@
-import { homedir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../../../");
+const runtimeRoot = resolve(tmpdir(), "gradlaunch-runtime");
 
 export function getResumeStorageDir() {
   return process.env.RESUME_STORAGE_DIR
     ? resolveConfiguredPath(process.env.RESUME_STORAGE_DIR)
-    : resolve(projectRoot, "storage", "resumes");
-}
-
-export function getApplicationArtifactStorageDir() {
-  return process.env.APPLICATION_ARTIFACT_STORAGE_DIR
-    ? resolveConfiguredPath(process.env.APPLICATION_ARTIFACT_STORAGE_DIR)
-    : resolve(projectRoot, "storage", "applications");
+    : resolve(runtimeRoot, "resumes");
 }
 
 export function getEmailOutboxStorageDir() {
   return process.env.EMAIL_OUTBOX_DIR
     ? resolveConfiguredPath(process.env.EMAIL_OUTBOX_DIR)
-    : resolve(projectRoot, "storage", "email-outbox");
+    : resolve(runtimeRoot, "email-outbox");
 }
 
 export function getBrowserWorkspaceStorageDir() {
   return process.env.BROWSER_WORKSPACE_DIR
     ? resolveConfiguredPath(process.env.BROWSER_WORKSPACE_DIR)
-    : resolve(projectRoot, "storage", "browser");
+    : resolve(runtimeRoot, "browser");
 }
 
 export function getManagedBrowserProfileDir() {
   return process.env.BROWSER_PROFILE_DIR
     ? resolveConfiguredPath(process.env.BROWSER_PROFILE_DIR)
-    : resolve(projectRoot, "storage", "browser-profile");
+    : resolve(runtimeRoot, "browser-profile");
 }
 
 export function getLoggedBrowserProfileDir() {
@@ -45,7 +40,7 @@ export function getLoggedBrowserProfileDir() {
   }
 
   if (process.env.BROWSER_USE_SYSTEM_CHROME_PROFILE !== "true") {
-    return resolve(projectRoot, "storage", "logged-browser-profile");
+    return resolve(runtimeRoot, "logged-browser-profile");
   }
 
   return getSystemChromeUserDataDir();
@@ -75,6 +70,10 @@ function resolveConfiguredPath(value: string) {
 
   if (trimmed.startsWith("~/")) {
     return resolve(homedir(), trimmed.slice(2));
+  }
+
+  if (isAbsolute(trimmed)) {
+    return trimmed;
   }
 
   return resolve(projectRoot, trimmed);

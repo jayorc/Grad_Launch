@@ -3,7 +3,7 @@ import { JobRepository } from "../repositories/job-repository";
 import { SearchSessionRepository } from "../repositories/search-session-repository";
 import { StudentRepository } from "../repositories/student-repository";
 import { nowIso } from "../lib/time";
-import { AIHawkAdapterService } from "./aihawk-adapter-service";
+import { BrowserAgentAdapterService } from "./browser-agent-adapter-service";
 import { LiveJobSearchService } from "./live-job-search-service";
 import { MatchingService } from "./matching-service";
 import { createId } from "../lib/id";
@@ -14,7 +14,7 @@ export class SearchService {
     private readonly jobs = new JobRepository(),
     private readonly sessions = new SearchSessionRepository(),
     private readonly matching = new MatchingService(),
-    private readonly aihawk = new AIHawkAdapterService(),
+    private readonly browserAgent = new BrowserAgentAdapterService(),
     private readonly liveSearch = new LiveJobSearchService()
   ) {}
 
@@ -25,7 +25,7 @@ export class SearchService {
       throw new Error("Student not found.");
     }
 
-    const capabilities = await this.aihawk.getCapabilities();
+    const capabilities = await this.browserAgent.getCapabilities();
     const liveResult = await this.liveSearch.searchForStudent(student);
     await Promise.all(liveResult.jobs.map((job) => this.jobs.save(job)));
 
@@ -73,17 +73,16 @@ function buildSearchTimeline(input: {
   durationMinutes: number;
 }): AgentTimelineStep[] {
   const browserCapability = input.capabilities.capabilities.find((capability) => capability.id === "browser_apply");
+  const browserReady = browserCapability?.status === "available" || browserCapability?.status === "partial";
 
   return [
     {
       id: "adapter",
       label: "Browser runtime checked",
-      detail: input.capabilities.repoDetected
-        ? browserCapability?.status === "unavailable"
-          ? "Local browser automation modules were detected, but search is running in GradLaunch mode because browser/apply plugins are missing."
-          : "Local browser automation modules were detected and the runtime is available for downstream draft flows."
-        : "No local browser runtime was detected, so the search session is running entirely on GradLaunch services.",
-      state: input.capabilities.repoDetected ? "done" : "attention",
+      detail: browserReady
+        ? "GradLaunch browser automation is available for downstream draft and fill flows."
+        : browserCapability?.detail ?? "Search can still run, but browser automation is unavailable in this runtime.",
+      state: browserReady ? "done" : "attention",
       source: "gradlaunch"
     },
     {

@@ -24,7 +24,7 @@ export function ApplicationRunTrace({ run }: ApplicationRunTraceProps) {
                 <div>
                   <div className="agent-step-headline">
                     <strong>{step.label}</strong>
-                    <span className={`agent-source agent-source-${step.source}`}>{step.source === "aihawk" ? "Browser Agent" : "GradLaunch"}</span>
+                    <span className="agent-source agent-source-gradlaunch">GradLaunch</span>
                   </div>
                   <p className="muted">{step.detail}</p>
                 </div>
@@ -54,13 +54,6 @@ export function ApplicationRunTrace({ run }: ApplicationRunTraceProps) {
                   <li className="list-item soft-list-item" key={note}>{note}</li>
                 ))}
               </ul>
-            </div>
-          ) : null}
-
-          {run.screenshots.length > 0 ? (
-            <div className="soft-panel">
-              <p className="detail-label">Review assets</p>
-              <p className="detail-value detail-wrap">{run.screenshots.join(", ")}</p>
             </div>
           ) : null}
 

@@ -1,6 +1,0 @@
-Aarav Sharma
-aarav@example.com
-B.Tech in Computer Science 2026
-Frontend Engineer
-Remote Bengaluru
-Skills: React, TypeScript, Next.js, Node.js, MongoDB

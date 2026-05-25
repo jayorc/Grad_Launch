@@ -1,6 +1,7 @@
-import type { BrowserContext, Page } from "playwright-core";
+import type { BrowserContext, Page } from "./browser-driver";
 
 type BotMood = "thinking" | "acting" | "waiting" | "done";
+type BotAction = { kind: "confirm_continue"; label?: string };
 type BotPosition = { left: number; top: number };
 type BotState = {
   dragging: boolean;
@@ -9,28 +10,57 @@ type BotState = {
   offsetY: number;
   position: BotPosition | null;
   stopRequested: boolean;
+  stopPointerDownAt: number;
+  continueRequested: boolean;
 };
 
 const stopRequestedContexts = new WeakSet<BrowserContext>();
+const continueRequestedContexts = new WeakSet<BrowserContext>();
 
 export async function clearUserStopRequest(page: Page) {
   stopRequestedContexts.delete(page.context());
 
-  await page.evaluate(() => {
-    const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
-      __gradlaunchBotState?: { stopRequested?: boolean };
-    }) | null;
+  await Promise.all(page.context().pages().filter((candidate) => !candidate.isClosed()).map((candidate) => {
+    return candidate.evaluate(() => {
+      const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
+        __gradlaunchBotState?: { stopRequested?: boolean; stopPointerDownAt?: number };
+      }) | null;
 
-    if (!root) {
-      return;
-    }
+      if (!root) {
+        return;
+      }
 
-    root.removeAttribute("data-gradlaunch-stop-requested");
+      root.removeAttribute("data-gradlaunch-stop-requested");
+      root.removeAttribute("data-gradlaunch-stop-confirmed");
 
-    if (root.__gradlaunchBotState) {
-      root.__gradlaunchBotState.stopRequested = false;
-    }
-  }).catch(() => undefined);
+      if (root.__gradlaunchBotState) {
+        root.__gradlaunchBotState.stopRequested = false;
+        root.__gradlaunchBotState.stopPointerDownAt = 0;
+      }
+    }).catch(() => undefined);
+  }));
+}
+
+export async function clearUserContinueRequest(page: Page) {
+  continueRequestedContexts.delete(page.context());
+
+  await Promise.all(page.context().pages().filter((candidate) => !candidate.isClosed()).map((candidate) => {
+    return candidate.evaluate(() => {
+      const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
+        __gradlaunchBotState?: { continueRequested?: boolean };
+      }) | null;
+
+      if (!root) {
+        return;
+      }
+
+      root.removeAttribute("data-gradlaunch-continue-requested");
+
+      if (root.__gradlaunchBotState) {
+        root.__gradlaunchBotState.continueRequested = false;
+      }
+    }).catch(() => undefined);
+  }));
 }
 
 export async function updateLiveBot(
@@ -40,14 +70,24 @@ export async function updateLiveBot(
     message: string;
     mood: BotMood;
     step?: string;
+    action?: BotAction;
   }
 ) {
-  await page.exposeFunction("__gradlaunchRequestStop", () => {
-    stopRequestedContexts.add(page.context());
+  const allowQuit = isLiveBotQuitEnabled();
+
+  if (allowQuit) {
+    await page.exposeFunction("__gradlaunchRequestStop", () => {
+      stopRequestedContexts.add(page.context());
+      return true;
+    }).catch(() => undefined);
+  }
+
+  await page.exposeFunction("__gradlaunchConfirmContinue", () => {
+    continueRequestedContexts.add(page.context());
     return true;
   }).catch(() => undefined);
 
-  await page.evaluate(({ title, message, mood, step }) => {
+  await page.evaluate(({ title, message, mood, step, action, allowQuit }) => {
     const rootId = "gradlaunch-live-bot";
     const existing = document.getElementById(rootId);
     const root = existing ?? document.createElement("div");
@@ -60,7 +100,9 @@ export async function updateLiveBot(
       offsetX: 0,
       offsetY: 0,
       position: null,
-      stopRequested: false
+      stopRequested: false,
+      stopPointerDownAt: 0,
+      continueRequested: false
     };
     botRoot.__gradlaunchBotState = state;
 
@@ -134,7 +176,7 @@ export async function updateLiveBot(
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        padding-right: 56px;
+        padding-right: ${allowQuit ? "56px" : "8px"};
       }
       #${rootId} .gl-message {
         margin: 0;
@@ -161,6 +203,28 @@ export async function updateLiveBot(
       }
       #${rootId} .gl-stop:disabled {
         opacity: 0.82;
+        cursor: default;
+      }
+      #${rootId} .gl-actions {
+        display: grid;
+        gap: 6px;
+        margin-top: 10px;
+        padding-right: 4px;
+      }
+      #${rootId} .gl-confirm {
+        border: 0;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #16a34a, #15803d);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.2;
+        padding: 8px 10px;
+        cursor: pointer;
+        box-shadow: 0 10px 20px rgba(21, 128, 61, 0.24);
+      }
+      #${rootId} .gl-confirm:disabled {
+        opacity: 0.84;
         cursor: default;
       }
       #${rootId} .gl-body {
@@ -313,20 +377,58 @@ export async function updateLiveBot(
     text.textContent = message;
     cloud.appendChild(text);
 
-    const stop = document.createElement("button");
-    stop.className = "gl-stop";
-    stop.textContent = "Quit";
-    stop.type = "button";
-    stop.onclick = () => {
-      state.stopRequested = true;
-      root.setAttribute("data-gradlaunch-stop-requested", "true");
-      stop.textContent = "Stopping";
-      stop.disabled = true;
-      void (window as typeof window & {
-        __gradlaunchRequestStop?: () => Promise<boolean>;
-      }).__gradlaunchRequestStop?.();
-    };
-    cloud.appendChild(stop);
+    if (action?.kind === "confirm_continue") {
+      const actions = document.createElement("div");
+      actions.className = "gl-actions";
+
+      const confirm = document.createElement("button");
+      confirm.className = "gl-confirm";
+      confirm.textContent = action.label ?? "I am logged in, continue";
+      confirm.type = "button";
+      confirm.onclick = () => {
+        state.continueRequested = true;
+        root.setAttribute("data-gradlaunch-continue-requested", "true");
+        confirm.textContent = "Checking...";
+        confirm.disabled = true;
+        void (window as typeof window & {
+          __gradlaunchConfirmContinue?: () => Promise<boolean>;
+        }).__gradlaunchConfirmContinue?.();
+      };
+
+      actions.appendChild(confirm);
+      cloud.appendChild(actions);
+    }
+
+    if (allowQuit) {
+      const stop = document.createElement("button");
+      stop.className = "gl-stop";
+      stop.textContent = "Quit";
+      stop.type = "button";
+      stop.onpointerdown = (event) => {
+        state.stopPointerDownAt = event.isTrusted ? Date.now() : 0;
+      };
+      stop.onclick = (event) => {
+        const trustedPointerClick = event.isTrusted
+          && state.stopPointerDownAt > 0
+          && Date.now() - state.stopPointerDownAt < 2500;
+
+        if (!trustedPointerClick) {
+          state.stopPointerDownAt = 0;
+          return;
+        }
+
+        state.stopRequested = true;
+        root.setAttribute("data-gradlaunch-stop-requested", "true");
+        stop.textContent = "Stopping";
+        stop.disabled = true;
+        void (window as typeof window & {
+          __gradlaunchRequestStop?: () => Promise<boolean>;
+        }).__gradlaunchRequestStop?.().then(() => {
+          root.setAttribute("data-gradlaunch-stop-confirmed", "true");
+        });
+      };
+      cloud.appendChild(stop);
+    }
 
     const body = document.createElement("div");
     body.className = `gl-body gl-${mood}`;
@@ -427,19 +529,56 @@ export async function updateLiveBot(
         }
       });
     }
-  }, input).catch(() => undefined);
+  }, { ...input, allowQuit }).catch(() => undefined);
 }
 
 export async function didUserRequestStop(page: Page) {
-  if (stopRequestedContexts.has(page.context())) {
-    return true;
+  if (!isLiveBotQuitEnabled()) {
+    return false;
   }
 
-  return page.evaluate(() => {
-    const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
-      __gradlaunchBotState?: { stopRequested?: boolean };
-    }) | null;
+  return stopRequestedContexts.has(page.context());
+}
 
-    return root?.dataset.gradlaunchStopRequested === "true" || root?.__gradlaunchBotState?.stopRequested === true;
+function isLiveBotQuitEnabled() {
+  return process.env.BROWSER_ENABLE_LIVE_BOT_QUIT === "true";
+}
+
+export async function isLiveBotMounted(page: Page) {
+  return page.evaluate(() => {
+    const root = document.getElementById("gradlaunch-live-bot");
+
+    if (!(root instanceof HTMLElement) || !root.isConnected) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(root);
+    const rect = root.getBoundingClientRect();
+
+    return style.display !== "none"
+      && style.visibility !== "hidden"
+      && Number(style.opacity || "1") > 0
+      && rect.width > 0
+      && rect.height > 0;
   }).catch(() => false);
+}
+
+export async function consumeUserContinueConfirmation(page: Page) {
+  const contextConfirmed = continueRequestedContexts.has(page.context());
+  const pageConfirmations = await Promise.all(page.context().pages().filter((candidate) => !candidate.isClosed()).map((candidate) => {
+    return candidate.evaluate(() => {
+      const root = document.getElementById("gradlaunch-live-bot") as (HTMLElement & {
+        __gradlaunchBotState?: { continueRequested?: boolean };
+      }) | null;
+
+      return root?.dataset.gradlaunchContinueRequested === "true" || root?.__gradlaunchBotState?.continueRequested === true;
+    }).catch(() => false);
+  }));
+  const confirmed = contextConfirmed || pageConfirmations.some(Boolean);
+
+  if (confirmed) {
+    await clearUserContinueRequest(page);
+  }
+
+  return confirmed;
 }

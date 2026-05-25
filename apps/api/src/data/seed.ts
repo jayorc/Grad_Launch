@@ -145,18 +145,11 @@ export const seedApplicationRuns: ApplicationRun[] = [
     applicationId: "application_1",
     status: "needs_review",
     startedAt: "2026-05-19T10:10:00.000Z",
-    adapterId: "aihawk-local",
+    adapterId: "gradlaunch-browser-agent",
     executionMode: "guided_autofill",
-    workspacePath: "/Users/jaykumargupta/Codes/gradlaunch/storage/applications/application_1-launchgrid-software-engineer-intern",
-    workspaceFiles: [
-      "job_application.json",
-      "run_trace.json",
-      "job_description.json",
-      "student_profile_snapshot.json",
-      "short_answers.json",
-      "README.txt"
-    ],
-    screenshots: ["launchgrid-review-step.png"],
+    workspacePath: undefined,
+    workspaceFiles: [],
+    screenshots: [],
     filledFields: [
       { label: "Full name", value: "Aarav Sharma" },
       { label: "Email", value: "aarav@example.com" },
@@ -165,10 +158,10 @@ export const seedApplicationRuns: ApplicationRun[] = [
     timeline: [
       {
         id: "adapter",
-        label: "AIHawk adapter checked",
-        detail: "Local AIHawk modules were detected, but the provider/apply engine is missing in this checkout.",
+        label: "Browser runtime checked",
+        detail: "GradLaunch browser automation is available for guided execution.",
         state: "done",
-        source: "aihawk"
+        source: "gradlaunch"
       },
       {
         id: "profile",
@@ -182,12 +175,12 @@ export const seedApplicationRuns: ApplicationRun[] = [
         label: "Review gate reached",
         detail: "Autofill values were prepared and paused for review before submission.",
         state: "attention",
-        source: "aihawk"
+        source: "gradlaunch"
       }
     ],
     notes: [
       "Latest resume used: aarav_resume_v3.pdf.",
-      "Browser auto-apply is unavailable in this AIHawk checkout, so autofill stays review-first."
+      "Browser auto-apply is unavailable in this browser runtime, so autofill stays review-first."
     ]
   }
 ];

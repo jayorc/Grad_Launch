@@ -18,7 +18,7 @@ import { ResumeRepository } from "../repositories/resume-repository";
 import { StudentRepository } from "../repositories/student-repository";
 import { createId } from "../lib/id";
 import { nowIso } from "../lib/time";
-import { AIHawkAdapterService, type StructuredApplicationPackageResult } from "./aihawk-adapter-service";
+import { BrowserAgentAdapterService } from "./browser-agent-adapter-service";
 import { AgentOrchestratorService } from "./agent-orchestrator-service";
 import { EmailService } from "./email-service";
 import { cityFromLocationLabel, inferCountryFromLocationLabel, inferCountryFromPhoneNumber, resolveBestProfileLocation } from "./location-resolver";
@@ -33,7 +33,7 @@ export class ApplicationService {
     private readonly agentRepository = new AgentRepository(),
     private readonly resumes = new ResumeRepository(),
     private readonly matching = new MatchingService(),
-    private readonly aihawk = new AIHawkAdapterService(),
+    private readonly browserAgent = new BrowserAgentAdapterService(),
     private readonly emails = new EmailService(),
     private readonly orchestrator = new AgentOrchestratorService(),
     private readonly memory = new StudentMemoryService()
@@ -44,7 +44,7 @@ export class ApplicationService {
       this.students.getById(input.studentId),
       this.jobs.getById(input.jobId),
       this.applications.getByStudentAndJob(input.studentId, input.jobId),
-      this.aihawk.getCapabilities(),
+      this.browserAgent.getCapabilities(),
       this.resumes.getLatestByStudent(input.studentId)
     ]);
 
@@ -53,7 +53,7 @@ export class ApplicationService {
     }
 
     if (existingApplication) {
-      throw new Error("An application for this job already exists in your workspace.");
+      throw new Error("An application for this job already exists.");
     }
 
     const recommendation = this.matching.scoreJob(student, job, student.defaultStrictness);
@@ -82,7 +82,7 @@ export class ApplicationService {
       executionMode: input.mode === "autopilot" ? "autonomous_apply" : input.mode === "autofill" ? "guided_autofill" : "draft_package",
       workspacePath: undefined,
       workspaceFiles: [],
-      screenshots: input.mode === "draft" ? [] : ["review-gate.png"],
+      screenshots: [],
       blockedReason: undefined,
       filledFields: buildFilledFields(student, job, resume, application.generatedArtifacts),
       timeline: buildApplicationTimeline({
@@ -157,7 +157,7 @@ export class ApplicationService {
       this.students.getById(input.studentId),
       this.jobs.getById(input.jobId),
       this.applications.getByStudentAndJob(input.studentId, input.jobId),
-      this.aihawk.getCapabilities(),
+      this.browserAgent.getCapabilities(),
       this.resumes.getLatestByStudent(input.studentId),
       this.memory.get(input.studentId)
     ]);
@@ -198,37 +198,26 @@ export class ApplicationService {
       startedAt: now,
       adapterId: capabilities.adapterId,
       executionMode: "browser_apply",
-      workspacePath: existingRuns[0]?.workspacePath,
-      workspaceFiles: existingRuns[0]?.workspaceFiles ?? [],
-      screenshots: existingRuns[0]?.screenshots ?? ["review-gate.png"],
+      workspacePath: undefined,
+      workspaceFiles: [],
+      screenshots: [],
       filledFields: fields,
       planner: existingRuns[0]?.planner,
       timeline: buildBrowserFillTimeline({
         job,
         receipt: undefined,
-        workspacePath: existingRuns[0]?.workspacePath,
         planner: existingRuns[0]?.planner
       }),
       notes: ["Opening the exact job URL in Chrome and filling known fields in front of the student."]
     };
 
-    const preparationPackage = await this.aihawk.prepareWorkspaceDirectory({
-      applicationId: application.id,
-      job
-    });
-    console.log("[GradLaunch][ApplicationService] preparation package ready", {
-      applicationId: application.id,
-      directory: preparationPackage.directory
-    });
-
-    const browserReceipt = await this.aihawk.applyWithBrowser({
+    const browserReceipt = await this.browserAgent.applyWithBrowser({
       studentId: student.id,
       applicationId: application.id,
       runId: preparingRun.id,
       executionSessionId: latestBrowserSession?.id,
       job,
       fields,
-      workspacePath: preparationPackage.directory,
       resume,
       student,
       memory,
@@ -271,14 +260,14 @@ export class ApplicationService {
       ...preparingRun,
       status: blocked ? "blocked" : handoffRequired || needsManualReview ? "needs_review" : "completed",
       completedAt,
-      workspacePath: preparationPackage.directory,
-      screenshots: mergeScreenshots(preparingRun.screenshots, browserReceipt.screenshots),
+      workspacePath: undefined,
+      workspaceFiles: [],
+      screenshots: [],
       blockedReason: blocked || handoffRequired ? browserReceipt.message : undefined,
       planner: browserReceipt.planner,
       timeline: buildBrowserFillTimeline({
         job,
         receipt: browserReceipt,
-        workspacePath: preparationPackage.directory,
         planner: browserReceipt.planner
       }),
       notes: [
@@ -288,23 +277,6 @@ export class ApplicationService {
       ],
       submission
     };
-    const finalPackage = await this.aihawk.createStructuredApplicationPackage({
-      application: updatedApplication,
-      run: finalRun,
-      job,
-      student,
-      resume
-    });
-    console.log("[GradLaunch][ApplicationService] final package ready", {
-      applicationId: application.id,
-      directory: finalPackage.directory,
-      status: finalRun.status
-    });
-    const savedRun: ApplicationRun = {
-      ...finalRun,
-      workspaceFiles: finalPackage.files,
-      workspacePath: finalPackage.directory
-    };
 
     if (existingApplication) {
       await this.applications.update(updatedApplication);
@@ -312,11 +284,11 @@ export class ApplicationService {
       await this.applications.create(updatedApplication);
     }
 
-    await this.applications.createRun(savedRun);
+    await this.applications.createRun(finalRun);
 
     return {
       application: updatedApplication,
-      run: savedRun,
+      run: finalRun,
       capabilities
     };
   }
@@ -324,7 +296,7 @@ export class ApplicationService {
   async submit(input: SubmitApplicationInput) {
     const [application, capabilities] = await Promise.all([
       this.applications.getById(input.applicationId),
-      this.aihawk.getCapabilities()
+      this.browserAgent.getCapabilities()
     ]);
 
     if (!application || application.studentId !== input.studentId) {
@@ -355,14 +327,13 @@ export class ApplicationService {
     );
     const latestBrowserSession = await this.agentRepository.getLatestBrowserExecutionSessionForApplication(application.id);
     const browserReceipt = canAutoSubmit
-      ? await this.aihawk.applyWithBrowser({
+      ? await this.browserAgent.applyWithBrowser({
           studentId: student.id,
           applicationId: application.id,
           runId: latestRun?.id ?? createId("run"),
           executionSessionId: latestBrowserSession?.id,
           job,
           fields: reviewedFields,
-          workspacePath: latestRun?.workspacePath,
           resume,
           student,
           memory,
@@ -387,7 +358,6 @@ export class ApplicationService {
       : await this.emails.sendApplicationCompletion({
           student,
           job,
-          workspacePath: latestRun?.workspacePath,
           externalSubmitted
         });
 
@@ -421,47 +391,23 @@ export class ApplicationService {
       completedAt: now,
       adapterId: capabilities.adapterId,
       executionMode: canAutoSubmit ? "browser_apply" : "guided_autofill",
-      workspacePath: latestRun?.workspacePath,
-      workspaceFiles: latestRun?.workspaceFiles ?? [],
-      screenshots: mergeScreenshots(latestRun?.screenshots, browserReceipt?.screenshots),
-      blockedReason: browserSubmitBlocked ? (browserReceipt?.message ?? "Browser auto-submit is unavailable in this checkout.") : undefined,
+      workspacePath: undefined,
+      workspaceFiles: [],
+      screenshots: [],
+      blockedReason: browserSubmitBlocked ? (browserReceipt?.message ?? "Browser auto-submit is unavailable in this browser runtime.") : undefined,
       filledFields: reviewedFields,
       planner: browserReceipt?.planner ?? latestRun?.planner,
       timeline: buildSubmissionTimeline({
         submission,
         job,
-        workspacePath: latestRun?.workspacePath,
         browserCapabilityStatus: browserCapability?.status
       }),
-      notes: buildSubmissionNotes(submission, latestRun?.workspacePath),
+      notes: buildSubmissionNotes(submission),
       submission
     };
 
-    const packageResult = await this.aihawk.createStructuredApplicationPackage({
-      application: updatedApplication,
-      run: baseRun,
-      job,
-      student,
-      resume
-    });
-
-    const finalRun: ApplicationRun = {
-      ...baseRun,
-      workspacePath: packageResult.directory,
-      workspaceFiles: packageResult.files,
-      notes: buildSubmissionNotes(submission, packageResult.directory)
-    };
-
-    await this.aihawk.createStructuredApplicationPackage({
-      application: updatedApplication,
-      run: finalRun,
-      job,
-      student,
-      resume
-    });
-
     await this.applications.update(updatedApplication);
-    await this.applications.createRun(finalRun);
+    await this.applications.createRun(baseRun);
 
     if (input.reviewedFields.length > 0) {
       await this.memory.recordCorrections(application.studentId, reviewedFields);
@@ -469,7 +415,7 @@ export class ApplicationService {
 
     return {
       application: updatedApplication,
-      run: finalRun,
+      run: baseRun,
       capabilities
     };
   }
@@ -496,76 +442,31 @@ export class ApplicationService {
     capabilities: AgentCapabilities,
     mode: CreateApplicationInput["mode"]
   ) {
-    try {
-      const packageResult = await this.aihawk.createStructuredApplicationPackage({
-        application,
-        run: baseRun,
-        job,
+    const finalRun: ApplicationRun = {
+      ...baseRun,
+      workspacePath: undefined,
+      workspaceFiles: [],
+      screenshots: [],
+      filledFields: buildFilledFields(student, job, resume, application.generatedArtifacts),
+      timeline: buildApplicationTimeline({
+        mode,
         student,
-        resume
-      });
-
-      const finalRun: ApplicationRun = {
-        ...baseRun,
-        workspacePath: packageResult.directory,
-        workspaceFiles: packageResult.files,
-        filledFields: buildFilledFields(student, job, resume, application.generatedArtifacts),
-        timeline: buildApplicationTimeline({
-          mode,
-          student,
-          job,
-          capabilities,
-          hasResume: Boolean(resume),
-          packageResult,
-          filledFieldsCount: baseRun.filledFields.length
-        }),
-        notes: buildRunNotes({
-          mode,
-          capabilities,
-          resume,
-          packageResult
-        })
-      };
-
-      await this.aihawk.createStructuredApplicationPackage({
-        application,
-        run: finalRun,
         job,
-        student,
+        capabilities,
+        hasResume: Boolean(resume),
+        filledFieldsCount: baseRun.filledFields.length
+      }),
+      notes: buildRunNotes({
+        mode,
+        capabilities,
         resume
-      });
+      })
+    };
 
-      return {
-        run: finalRun,
-        packageError: undefined
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to save the structured application package.";
-
-      return {
-        run: {
-          ...baseRun,
-          workspacePath: undefined,
-          workspaceFiles: [],
-          timeline: buildApplicationTimeline({
-            mode,
-            student,
-            job,
-            capabilities,
-            hasResume: Boolean(resume),
-            packageError: message,
-            filledFieldsCount: baseRun.filledFields.length
-          }),
-          notes: buildRunNotes({
-            mode,
-            capabilities,
-            resume,
-            packageError: message
-          })
-        },
-        packageError: message
-      };
-    }
+    return {
+      run: finalRun,
+      packageError: undefined
+    };
   }
 }
 
@@ -603,11 +504,6 @@ function normalizeFieldKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function mergeScreenshots(existing: string[] | undefined, browserScreenshots: string[] | undefined) {
-  const values = [...(existing ?? ["review-gate.png"]), ...(browserScreenshots ?? [])];
-  return [...new Set(values)];
-}
-
 function buildSubmissionConfirmation(input: {
   blocked: boolean;
   externalSubmitted: boolean;
@@ -633,7 +529,6 @@ function buildSubmissionConfirmation(input: {
 function buildSubmissionTimeline(input: {
   submission: ApplicationSubmission;
   job: Job;
-  workspacePath?: string;
   browserCapabilityStatus?: string;
 }): AgentTimelineStep[] {
   const blocked = input.submission.outcome === "blocked";
@@ -642,7 +537,7 @@ function buildSubmissionTimeline(input: {
     {
       id: "review",
       label: "Student review confirmed",
-      detail: "The prepared fields, resume brief, cover-letter excerpt, and short answers were reviewed on the workspace screen.",
+      detail: "The prepared fields, profile context, and short answers were reviewed in the application run.",
       state: "done",
       source: "gradlaunch"
     },
@@ -661,15 +556,6 @@ function buildSubmissionTimeline(input: {
       source: "gradlaunch"
     },
     {
-      id: "workspace",
-      label: "Workspace receipt saved",
-      detail: input.workspacePath
-        ? `Updated the workspace package at ${input.workspacePath}.`
-        : "Updated the workspace package with the submission receipt.",
-      state: blocked ? "attention" : "done",
-      source: "gradlaunch"
-    },
-    {
       id: "email",
       label: "Student email notification",
       detail: input.submission.email.message ?? `${input.submission.email.status} via ${input.submission.email.provider}.`,
@@ -682,7 +568,6 @@ function buildSubmissionTimeline(input: {
 function buildBrowserFillTimeline(input: {
   job: Job;
   receipt?: BrowserApplyReceipt;
-  workspacePath?: string;
   planner?: ApplicationRun["planner"];
 }): AgentTimelineStep[] {
   const receipt = input.receipt;
@@ -731,26 +616,17 @@ function buildBrowserFillTimeline(input: {
       label: "Planner checkpoint updated",
       detail: input.planner
         ? `${input.planner.summary} Form mode: ${input.planner.formMode}. Stages tracked: ${stageCount}. Last action: ${plannerAction ?? "none"}. Resume token: ${input.planner.resumeToken}.`
-        : "The planner will save a resumable checkpoint after the browser worker updates the workspace.",
+        : "The planner will keep a resumable checkpoint in the application run.",
       state: input.planner ? "done" : "queued",
-      source: "gradlaunch"
-    },
-    {
-      id: "workspace",
-      label: "Saving screenshots and receipt",
-      detail: input.workspacePath
-        ? `Workspace updated at ${input.workspacePath}.`
-        : "The workspace will be updated after Chrome finishes filling.",
-      state: blocked || handoffRequired ? "attention" : receipt ? "done" : "queued",
       source: "gradlaunch"
     }
   ];
 }
 
-function buildSubmissionNotes(submission: ApplicationSubmission, workspacePath?: string) {
+function buildSubmissionNotes(submission: ApplicationSubmission) {
   return [
     submission.confirmation,
-    workspacePath ? `Submission receipt saved to ${workspacePath}.` : "Submission receipt was recorded in the run trace.",
+    "Submission receipt was recorded in the application run.",
     `Email status: ${submission.email.status} via ${submission.email.provider}.`
   ];
 }
@@ -792,7 +668,10 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
   const nameParts = student.fullName.trim().split(/\s+/).filter(Boolean);
   const firstName = nameParts[0] ?? student.fullName;
   const lastName = nameParts.slice(1).join(" ");
-  const phoneNumber = extractPhoneNumber(resume?.extractedText) ?? process.env.DEFAULT_STUDENT_PHONE;
+  const phoneCountryHint = student.completeProfile?.country ?? student.completeProfile?.nationality;
+  const phoneNumber = normalizeApplicationPhone(student.completeProfile?.phone, phoneCountryHint)
+    ?? normalizeApplicationPhone(extractPhoneNumber(resume?.extractedText), phoneCountryHint)
+    ?? normalizeApplicationPhone(process.env.DEFAULT_STUDENT_PHONE, phoneCountryHint);
   const resolvedLocation = resolveBestProfileLocation({
     student,
     job,
@@ -815,11 +694,13 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
   const portfolioUrl = normalizeApplicationProfileUrl(student.completeProfile?.portfolioUrl, "generic");
   const websiteUrl = normalizeApplicationProfileUrl(student.completeProfile?.websiteUrl, "generic")
     ?? portfolioUrl
-    ?? githubUrl
-    ?? normalizeApplicationProfileUrl(extractUrl(resume?.extractedText, /https?:\/\/(?!.*linkedin)[^\s)>,]+/i), "generic")
+    ?? normalizeApplicationProfileUrl(extractUrl(resume?.extractedText, /https?:\/\/(?![^\s)>,]*(?:linkedin|github)\.com)[^\s)>,]+/i), "generic")
     ?? normalizeApplicationProfileUrl(process.env.DEFAULT_STUDENT_WEBSITE, "generic");
-  const currentCtc = extractCompensation(resume?.extractedText, /current\s+(?:ctc|salary|compensation)[:\s-]*([^\n,;]+)/i) ?? process.env.DEFAULT_CURRENT_CTC ?? "0 LPA";
-  const expectedCtc = student.expectedSalaryLpa ? `${student.expectedSalaryLpa} LPA` : process.env.DEFAULT_EXPECTED_CTC;
+  const currentCtc = formatSalaryLpa(student.completeProfile?.currentSalaryLpa)
+    ?? extractCompensation(resume?.extractedText, /current\s+(?:ctc|salary|compensation)[:\s-]*([^\n,;]+)/i)
+    ?? process.env.DEFAULT_CURRENT_CTC
+    ?? "";
+  const expectedCtc = formatSalaryLpa(student.expectedSalaryLpa) ?? process.env.DEFAULT_EXPECTED_CTC;
   const hiringMessage = artifacts?.coverLetterExcerpt
     ?? `I am interested in the ${job.title} role at ${job.company} and believe my ${student.skills.slice(0, 3).join(", ")} experience is a strong match.`;
   const fields: ApplicationRun["filledFields"] = [
@@ -851,6 +732,7 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
     { label: "Current salary", value: currentCtc },
     { label: "Expected salary", value: expectedCtc ?? "" },
     { label: "Expected CTC", value: expectedCtc ?? "" },
+    { label: "Cover Letter", value: hiringMessage },
     { label: "Message to the Hiring Team", value: hiringMessage },
     { label: "Primary skills", value: student.skills.slice(0, 5).join(", ") || "Not provided" },
     { label: "Resume context", value: resume?.filename ?? "Profile data only" },
@@ -869,6 +751,67 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
 
 function extractPhoneNumber(text?: string) {
   return text?.match(/(?:\+?\d[\s-]?){8,15}/)?.[0]?.replace(/\s+/g, " ").trim();
+}
+
+function normalizeApplicationPhone(value: string | undefined, countryHint?: string) {
+  const cleanValue = value?.trim();
+
+  if (!cleanValue) {
+    return undefined;
+  }
+
+  const compact = cleanValue.replace(/\s+/g, " ");
+
+  if (/^\+/.test(compact)) {
+    return compact;
+  }
+
+  const digits = compact.replace(/\D+/g, "");
+  const dialCode = inferDialCodeFromCountryHint(countryHint) ?? inferDefaultDialCodeForLocalPhone(digits);
+
+  if (dialCode && digits.length >= 7 && digits.length <= 10) {
+    return `${dialCode}-${digits}`;
+  }
+
+  return compact;
+}
+
+function formatSalaryLpa(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return `${value} LPA`;
+}
+
+function inferDialCodeFromCountryHint(value: string | undefined) {
+  const normalized = value?.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (/\bindia|indian\b/.test(normalized)) {
+    return "+91";
+  }
+
+  if (/\bunited states|usa|us|canada\b/.test(normalized)) {
+    return "+1";
+  }
+
+  if (/\bunited kingdom|uk|britain|england\b/.test(normalized)) {
+    return "+44";
+  }
+
+  if (/\baustralia\b/.test(normalized)) {
+    return "+61";
+  }
+
+  return undefined;
+}
+
+function inferDefaultDialCodeForLocalPhone(digits: string) {
+  return digits.length === 10 ? "+91" : undefined;
 }
 
 function extractUrl(text: string | undefined, pattern: RegExp) {
@@ -965,28 +908,19 @@ function buildApplicationTimeline(input: {
   job: Job;
   capabilities: AgentCapabilities;
   hasResume: boolean;
-  packageResult?: StructuredApplicationPackageResult;
-  packageError?: string;
   filledFieldsCount: number;
 }): AgentTimelineStep[] {
   const browserCapability = input.capabilities.capabilities.find((capability) => capability.id === "browser_apply");
-  const packageStepState = input.packageError ? "attention" : input.packageResult ? "done" : "running";
-  const packageDetail = input.packageError
-    ? `GradLaunch created the run trace, but writing the structured package failed: ${input.packageError}`
-    : input.packageResult
-      ? `Saved ${input.packageResult.files.join(", ")} to ${input.packageResult.directory}.`
-      : "Saving the structured application package to the workspace.";
+  const browserReady = browserCapability?.status === "available" || browserCapability?.status === "partial";
 
   return [
     {
       id: "adapter",
       label: "Browser runtime checked",
-      detail: input.capabilities.repoDetected
-        ? browserCapability?.status === "unavailable"
-          ? "Local browser automation modules were detected, but the apply engine is missing in this checkout."
-          : "Local browser automation modules were detected and the runtime is ready for guided execution."
-        : "No local browser runtime was detected, so GradLaunch is using its built-in fallback flow.",
-      state: input.capabilities.repoDetected ? "done" : "attention",
+      detail: browserReady
+        ? "GradLaunch browser automation is available for guided execution."
+        : browserCapability?.detail ?? "GradLaunch browser automation is not available in this runtime.",
+      state: browserReady ? "done" : "attention",
       source: "gradlaunch"
     },
     {
@@ -1007,8 +941,8 @@ function buildApplicationTimeline(input: {
     },
     {
       id: "artifacts",
-      label: input.mode === "autopilot" ? "Autopilot package generated" : input.mode === "autofill" ? "Review package generated" : "Draft package generated",
-      detail: "Generated a tailored resume summary, a cover-letter excerpt, and reusable short-answer drafts.",
+      label: input.mode === "autopilot" ? "Autopilot context prepared" : input.mode === "autofill" ? "Review context prepared" : "Draft context prepared",
+      detail: "Prepared reusable answers from saved profile context, known resume metadata, and job requirements.",
       state: "done",
       source: "gradlaunch"
     },
@@ -1017,13 +951,6 @@ function buildApplicationTimeline(input: {
       label: "Known fields prepared",
       detail: `Prepared ${input.filledFieldsCount} mapped values for the application form and review checklist.`,
       state: "done",
-      source: "gradlaunch"
-    },
-    {
-      id: "package",
-      label: "Structured application package",
-      detail: packageDetail,
-      state: packageStepState,
       source: "gradlaunch"
     },
     {
@@ -1037,7 +964,7 @@ function buildApplicationTimeline(input: {
           ? browserCapability?.status === "unavailable"
             ? "GradLaunch prepared the autofill data but stopped before browser submission because the local browser runtime does not include the apply engine."
             : "GradLaunch prepared the autofill data and paused at the student review gate before final submission."
-          : "The structured draft is ready to inspect, edit, and submit.",
+          : "The draft context is ready to inspect, edit, and submit.",
       state: input.mode === "draft" ? "done" : input.mode === "autopilot" ? "running" : "attention",
       source: "gradlaunch"
     }
@@ -1210,6 +1137,10 @@ function isWeakFieldValue(labelKey: string, value: string) {
     return /\baspiring\s+(a|an|sw|sde|dev)\b/i.test(value) || /\bbecoming a a\b/i.test(value);
   }
 
+  if (labelKey === "website") {
+    return /(^https?:\/\/github\.com\/?$)|(^https?:\/\/(?:www\.)?github\.com\/?$)|(^github\.com\/?$)/i.test(value.trim());
+  }
+
   return false;
 }
 
@@ -1282,8 +1213,6 @@ function buildRunNotes(input: {
   mode: CreateApplicationInput["mode"];
   capabilities: AgentCapabilities;
   resume?: ResumeRecord;
-  packageResult?: StructuredApplicationPackageResult;
-  packageError?: string;
 }) {
   const browserCapability = input.capabilities.capabilities.find((capability) => capability.id === "browser_apply");
   const notes = [
@@ -1300,14 +1229,6 @@ function buildRunNotes(input: {
     );
   }
 
-  if (input.packageResult) {
-    notes.push(`Structured application package saved to ${input.packageResult.directory}.`);
-  }
-
-  if (input.packageError) {
-    notes.push(`Structured application package failed to save: ${input.packageError}`);
-  }
-
   if (input.mode === "draft") {
     notes.push("Draft mode does not attempt browser interaction.");
   }
@@ -1317,34 +1238,6 @@ function buildRunNotes(input: {
   }
 
   return notes;
-}
-
-function buildAutopilotFailureTimeline(job: Job, message: string, workspacePath?: string): AgentTimelineStep[] {
-  return [
-    {
-      id: "launch",
-      label: "Autopilot launched",
-      detail: `Background execution started for ${job.title} at ${job.company}.`,
-      state: "done",
-      source: "gradlaunch"
-    },
-    {
-      id: "browser",
-      label: "Browser agent blocked",
-      detail: message,
-      state: "attention",
-      source: "gradlaunch"
-    },
-    {
-      id: "workspace",
-      label: "Workspace preserved",
-      detail: workspacePath
-        ? `The latest application state is still available at ${workspacePath}.`
-        : "GradLaunch preserved the latest known application state in the run trace.",
-      state: "done",
-      source: "gradlaunch"
-    }
-  ];
 }
 
 function formatSource(job: Job): string {

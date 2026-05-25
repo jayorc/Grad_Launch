@@ -9,7 +9,7 @@ import type {
   PlannerStageSnapshot,
   PlannerTask
 } from "@gradlaunch/shared";
-import type { Page } from "playwright-core";
+import type { Page } from "./browser-driver";
 import { nowIso } from "../../lib/time";
 import { dedupeLabels } from "./util";
 

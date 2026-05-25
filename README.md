@@ -16,7 +16,7 @@ Everything related to GradLaunch should live inside this folder, including:
 - `apps/api/`: Express + TypeScript backend for search sessions, job intake, applications, and dashboard reporting
 - `apps/web/`: Next.js dashboard app for search, jobs, and application reporting
 - `packages/shared/`: shared domain types and constants
-- `gradlaunch-docs/`: product planning and architecture docs
+- `docs/`: product planning and architecture docs
 
 ## Implemented MVP Foundation
 
@@ -85,11 +85,11 @@ The current codebase includes:
 - set `SEED_DEMO_DATA=true` if you want the demo account and sample job/application data inserted automatically
 - set `SEED_DEMO_DATA=false` for real usage so dashboards start from live searches, pasted URLs, and MongoDB data
 - live search currently fetches Remotive public remote jobs by profile query, configured Greenhouse boards, configured Lever companies, and direct URLs from `LIVE_JOB_URLS`
-- resume upload is supported for signup-prefill and profile refresh; uploads are stored in `RESUME_STORAGE_DIR`
-- AIHawk local adapter detection is supported via `AIHAWK_REPO_PATH`
-- every application run also writes a structured package to `APPLICATION_ARTIFACT_STORAGE_DIR`
-- notifications use Nodemailer when SMTP variables are configured, otherwise receipts are saved in `EMAIL_OUTBOX_DIR`
-- browser autofill uses a GradLaunch-controlled persistent Chrome profile for login reuse. By default this is `storage/logged-browser-profile` or `BROWSER_LOGGED_PROFILE_DIR`; run `npm run browser:prepare-logged-profile` after quitting Chrome to seed it, or just log in once inside the controlled GradLaunch Chrome window. If a login gate appears, the agent fully pauses until the user clicks `I am logged in, continue`.
+- resume upload is supported for signup-prefill and profile refresh; uploads default to OS temp unless `RESUME_STORAGE_DIR` is configured
+- browser automation uses the built-in GradLaunch browser agent; no external checkout is required
+- application runs keep compact state in the database; structured file packages, screenshots, and debug logs are not written by default
+- notifications use Nodemailer when SMTP variables are configured, otherwise receipts are saved in OS temp unless `EMAIL_OUTBOX_DIR` is configured
+- browser autofill uses a GradLaunch-controlled Chrome profile for login reuse. By default this is under OS temp or `BROWSER_LOGGED_PROFILE_DIR`; run `npm run browser:prepare-logged-profile` after quitting Chrome to seed it, or just log in once inside the controlled GradLaunch Chrome window. If a login gate appears, the agent fully pauses until the user clicks `I am logged in, continue`.
 - background autopilot can queue a browser run behind the API request, and the Applications page will keep refreshing while that run is active
 - browser runs open Chrome visibly by default because `BROWSER_HEADLESS=false`; set it to `true` only for automated tests
 

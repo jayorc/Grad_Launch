@@ -664,11 +664,6 @@ h3 {
   font-weight: 700;
 }
 
-.agent-source-aihawk {
-  background: rgba(16, 24, 40, 0.08);
-  color: #12253d;
-}
-
 .agent-source-gradlaunch {
   background: rgba(15, 91, 215, 0.08);
   color: var(--brand-deep);

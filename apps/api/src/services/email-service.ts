@@ -107,10 +107,7 @@ function hasSmtpConfig() {
 function buildApplicationEmailBody(input: ApplicationNotificationInput) {
   const resultLine = input.externalSubmitted
     ? "Your application was submitted through the connected apply worker."
-    : "Your complete review package was saved and is ready for final portal submission.";
-  const workspaceLine = input.workspacePath
-    ? `Workspace: ${input.workspacePath}`
-    : "Workspace: not recorded for this run";
+    : "Your application record was updated and is ready for final portal submission.";
   const text = [
     `Hi ${input.student.fullName},`,
     "",
@@ -118,7 +115,7 @@ function buildApplicationEmailBody(input: ApplicationNotificationInput) {
     "",
     `Role: ${input.job.title}`,
     `Company: ${input.job.company}`,
-    workspaceLine,
+    "Artifacts: compact database record only",
     "",
     "GradLaunch"
   ].join("\n");

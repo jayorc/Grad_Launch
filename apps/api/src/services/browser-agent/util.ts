@@ -23,6 +23,24 @@ export function dedupeLabels(values: string[]) {
   return result;
 }
 
+export function isTransientStatusMessage(value: string | undefined | null) {
+  const normalized = normalizeKey(value);
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (/\b(required|invalid|error|cannot be blank|please select|please enter|must be|failed|not allowed|denied)\b/.test(normalized)) {
+    return false;
+  }
+
+  if (/\b(active loading indicator|loading|please wait|processing|uploading|saving|submitting|spinner|progress|still working|one moment)\b/.test(normalized)) {
+    return true;
+  }
+
+  return /\b(options available|total results|use the up and down keys|press enter to select|press escape to exit|not selected|selected 1 of|selected \d+ of|results found|no results found)\b/.test(normalized);
+}
+
 export function safeHostname(url: string) {
   try {
     return new URL(url).hostname;
@@ -53,6 +71,10 @@ export function jsonBlock(text: string) {
 }
 
 export async function writeBrowserDebug(workspacePath: string, label: string, payload: unknown) {
+  if (process.env.BROWSER_AGENT_DEBUG !== "true") {
+    return;
+  }
+
   try {
     await appendFile(
       `${workspacePath}/browser-agent-debug.log`,

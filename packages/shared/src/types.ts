@@ -12,7 +12,7 @@ export type ApplicationStatus =
   | "blocked"
   | "failed";
 export type RunStatus = "queued" | "running" | "needs_review" | "completed" | "blocked" | "failed";
-export type AgentSurface = "gradlaunch" | "aihawk";
+export type AgentSurface = "gradlaunch";
 export type AgentCapabilityStatus = "available" | "partial" | "unavailable";
 export type AgentStepState = "done" | "running" | "queued" | "attention";
 export type ApplicationExecutionMode = "draft_package" | "guided_autofill" | "browser_apply" | "autonomous_apply";
@@ -274,9 +274,6 @@ export interface AgentCapability {
 export interface AgentCapabilities {
   adapterId: string;
   adapterLabel: string;
-  repoDetected: boolean;
-  repoPath?: string;
-  pythonAvailable: boolean;
   capabilities: AgentCapability[];
   limitations: string[];
 }

@@ -49,7 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <div className="sidebar-brand">
                 <p className="eyebrow">Career Copilot</p>
                 <h1>GradLaunch</h1>
-                <p className="muted">One clean workspace for search, drafts, autopilot, handoff, and submission tracking.</p>
+                <p className="muted">One clean control room for search, drafts, autopilot, handoff, and submission tracking.</p>
               </div>
               <nav className="sidebar-nav">
                 {navItems.map((item) => {

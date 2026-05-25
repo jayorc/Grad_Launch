@@ -157,9 +157,9 @@ async function animateSearch(
     {
       id: "adapter",
       label: "Checking browser runtime",
-      detail: capabilities?.repoDetected
-        ? "Local browser runtime detected. Search is using GradLaunch ranking with transparent downstream limitations."
-        : "No local browser runtime detected. Running the search in GradLaunch fallback mode.",
+      detail: isBrowserReady(capabilities)
+        ? "GradLaunch browser runtime is available for downstream fill and submit flows."
+        : "Search can still run, but browser automation is unavailable in this runtime.",
       state: "running",
       source: "gradlaunch"
     },
@@ -211,10 +211,10 @@ function createIdleActivity(capabilities: AgentCapabilities | null): AgentActivi
     {
       id: "adapter",
       label: "Browser runtime ready",
-      detail: capabilities?.repoDetected
-        ? "Local browser runtime detected. The capability panel shows which automation layers are truly available."
-        : "No local browser runtime detected. GradLaunch can still search, rank, and package jobs transparently.",
-      state: capabilities?.repoDetected ? "done" : "attention",
+      detail: isBrowserReady(capabilities)
+        ? "GradLaunch browser runtime is ready. The capability panel shows which automation layers are available."
+        : "GradLaunch can still search, rank, and package jobs transparently, but browser automation is unavailable.",
+      state: isBrowserReady(capabilities) ? "done" : "attention",
       source: "gradlaunch"
     },
     {
@@ -246,6 +246,11 @@ function createIdleActivity(capabilities: AgentCapabilities | null): AgentActivi
       source: "gradlaunch"
     }
   ];
+}
+
+function isBrowserReady(capabilities: AgentCapabilities | null) {
+  const browserCapability = capabilities?.capabilities.find((capability) => capability.id === "browser_apply");
+  return browserCapability?.status === "available" || browserCapability?.status === "partial";
 }
 
 function wait(durationMs: number) {

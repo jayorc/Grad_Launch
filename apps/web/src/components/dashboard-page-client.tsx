@@ -48,7 +48,7 @@ export function DashboardPageClient() {
 
       <section className="hero hero-dashboard">
         <div className="card hero-panel hero-primary">
-          <p className="eyebrow">Agent workspace</p>
+          <p className="eyebrow">Agent control</p>
           <h3 className="hero-title">One control room for a background agent that keeps applying while you move on.</h3>
           <p className="muted">
             GradLaunch now runs as an autonomous worker: prepare context once, launch autopilot, and only step in when a portal truly requires you.
@@ -92,10 +92,10 @@ export function DashboardPageClient() {
           },
           {
             id: "drafts",
-            label: "Application package builder",
+            label: "Application run builder",
             detail: dashboard?.recentApplications?.length
               ? "Saved application records already exist and the background agent can continue from the Applications page."
-              : "Your first draft or autopilot run will create a structured application record here.",
+              : "Your first draft or autopilot run will create an application record here.",
             state: dashboard?.recentApplications?.length ? "running" : "queued"
           },
           {

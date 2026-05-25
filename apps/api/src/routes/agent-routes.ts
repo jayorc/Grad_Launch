@@ -2,10 +2,10 @@ import type { Express, Response } from "express";
 import type { AuthenticatedRequest } from "../lib/express";
 import { requireAuth } from "../middleware/auth-middleware";
 import { AgentOrchestratorService } from "../services/agent-orchestrator-service";
-import { AIHawkAdapterService } from "../services/aihawk-adapter-service";
+import { BrowserAgentAdapterService } from "../services/browser-agent-adapter-service";
 
 export function registerAgentRoutes(app: Express) {
-  const adapter = new AIHawkAdapterService();
+  const adapter = new BrowserAgentAdapterService();
   const orchestrator = new AgentOrchestratorService();
 
   app.get("/agent/capabilities", requireAuth, async (_request: AuthenticatedRequest, response: Response) => {

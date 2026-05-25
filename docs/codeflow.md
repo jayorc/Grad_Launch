@@ -13,9 +13,8 @@ flowchart TD
   A[User clicks Fill in Browser] --> B[POST /jobs/:jobId/fill-browser]
   B --> C[ApplicationService.fillJobInBrowser]
   C --> D[buildFilledFields]
-  C --> E[AIHawkAdapterService.applyWithBrowser]
-  E --> F[BrowserApplyService.apply]
-  F --> G[BrowserAgentEngine.apply]
+  C --> E[BrowserAgentAdapterService.applyWithBrowser]
+  E --> G[BrowserAgentEngine.apply]
 
   G --> H[Chrome availability + launch]
   H --> I[openOrResumePage]
@@ -74,11 +73,8 @@ gradlaunch/
     application-service.ts
       Loads student/job/resume/memory, creates the ApplicationRun, and saves the final receipt.
 
-    aihawk-adapter-service.ts
-      Adapter facade. Despite the name, the active browser path delegates to GradLaunch's built-in browser agent.
-
-    browser-apply-service.ts
-      Thin wrapper around BrowserAgentEngine. The active class delegates getAvailability/apply to the engine.
+    browser-agent-adapter-service.ts
+      Adapter facade for GradLaunch's built-in browser agent.
 
     browser-agent/
       engine.ts
@@ -130,9 +126,8 @@ gradlaunch/
 registerApplicationRoutes()
   -> ApplicationService.fillJobInBrowser()
      -> buildFilledFields()
-     -> AIHawkAdapterService.applyWithBrowser()
-        -> BrowserApplyService.apply()
-           -> BrowserAgentEngine.apply()
+     -> BrowserAgentAdapterService.applyWithBrowser()
+        -> BrowserAgentEngine.apply()
 ```
 
 Exact links:
@@ -143,13 +138,12 @@ Exact links:
 | Browser fill endpoint | [`POST /jobs/:jobId/fill-browser`](../apps/api/src/routes/application-routes.ts#L78) | Reads authenticated student id, job id, submit flag, then calls application service. |
 | Application orchestration | [`ApplicationService.fillJobInBrowser()`](../apps/api/src/services/application-service.ts#L154) | Loads student/job/resume/memory, prepares run state, calls browser adapter, saves final application/run. |
 | Prepared answer fields | [`buildFilledFields()`](../apps/api/src/services/application-service.ts#L791) | Builds known profile/resume/job facts used as base form answers. |
-| Browser adapter facade | [`AIHawkAdapterService.applyWithBrowser()`](../apps/api/src/services/aihawk-adapter-service.ts#L184) | Passes the browser package into the built-in browser apply service. |
-| Browser wrapper | [`BrowserApplyService.apply()`](../apps/api/src/services/browser-apply-service.ts#L196) | Delegates to `BrowserAgentEngine.apply()`. |
+| Browser adapter facade | [`BrowserAgentAdapterService.applyWithBrowser()`](../apps/api/src/services/browser-agent-adapter-service.ts) | Passes the compact browser context into `BrowserAgentEngine.apply()`. |
 | Main browser engine | [`BrowserAgentEngine.apply()`](../apps/api/src/services/browser-agent/engine.ts#L167) | Owns the complete browser execution lifecycle. |
 
 ## BrowserAgentEngine Lifecycle
 
-### 1. Availability And Workspace
+### 1. Availability And Runtime
 
 Relevant functions:
 
@@ -158,12 +152,12 @@ Relevant functions:
 | `BrowserAgentEngine.getAvailability()` | [`engine.ts#L69`](../apps/api/src/services/browser-agent/engine.ts#L69) | Checks whether GradLaunch can use logged CDP, logged profile, managed CDP, managed profile, or Chrome executable. |
 | `launchContext()` | [`engine.ts#L2926`](../apps/api/src/services/browser-agent/engine.ts#L2926) | Opens or attaches to Chrome using the configured profile strategy. |
 | `createPlannerCheckpoint()` | [`planner.ts#L19`](../apps/api/src/services/browser-agent/planner.ts#L19) | Creates the durable trace for the run. |
-| `writeBrowserDebug()` | [`util.ts#L88`](../apps/api/src/services/browser-agent/util.ts#L88) | Writes debug events into the application workspace. |
+| `writeBrowserDebug()` | [`util.ts#L88`](../apps/api/src/services/browser-agent/util.ts#L88) | Writes debug events only when debug logging is explicitly enabled. |
 
 What happens:
 
 1. The engine validates the job URL.
-2. It creates a workspace folder for screenshots/debug logs.
+2. It keeps runtime files in OS temp only when debug/screenshots are explicitly enabled.
 3. It creates or resumes a planner checkpoint.
 4. It launches/attaches Chrome using the safest available profile mode.
 5. It installs browser safety handlers so dialogs/crashes are recorded.
@@ -475,17 +469,9 @@ Relevant functions:
 | `recordPlannerStageOutcome()` | [`planner.ts#L171`](../apps/api/src/services/browser-agent/planner.ts#L171) | Records review/submitted/manual outcome. |
 | `setPlannerStatus()` | [`planner.ts#L83`](../apps/api/src/services/browser-agent/planner.ts#L83) | Updates final planner status. |
 | `ApplicationService.fillJobInBrowser()` | [`application-service.ts#L154`](../apps/api/src/services/application-service.ts#L154) | Converts browser receipt into application/run status. |
-| `AIHawkAdapterService.createStructuredApplicationPackage()` | [`aihawk-adapter-service.ts#L211`](../apps/api/src/services/aihawk-adapter-service.ts#L211) | Writes final structured package files. |
+| `BrowserAgentAdapterService.applyWithBrowser()` | [`browser-agent-adapter-service.ts`](../apps/api/src/services/browser-agent-adapter-service.ts) | Passes the compact browser context into `BrowserAgentEngine.apply()`. |
 
-Saved artifacts commonly include:
-
-```text
-storage/applications/<application-id>-<company>-<role>/
-  browser-agent-debug.log
-  browser-opened.png
-  browser-stage-*.png
-  job_application.json
-```
+Application runs now keep compact state in the database. File artifacts, browser screenshots, and debug logs are disabled by default and only written to OS temp when explicitly enabled.
 
 ## Important Runtime Guarantees
 
@@ -518,14 +504,12 @@ If someone is onboarding, read in this order:
 
 1. [`application-routes.ts`](../apps/api/src/routes/application-routes.ts#L78)
 2. [`ApplicationService.fillJobInBrowser()`](../apps/api/src/services/application-service.ts#L154)
-3. [`AIHawkAdapterService.applyWithBrowser()`](../apps/api/src/services/aihawk-adapter-service.ts#L184)
-4. [`BrowserApplyService.apply()`](../apps/api/src/services/browser-apply-service.ts#L196)
-5. [`BrowserAgentEngine.apply()`](../apps/api/src/services/browser-agent/engine.ts#L167)
-6. [`observe.ts`](../apps/api/src/services/browser-agent/observe.ts)
-7. [`strategy.ts`](../apps/api/src/services/browser-agent/strategy.ts)
-8. [`answer.ts`](../apps/api/src/services/browser-agent/answer.ts)
+3. [`BrowserAgentAdapterService.applyWithBrowser()`](../apps/api/src/services/browser-agent-adapter-service.ts)
+4. [`BrowserAgentEngine.apply()`](../apps/api/src/services/browser-agent/engine.ts#L167)
+5. [`observe.ts`](../apps/api/src/services/browser-agent/observe.ts)
+6. [`strategy.ts`](../apps/api/src/services/browser-agent/strategy.ts)
+7. [`answer.ts`](../apps/api/src/services/browser-agent/answer.ts)
 9. [`fill.ts`](../apps/api/src/services/browser-agent/fill.ts)
 10. [`autonomous-fill.ts`](../apps/api/src/services/browser-agent/autonomous-fill.ts)
 11. [`eval.ts`](../apps/api/src/services/browser-agent/eval.ts)
 12. [`planner.ts`](../apps/api/src/services/browser-agent/planner.ts)
-

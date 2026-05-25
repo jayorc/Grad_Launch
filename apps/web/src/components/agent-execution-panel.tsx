@@ -37,7 +37,7 @@ export function AgentExecutionPanel({ mode, pendingSteps, run, notice, variant }
       {isRunning ? (
         <div className="agent-loader-row">
           <span className="agent-loader-orb" />
-          <p className="muted">GradLaunch is moving through the steps below and keeping the workspace updated while the agent continues in the background.</p>
+          <p className="muted">GradLaunch is moving through the steps below and keeping the run state updated while the agent continues in the background.</p>
         </div>
       ) : null}
 
@@ -49,7 +49,7 @@ export function AgentExecutionPanel({ mode, pendingSteps, run, notice, variant }
               <div>
                 <div className="agent-step-headline">
                   <strong>{step.label}</strong>
-                  <span className={`agent-source agent-source-${step.source}`}>{step.source === "aihawk" ? "Browser Agent" : "GradLaunch"}</span>
+                  <span className="agent-source agent-source-gradlaunch">GradLaunch</span>
                 </div>
                 <p className="muted">{step.detail}</p>
               </div>
@@ -61,16 +61,12 @@ export function AgentExecutionPanel({ mode, pendingSteps, run, notice, variant }
       {run ? (
         <div className="agent-result-grid">
           <article className="agent-result-card">
-            <p className="detail-label">Workspace folder</p>
-            <p className="detail-value detail-wrap path-text">{run.workspacePath ?? "Not recorded yet"}</p>
-          </article>
-          <article className="agent-result-card">
             <p className="detail-label">Prepared fields</p>
             <p className="detail-value">{run.filledFields.length}</p>
           </article>
           <article className="agent-result-card">
-            <p className="detail-label">Saved files</p>
-            <p className="detail-value">{run.workspaceFiles.length}</p>
+            <p className="detail-label">Run mode</p>
+            <p className="detail-value">{run.executionMode.replaceAll("_", " ")}</p>
           </article>
         </div>
       ) : null}
@@ -88,10 +84,6 @@ export function AgentExecutionPanel({ mode, pendingSteps, run, notice, variant }
           <article>
             <p className="detail-label">Needs manual check</p>
             <p className="detail-value">{browserReceipt.skippedLabels.length}</p>
-          </article>
-          <article>
-            <p className="detail-label">Screenshots saved</p>
-            <p className="detail-value">{browserReceipt.screenshots.length}</p>
           </article>
         </div>
       ) : null}
@@ -116,7 +108,7 @@ export function AgentExecutionPanel({ mode, pendingSteps, run, notice, variant }
       {!isRunning ? (
         <div className="button-row button-row-compact">
           <Link className="button button-secondary" href="/applications">
-            {variant === "duplicate" ? "Open Existing Workspace" : mode === "browser_fill" ? "Open Workspace Report" : "View Saved Applications"}
+            {variant === "duplicate" ? "Open Existing Application" : mode === "browser_fill" ? "Open Application Run" : "View Saved Applications"}
           </Link>
         </div>
       ) : null}
@@ -143,7 +135,7 @@ function getTitle(input: {
   }
 
   if (input.variant === "duplicate") {
-    return "Existing application workspace found";
+    return "Existing application found";
   }
 
   if (input.variant === "error") {
@@ -162,7 +154,7 @@ function getTitle(input: {
     return input.run.status === "blocked" ? "Autopilot needs attention" : "Autopilot queued";
   }
 
-  return input.run?.executionMode === "guided_autofill" ? "Autofill package ready for review" : "Draft package saved";
+  return input.run?.executionMode === "guided_autofill" ? "Autofill context ready for review" : "Draft context ready";
 }
 
 function getSummary(input: {
@@ -178,16 +170,16 @@ function getSummary(input: {
     }
 
     if (input.mode === "autopilot") {
-      return "The agent is packaging the application, launching the browser worker, and continuing toward submit in the background.";
+      return "The agent is preparing profile context, launching the browser worker, and continuing toward submit in the background.";
     }
 
     return input.mode === "autofill"
       ? "The agent is checking capabilities, preparing answers, and pausing before any final submit action."
-      : "The agent is packaging the draft artifacts and saving a structured workspace folder.";
+      : "The agent is preparing compact draft context from profile and job data.";
   }
 
   if (input.variant === "duplicate") {
-    return "This job already has a saved application record, so GradLaunch is asking you to continue from the saved workspace instead of creating a second one.";
+    return "This job already has a saved application record, so GradLaunch is asking you to continue from that record instead of creating a second one.";
   }
 
   if (input.variant === "error") {
@@ -197,16 +189,14 @@ function getSummary(input: {
   if (input.run?.executionMode === "browser_apply") {
     return input.run.submission?.browser?.status === "submitted"
       ? "The Chrome session opened the exact job URL, completed the form flow, submitted it, and saved the receipt."
-      : "The Chrome session opened the exact job URL, filled recognized fields, saved a workspace report, and stopped only where human review was still needed.";
+      : "The Chrome session opened the exact job URL, filled recognized fields, and stopped only where human review was still needed.";
   }
 
   if (input.run?.executionMode === "autonomous_apply") {
     return "The autonomous agent has the application package and is continuing the browser workflow in the background.";
   }
 
-  return input.run?.workspacePath
-    ? "The application package has been saved and can be reviewed from the applications workspace."
-    : "The application run completed and is ready to inspect from the applications workspace.";
+  return "The application run completed and is ready to inspect.";
 }
 
 function getBadgeClass(input: { isRunning: boolean; variant: AgentExecutionPanelProps["variant"] }) {

@@ -104,7 +104,7 @@ export function ApplicationsPageClient() {
   const selectedRun = selectedApplication ? runsByApplication[selectedApplication.id]?.[0] : undefined;
   const browserApplyCapability = capabilities?.capabilities.find((capability) => capability.id === "browser_apply");
   const placeholderJobMessage = selectedJob && isPlaceholderJobUrl(selectedJob.sourceUrl)
-    ? "This saved workspace came from an old generated demo URL. Run a fresh live search or paste the real company job page URL before auto-submit."
+    ? "This saved application came from an old generated demo URL. Run a fresh live search or paste the real company job page URL before auto-submit."
     : null;
   const canAutoSubmit = !placeholderJobMessage && (browserApplyCapability?.status === "available" || browserApplyCapability?.status === "partial");
   const hasActiveAutopilot = applications.some((application) => application.status === "queued" || application.status === "running");
@@ -233,8 +233,8 @@ export function ApplicationsPageClient() {
     <ProtectedPage>
       <PageHeader
         eyebrow="Saved Applications"
-        title="See everything GradLaunch has saved for you"
-        description="Every application keeps a visible run trace so you can see what the agent prepared, what fields were mapped, and whether the background autopilot is still progressing."
+        title="Review your compact application runs"
+        description="Every application keeps the useful run trace in app data only: mapped fields, browser status, and autopilot progress."
       />
       <AgentCapabilityPanel
         capabilities={capabilities}
@@ -246,8 +246,8 @@ export function ApplicationsPageClient() {
           <section className="card section-card workspace-list-card">
             <div className="section-header">
               <div>
-                <p className="eyebrow">Saved Workspaces</p>
-                <p className="section-description">Choose one application on the left and GradLaunch will show the agent trace, saved folder, prepared fields, and any live autopilot progress here.</p>
+                <p className="eyebrow">Saved Applications</p>
+                <p className="section-description">Choose one application on the left and GradLaunch will show the run trace, prepared fields, and any live autopilot progress here.</p>
               </div>
             </div>
 
@@ -290,7 +290,7 @@ export function ApplicationsPageClient() {
               <>
                 <div className="workspace-detail-head">
                   <div>
-                    <p className="eyebrow">Selected Workspace</p>
+                    <p className="eyebrow">Selected Application</p>
                     <h3 className="workspace-detail-title">
                       {selectedJob ? `${selectedJob.company} • ${selectedJob.title}` : selectedApplication.sourceLabel}
                     </h3>
@@ -311,8 +311,8 @@ export function ApplicationsPageClient() {
                     <p className="workspace-stat-value">{selectedRun?.filledFields.length ?? 0}</p>
                   </article>
                   <article className="workspace-stat-card">
-                    <p className="detail-label">Saved files</p>
-                    <p className="workspace-stat-value">{selectedRun?.workspaceFiles.length ?? selectedApplication.uploadedDocuments.length}</p>
+                    <p className="detail-label">Resume docs</p>
+                    <p className="workspace-stat-value">{selectedApplication.uploadedDocuments.length}</p>
                   </article>
                 </div>
 
@@ -339,21 +339,6 @@ export function ApplicationsPageClient() {
                   onRemoveField={handleRemoveField}
                   onReviewSubmit={() => handleSubmit("review_submit")}
                 />
-
-                <div className="workspace-info-grid">
-                  <div className="soft-panel">
-                    <p className="detail-label">Workspace folder</p>
-                    <p className="detail-value detail-wrap path-text">{selectedRun?.workspacePath ?? "Workspace path not recorded yet."}</p>
-                  </div>
-                  <div className="soft-panel">
-                    <p className="detail-label">Workspace files</p>
-                    <div className="workspace-file-list">
-                      {selectedRun?.workspaceFiles.length
-                        ? selectedRun.workspaceFiles.map((file) => <span className="file-chip" key={file}>{file}</span>)
-                        : selectedApplication.uploadedDocuments.map((file) => <span className="file-chip" key={file}>{file}</span>)}
-                    </div>
-                  </div>
-                </div>
 
                 <div className="detail-grid">
                   <div>
@@ -382,7 +367,7 @@ export function ApplicationsPageClient() {
                 )}
               </>
             ) : (
-              <div className="empty-state">Select an application to open its workspace.</div>
+              <div className="empty-state">Select an application to open its run details.</div>
             )}
           </section>
         </div>
@@ -598,7 +583,7 @@ function ReviewCompletionPanel({
       ) : !canAutoSubmit ? (
         <p className="muted compact-help">Auto-submit needs the local Chrome browser worker. Review submit still records the final confirmation and sends the student email.</p>
       ) : (
-        <p className="muted compact-help">Auto-submit opens Chrome, fills recognized fields, saves screenshots, and records a receipt. Portals with login, captcha, or unknown steps pause for manual review.</p>
+        <p className="muted compact-help">Auto-submit opens Chrome, fills recognized fields, and records a compact receipt. Portals with login, captcha, or unknown steps pause for manual review.</p>
       )}
     </section>
   );
@@ -625,7 +610,7 @@ function createSubmitPendingSteps(intent: SubmissionIntent): AgentTimelineStep[]
     {
       id: "email",
       label: "Sending email notification",
-      detail: "Preparing the confirmation email and workspace receipt.",
+      detail: "Preparing the confirmation email and compact receipt.",
       state: "queued",
       source: "gradlaunch"
     }
@@ -637,7 +622,7 @@ function createResumePendingSteps(submit: boolean): AgentTimelineStep[] {
     {
       id: "checkpoint",
       label: "Load saved checkpoint",
-      detail: "Restoring the latest planner state, prepared fields, and workspace path from the selected application.",
+      detail: "Restoring the latest planner state and prepared fields from the selected application.",
       state: "running",
       source: "gradlaunch"
     },

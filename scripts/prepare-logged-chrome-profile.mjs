@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { cp, lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { basename, dirname, relative, resolve, sep } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { basename, dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, "..");
-const defaultDest = "./storage/logged-browser-profile";
+const defaultDest = resolve(tmpdir(), "gradlaunch-runtime", "logged-browser-profile");
 
 const sourceDir = resolveConfiguredPath(
   process.env.BROWSER_SOURCE_PROFILE_DIR || defaultChromeUserDataDir()
@@ -40,7 +40,7 @@ await writeFile(resolve(destDir, ".gradlaunch-profile-source.json"), JSON.string
 
 console.log(`Prepared GradLaunch logged Chrome profile at ${destDir}`);
 console.log(`Profile copied: ${profileName}`);
-console.log(`Set BROWSER_LOGGED_PROFILE_DIR=${relative(projectRoot, destDir) || "."}`);
+console.log(`Optional: set BROWSER_LOGGED_PROFILE_DIR=${destDir}`);
 console.log(`Set BROWSER_LOGGED_PROFILE_NAME=${profileName}`);
 
 function defaultChromeUserDataDir() {
@@ -64,6 +64,10 @@ function resolveConfiguredPath(value) {
 
   if (trimmed.startsWith("~/")) {
     return resolve(homedir(), trimmed.slice(2));
+  }
+
+  if (isAbsolute(trimmed)) {
+    return trimmed;
   }
 
   return resolve(projectRoot, trimmed);
