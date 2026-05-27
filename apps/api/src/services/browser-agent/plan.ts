@@ -1,6 +1,7 @@
 import type { StageEvaluation, StageExecutionPlan, VisibleField } from "./types";
 import type { BrowserAgentObservation } from "./types";
 import { classifyPage, rankActions } from "./strategy";
+import { isTransientStatusMessage } from "./util";
 
 type BuildStageExecutionPlanInput = {
   observation: BrowserAgentObservation;
@@ -59,13 +60,15 @@ export function buildStageExecutionPlan(input: BuildStageExecutionPlanInput): St
 }
 
 export function evaluateStageReadiness(input: EvaluateStageInput): StageEvaluation {
-  if (input.validationMessages.length > 0) {
+  const validationMessages = input.validationMessages.filter((message) => !isTransientStatusMessage(message));
+
+  if (validationMessages.length > 0) {
     return {
       status: "needs_retry",
       confidence: 0.96,
-      reason: `Validation blockers are visible: ${input.validationMessages.join(", ")}.`,
+      reason: `Validation blockers are visible: ${validationMessages.join(", ")}.`,
       missingRequiredLabels: input.outstandingRequired,
-      validationMessages: input.validationMessages,
+      validationMessages,
       suggestedAction: "fill"
     };
   }

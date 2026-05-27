@@ -1,6 +1,6 @@
 import type { FilledField, Job, StudentMemory, StudentProfile } from "@gradlaunch/shared";
 import { callLangChainJson, createStudentProfileSummary, isLangChainAnswerEnabled, retrieveProfileAnswer } from "./answer";
-import { jsonBlock, normalizeKey, writeBrowserDebug } from "./util";
+import { jsonBlock, logBrowserLlmTrace, normalizeKey, writeBrowserDebug } from "./util";
 import type { FillV2Answer, FillV2Field, FillV2Input, FillV2Intent } from "./fill-engine";
 
 type PreparedValue = {
@@ -8,25 +8,8 @@ type PreparedValue = {
   source: "prepared" | "memory";
 };
 
-const fillV2AnswerCache = new Map<string, Awaited<ReturnType<typeof buildFillV2AnswersUncached>>>();
-const maxFillV2AnswerCacheEntries = 40;
-
 export async function buildFillV2Answers(input: FillV2Input, fields: FillV2Field[]) {
-  const cacheKey = buildFillV2AnswerCacheKey(input, fields);
-  const cached = fillV2AnswerCache.get(cacheKey);
-
-  if (cached) {
-    await writeBrowserDebug(input.workspacePath, "fill-v2-answer-cache-hit", {
-      stageIndex: input.stageIndex,
-      answerCount: cached.answers.length,
-      unresolvedRequiredLabels: cached.unresolvedRequiredLabels
-    });
-    return cloneFillV2AnswerResult(cached);
-  }
-
-  const built = await buildFillV2AnswersUncached(input, fields);
-  rememberFillV2Answers(cacheKey, built);
-  return cloneFillV2AnswerResult(built);
+  return buildFillV2AnswersUncached(input, fields);
 }
 
 async function buildFillV2AnswersUncached(input: FillV2Input, fields: FillV2Field[]) {
@@ -48,7 +31,21 @@ async function buildFillV2AnswersUncached(input: FillV2Input, fields: FillV2Fiel
     }
 
     if (field.intent === "prose") {
-      proseFields.push(field);
+      if (isTextProseField(field)) {
+        proseFields.push(field);
+      } else if (field.required) {
+        unresolvedRequiredLabels.push(field.label);
+      }
+
+      continue;
+    }
+
+    const requiredFallback = field.required
+      ? resolveRequiredBestEffortFallback(field, input.student, input.job)
+      : undefined;
+
+    if (requiredFallback) {
+      answers.set(field.id, createAnswer(field, normalizeAnswer(field, requiredFallback), "fallback", field.intent === "unknown" ? 0.6 : 0.72));
       continue;
     }
 
@@ -97,6 +94,7 @@ async function buildFillV2AnswersUncached(input: FillV2Input, fields: FillV2Fiel
   }
 
   const finalAnswers = [...answers.values()];
+  const answerById = new Map(finalAnswers.map((answer) => [answer.fieldId ?? answer.label, answer]));
 
   await writeBrowserDebug(input.workspacePath, "fill-v2-answer-plan", {
     stageIndex: input.stageIndex,
@@ -110,72 +108,47 @@ async function buildFillV2AnswersUncached(input: FillV2Input, fields: FillV2Fiel
       valuePreview: answer.value.length > 80 ? `${answer.value.slice(0, 77)}...` : answer.value
     }))
   });
+  await writeBrowserDebug(input.workspacePath, "fill-v2-field-resolution-trace", {
+    stageIndex: input.stageIndex,
+    fields: fields.map((field) => {
+      const answer = answerById.get(field.id);
+
+      return {
+        fieldId: field.id,
+        label: field.label,
+        driver: field.driver,
+        widgetKind: field.widgetKind,
+        valueKind: field.valueKind,
+        confidence: field.confidence,
+        required: field.required,
+        metadata: {
+          labelSource: field.labelSource,
+          placeholder: field.placeholder,
+          autocomplete: field.autocomplete,
+          name: field.name,
+          sectionLabel: field.sectionLabel,
+          helpText: field.helpText,
+          domPathSignature: field.domPathSignature
+        },
+        signature: field.signature,
+        intentCandidates: field.intentCandidates,
+        chosenSource: answer?.source ?? null,
+        chosenValuePreview: answer
+          ? answer.value.length > 120
+            ? `${answer.value.slice(0, 117)}...`
+            : answer.value
+          : null,
+        chosenIntent: answer?.intent ?? null,
+        unresolved: !answer && field.required
+      };
+    }).slice(0, 120)
+  });
 
   return {
     answers: finalAnswers,
     unresolvedRequiredLabels,
     usedLlm: finalAnswers.some((answer) => answer.source === "llm"),
     summary: summarizeAnswerSources(finalAnswers)
-  };
-}
-
-function buildFillV2AnswerCacheKey(input: FillV2Input, fields: FillV2Field[]) {
-  const fieldKey = fields
-    .map((field) => [
-      field.id,
-      normalizeKey(field.label),
-      field.intent,
-      field.driver,
-      field.required ? "required" : "optional",
-      field.options.map((option) => normalizeKey(option)).join("|")
-    ].join(":"))
-    .join("||");
-  const preparedKey = input.baseFields
-    .map((field) => `${normalizeKey(field.label)}=${normalizeKey(field.value)}`)
-    .sort()
-    .join("||");
-  const correctionKey = (input.memory?.corrections ?? [])
-    .map((correction) => `${normalizeKey(correction.label)}=${normalizeKey(correction.value)}`)
-    .sort()
-    .join("||");
-  const studentKey = [
-    input.student?.email,
-    input.student?.fullName,
-    input.student?.completeProfile?.phone,
-    input.student?.completeProfile?.city,
-    input.student?.completeProfile?.country,
-    input.student?.degree,
-    input.student?.graduationYear
-  ].map((value) => normalizeKey(String(value ?? ""))).join("|");
-  const resumeKey = normalizeKey((input.resumeText ?? "").slice(0, 1200));
-  const jobKey = `${normalizeKey(input.job.title)}|${normalizeKey(input.job.company)}|${normalizeKey(input.job.location)}`;
-
-  return [fieldKey, preparedKey, correctionKey, studentKey, resumeKey, jobKey].join("###");
-}
-
-function rememberFillV2Answers(key: string, result: Awaited<ReturnType<typeof buildFillV2AnswersUncached>>) {
-  fillV2AnswerCache.delete(key);
-  fillV2AnswerCache.set(key, cloneFillV2AnswerResult(result));
-
-  while (fillV2AnswerCache.size > maxFillV2AnswerCacheEntries) {
-    const firstKey = fillV2AnswerCache.keys().next().value;
-
-    if (!firstKey) {
-      break;
-    }
-
-    fillV2AnswerCache.delete(firstKey);
-  }
-}
-
-function cloneFillV2AnswerResult(result: Awaited<ReturnType<typeof buildFillV2AnswersUncached>>) {
-  return {
-    ...result,
-    answers: result.answers.map((answer) => ({
-      ...answer,
-      options: answer.options ? [...answer.options] : answer.options
-    })),
-    unresolvedRequiredLabels: [...result.unresolvedRequiredLabels]
   };
 }
 
@@ -188,20 +161,74 @@ function resolveDeterministicAnswer(
     return undefined;
   }
 
+  if (field.intent === "prose") {
+    return undefined;
+  }
+
+  const profileFirstValue = shouldPreferProfileValue(field)
+    ? resolveProfileAnswerValue(field, input)
+    : undefined;
+
+  if (profileFirstValue) {
+    return createAnswer(field, normalizeAnswer(field, profileFirstValue), "profile", field.intent === "unknown" ? 0.55 : 0.95);
+  }
+
   const preparedValue = resolvePreparedValue(field, prepared);
 
   if (preparedValue && isSafePreparedValueForField(field, preparedValue.value)) {
     return createAnswer(field, normalizeAnswer(field, preparedValue.value), preparedValue.source, 0.92);
   }
 
-  const value = resolveProfileValue(field.intent, field, input.student, input.job)
-    ?? retrieveProfileAnswer(field, input.student, input.job);
+  const value = resolveProfileAnswerValue(field, input);
 
   if (!value) {
     return undefined;
   }
 
   return createAnswer(field, normalizeAnswer(field, value), "profile", field.intent === "unknown" ? 0.55 : 0.95);
+}
+
+function isTextProseField(field: FillV2Field) {
+  return !["choice", "native_select", "custom_select", "file"].includes(field.driver);
+}
+
+function resolveProfileAnswerValue(field: FillV2Field, input: FillV2Input) {
+  if (isSensitiveGovernmentIdField(field)) {
+    return undefined;
+  }
+
+  const explicit = resolveProfileValue(field.intent, field, input.student, input.job);
+
+  if (explicit) {
+    return explicit;
+  }
+
+  if (field.intent === "unknown") {
+    return undefined;
+  }
+
+  const retrieved = retrieveProfileAnswer(field, input.student, input.job);
+
+  return retrieved && isSafeRetrievedProfileValueForField(field, retrieved) ? retrieved : undefined;
+}
+
+function shouldPreferProfileValue(field: FillV2Field) {
+  return [
+    "first_name",
+    "middle_name",
+    "last_name",
+    "full_name",
+    "email",
+    "confirm_email",
+    "phone",
+    "country",
+    "state",
+    "city",
+    "preferred_work_location",
+    "postal_code",
+    "address_1",
+    "address_2"
+  ].includes(field.intent);
 }
 
 function resolveProfileValue(
@@ -231,15 +258,33 @@ function resolveProfileValue(
     case "phone":
       return normalizePhone(details?.phone, details?.country ?? details?.nationality);
     case "country":
-      return normalizeCountry(details?.country ?? inferCountryFromPhone(details?.phone) ?? "India");
+      return normalizeCountryOrUndefined(details?.country)
+        ?? inferCountryFromPhone(details?.phone)
+        ?? normalizeCountryOrUndefined(details?.nationality)
+        ?? "India";
     case "state":
       return details?.state;
     case "city":
-      return formatLocation(details?.city ?? student?.preferredLocations?.[0], details?.state, details?.country);
+      return formatLocation(
+        details?.city ?? inferCityFromAddress(details?.addressLine1) ?? inferCityFromAddress(details?.addressLine2),
+        details?.state,
+        normalizeCountryOrUndefined(details?.country) ?? inferCountryFromPhone(details?.phone)
+      )
+        ?? details?.city
+        ?? inferCityFromAddress(details?.addressLine1)
+        ?? inferCityFromAddress(details?.addressLine2);
+    case "preferred_work_location":
+      return normalizePreferredLocation(student, job)
+        ?? formatLocation(
+          details?.city ?? inferCityFromAddress(details?.addressLine1) ?? inferCityFromAddress(details?.addressLine2),
+          details?.state,
+          normalizeCountryOrUndefined(details?.country) ?? inferCountryFromPhone(details?.phone)
+        )
+        ?? "Bhiwani, Haryana, India";
     case "postal_code":
       return details?.postalCode;
     case "address_1":
-      return details?.addressLine1 ?? formatLocation(details?.city, details?.state, details?.country);
+      return details?.addressLine1 ?? formatLocation(details?.city, details?.state, normalizeCountryOrUndefined(details?.country) ?? inferCountryFromPhone(details?.phone));
     case "address_2":
       return details?.addressLine2;
     case "linkedin":
@@ -253,9 +298,23 @@ function resolveProfileValue(
     case "expected_ctc":
       return formatSalary(student?.expectedSalaryLpa, field);
     case "current_ctc":
-      return formatSalary(details?.currentSalaryLpa, field);
+      return formatSalary(details?.currentSalaryLpa, field) ?? (field.required ? defaultCurrentCtcFallback(field) : undefined);
     case "notice_period":
-      return details?.noticePeriodDays !== undefined ? String(details.noticePeriodDays) : undefined;
+      return formatNoticePeriod(details?.noticePeriodDays, field);
+    case "total_experience":
+      return formatExperienceYears(details?.totalExperienceYears, field) ?? (field.required ? formatExperienceYears(0, field) : undefined);
+    case "office_work_choice":
+      return choiceYes(field.options) ?? "Yes";
+    case "bond_obligation_choice":
+      return choiceNo(field.options) ?? "No";
+    case "previous_employer_choice":
+      return hasWorkedAtCompany(student, job.company) ? choiceYes(field.options) ?? "Yes" : choiceNo(field.options) ?? "No";
+    case "shift_flexibility_choice":
+      return choiceYes(field.options) ?? "Yes";
+    case "notice_buyout_choice":
+      return choiceNo(field.options) ?? "No";
+    case "government_id":
+      return undefined;
     case "degree_name":
       return cleanDegree(education?.fieldOfStudy) ?? cleanDegree(education?.degree) ?? cleanDegree(student?.degree);
     case "degree_type":
@@ -269,7 +328,7 @@ function resolveProfileValue(
     case "work_experience_choice":
       return hasWorkHistory(student) ? choiceYes(field.options) : choiceNo(field.options);
     case "work_company":
-      return details?.currentCompany ?? employment?.company;
+      return details?.currentCompany ?? employment?.company ?? (field.required ? "Not Applicable" : undefined);
     case "work_title":
       return details?.currentTitle ?? employment?.title;
     case "work_start":
@@ -296,48 +355,79 @@ function resolveProfileValue(
 }
 
 async function askLangChainForProseAnswers(input: FillV2Input, fields: FillV2Field[]): Promise<FillV2Answer[]> {
-  const prompt = [
-    "Return strict JSON only.",
-    "You are filling only prose job application fields. Use only the provided student profile, resume excerpt, prepared fields, and job details.",
-    "Do not answer factual fields like phone, country, salary, name, email, or dates.",
-    "Create a distinct answer for each field. Do not reuse the exact same paragraph.",
-    "Keep Message to Hiring Team / comments to 2-4 concise sentences. Keep cover letter fields to 4-6 concise sentences.",
-    "",
-    "Schema:",
-    '{"answers":[{"fieldId":"...","value":"...","reason":"..."}]}',
-    "",
-    `Job: ${input.job.title} at ${input.job.company}`,
-    `Job excerpt: ${input.job.description.slice(0, 1600)}`,
-    `Student profile: ${JSON.stringify(createStudentProfileSummary(input.student))}`,
-    `Resume excerpt: ${JSON.stringify((input.resumeText ?? "").slice(0, 5000))}`,
-    `Prepared fields: ${JSON.stringify(input.baseFields)}`,
-    `Memory corrections: ${JSON.stringify(input.memory?.corrections ?? [])}`,
-    `Fields: ${JSON.stringify(fields.map((field) => ({
-      fieldId: field.id,
-      label: field.label,
-      context: field.context.slice(0, 300),
-      required: field.required
-    })))}`
-  ].join("\n");
-  const content = await callLangChainJson({
-    system: "You generate concise, truthful job-application prose using the provided context only.",
-    prompt
-  });
-  const parsed = JSON.parse(jsonBlock(content)) as {
-    answers?: Array<{ fieldId?: string; label?: string; value?: string; reason?: string }>;
-  };
-  const byId = new Map(fields.map((field) => [field.id, field]));
-  const byLabel = new Map(fields.map((field) => [normalizeKey(field.label), field]));
   const answers: FillV2Answer[] = [];
 
-  for (const candidate of parsed.answers ?? []) {
-    const field = (candidate.fieldId ? byId.get(candidate.fieldId) : undefined)
-      ?? (candidate.label ? byLabel.get(normalizeKey(candidate.label)) : undefined);
+  for (const requestedField of fields) {
+    const variationToken = `${requestedField.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const prompt = [
+      "Answer this one prose field and return JSON only.",
+      "Write one fresh field-specific response using the supplied job, student, resume, prepared fields, and memory.",
+      "",
+      "Schema:",
+      '{"fieldId":"...","label":"...","value":"...","reason":"..."}',
+      "",
+      `Variation token: ${variationToken}`,
+      `Job: ${input.job.title} at ${input.job.company}`,
+      `Job excerpt: ${input.job.description.slice(0, 1600)}`,
+      `Student profile: ${JSON.stringify(createStudentProfileSummary(input.student))}`,
+      `Resume excerpt: ${JSON.stringify((input.resumeText ?? "").slice(0, 5000))}`,
+      `Prepared fields: ${JSON.stringify(input.baseFields)}`,
+      `Memory corrections: ${JSON.stringify(input.memory?.corrections ?? [])}`,
+      `Field: ${JSON.stringify({
+        fieldId: requestedField.id,
+        label: requestedField.label,
+        context: requestedField.context.slice(0, 300),
+        required: requestedField.required,
+        maxLength: requestedField.maxLength
+      })}`
+    ].join("\n");
+
+    const content = await callLangChainJson({
+      system: "You write concise job-application prose and return JSON.",
+      prompt,
+      workspacePath: input.workspacePath,
+      traceLabel: `fill-v2-prose-${requestedField.id}`,
+      temperatureOverride: 0.95
+    });
+    const parsed = JSON.parse(jsonBlock(content)) as {
+      fieldId?: string;
+      label?: string;
+      value?: string;
+      reason?: string;
+      answer?: { fieldId?: string; label?: string; value?: string; reason?: string };
+    };
+    const candidate = parsed.answer ?? parsed;
+    const field = requestedField;
     const value = candidate.value?.trim();
 
-    if (!field || !value) {
+    if (!value) {
+      await logBrowserLlmTrace(input.workspacePath, "fill-v2-prose-field-discarded", {
+        requestedFieldId: requestedField.id,
+        requestedLabel: requestedField.label,
+        returnedFieldId: candidate.fieldId ?? "",
+        returnedLabel: candidate.label ?? "",
+        returnedReason: candidate.reason ?? "",
+        matchedFieldId: field.id,
+        matchedLabel: field.label,
+        value: value ?? "",
+        discardedBecause: "empty_value"
+      });
       continue;
     }
+
+    await logBrowserLlmTrace(input.workspacePath, "fill-v2-prose-field", {
+      requestedFieldId: requestedField.id,
+      requestedLabel: requestedField.label,
+      returnedFieldId: candidate.fieldId ?? "",
+      returnedLabel: candidate.label ?? "",
+      returnedReason: candidate.reason ?? "",
+      matchedFieldId: field.id,
+      matchedLabel: field.label,
+      mappingMode: candidate.fieldId?.trim() === requestedField.id || normalizeKey(candidate.label ?? "") === normalizeKey(requestedField.label)
+        ? "requested_field_confirmed"
+        : "requested_field_forced",
+      answer: value
+    });
 
     answers.push({
       ...createAnswer(field, value, "llm", 0.84),
@@ -362,6 +452,17 @@ function resolveProseFallback(field: FillV2Field, student: StudentProfile | unde
     ].join(" ");
   }
 
+  if (/\b(technical expertise|overall technical|expertise|tell us)\b/.test(descriptor)) {
+    return [
+      `My strongest technical areas are ${skills || "software development, problem-solving, and building practical applications"}.`,
+      "I focus on writing maintainable code, understanding product requirements clearly, and learning quickly when a role needs a new tool or framework."
+    ].join(" ");
+  }
+
+  if (/\b(reason for job change|job change reason|reason.*change)\b/.test(descriptor)) {
+    return `I am looking for a role where I can keep growing as a ${role}, contribute to meaningful engineering work, and take on stronger ownership in a collaborative team.`;
+  }
+
   if (/\b(message|hiring team|comments?|additional information|let the company know|interest working there|interest in working there)\b/.test(descriptor)) {
     return [
       `Thank you for reviewing my application for the ${job.title} role.`,
@@ -371,6 +472,96 @@ function resolveProseFallback(field: FillV2Field, student: StudentProfile | unde
   }
 
   return undefined;
+}
+
+function resolveRequiredBestEffortFallback(field: FillV2Field, student: StudentProfile | undefined, job: Job) {
+  if (isSensitiveGovernmentIdField(field)) {
+    return undefined;
+  }
+
+  const descriptor = normalizeKey(`${field.label} ${field.context}`);
+  const details = student?.completeProfile;
+
+  if (field.driver === "choice") {
+    if (/\b(privacy|terms|consent|agree|acknowledge|declaration|read and understand)\b/.test(descriptor)) {
+      return choiceYes(field.options) ?? "Yes";
+    }
+
+    if (/\b(bond|obligation|buyout|previously associated|associated previously|previous employer|worked previously)\b/.test(descriptor)) {
+      return choiceNo(field.options) ?? "No";
+    }
+
+    if (/\b(open|flexible|available|willing|work from office|hybrid|shift|night|relocat)\b/.test(descriptor)) {
+      return choiceYes(field.options) ?? "Yes";
+    }
+
+    return choiceNo(field.options) ?? "No";
+  }
+
+  switch (field.intent) {
+    case "current_ctc":
+      return formatSalary(details?.currentSalaryLpa, field) ?? defaultCurrentCtcFallback(field);
+    case "expected_ctc":
+      return formatSalary(student?.expectedSalaryLpa, field) ?? defaultExpectedCtcFallback(field);
+    case "preferred_work_location":
+      return normalizePreferredLocation(student, job) ?? "Bhiwani, Haryana, India";
+    case "work_company":
+      return details?.currentCompany ?? details?.employmentHistory?.[0]?.company ?? "Not Applicable";
+    case "notice_buyout_choice":
+      return "No";
+    case "notice_period":
+      return formatNoticePeriod(details?.noticePeriodDays, field) ?? "Immediate";
+    case "total_experience":
+      return formatExperienceYears(details?.totalExperienceYears ?? 0, field) ?? "0";
+    case "prose":
+      return resolveProseFallback(field, student, job);
+    case "unknown":
+      break;
+    default:
+      return undefined;
+  }
+
+  if (!isTextLikeField(field)) {
+    return undefined;
+  }
+
+  if (/\b(current company|company|employer|organization)\b/.test(descriptor)) {
+    return details?.currentCompany ?? details?.employmentHistory?.[0]?.company ?? "Not Applicable";
+  }
+
+  if (/\b(preferred|work)\b/.test(descriptor) && /\b(location|city)\b/.test(descriptor)) {
+    return normalizePreferredLocation(student, job) ?? "Bhiwani, Haryana, India";
+  }
+
+  if (/\b(current|present|existing|last|previous|annual)\b/.test(descriptor) && /\b(ctc|salary|compensation|package|pay)\b/.test(descriptor)) {
+    return formatSalary(details?.currentSalaryLpa, field) ?? defaultCurrentCtcFallback(field);
+  }
+
+  if (/\b(expected|desired|target|asking|minimum)\b/.test(descriptor) && /\b(ctc|salary|compensation|package|pay)\b/.test(descriptor)) {
+    return formatSalary(student?.expectedSalaryLpa, field) ?? defaultExpectedCtcFallback(field);
+  }
+
+  if (/\bnotice period buyout|notice buyout|buyout\b/.test(descriptor)) {
+    return "No";
+  }
+
+  if (/\bnotice period|joining time|available to join|availability to join\b/.test(descriptor)) {
+    return formatNoticePeriod(details?.noticePeriodDays, field) ?? "Immediate";
+  }
+
+  if (/\b(total|overall|years?)\b/.test(descriptor) && /\b(experience|exp)\b/.test(descriptor)) {
+    return formatExperienceYears(details?.totalExperienceYears ?? 0, field) ?? "0";
+  }
+
+  if (/\b(reason|expertise|why|describe|explain|tell us|about|summary|message|comments?)\b/.test(descriptor)) {
+    return resolveProseFallback({ ...field, intent: "prose" }, student, job);
+  }
+
+  return "Not Applicable";
+}
+
+function isTextLikeField(field: FillV2Field) {
+  return ["text", "textarea", "number", "contenteditable", "email", "phone"].includes(field.driver);
 }
 
 function createPreparedMap(baseFields: FilledField[], memory: StudentMemory | undefined) {
@@ -402,6 +593,10 @@ function addPrepared(map: Map<string, PreparedValue>, label: string, value: stri
 }
 
 function resolvePreparedValue(field: FillV2Field, prepared: Map<string, PreparedValue>) {
+  if (isSensitiveGovernmentIdField(field)) {
+    return undefined;
+  }
+
   const keys = [
     field.label,
     field.intent.replace(/_/g, " "),
@@ -418,10 +613,18 @@ function aliasesFor(label: string) {
   if (/\bphone|mobile|contact\b/.test(key)) aliases.add("Phone number");
   if (/\bemail\b/.test(key)) aliases.add("Email");
   if (/\bcountry\b/.test(key)) aliases.add("Country");
-  if (/\bcity|location\b/.test(key)) aliases.add("Current location");
-  if (/\bctc|salary|compensation\b/.test(key)) {
+  if (/\bpreferred\b/.test(key) && /\b(location|city)\b/.test(key)) {
+    aliases.add("Preferred location");
+  } else if (/\bcity|location\b/.test(key)) {
+    aliases.add("Current location");
+    aliases.add("Location (City)");
+  }
+  if (/\b(expected|desired|target|asking|minimum)\b/.test(key) && /\bctc|salary|compensation\b/.test(key)) {
     aliases.add("Expected CTC");
+    aliases.add("Expected salary");
+  } else if (/\b(current|present|existing|last|previous|annual)\b/.test(key) && /\bctc|salary|compensation\b/.test(key)) {
     aliases.add("Current CTC");
+    aliases.add("Current salary");
   }
   if (/\blinkedin\b/.test(key)) aliases.add("LinkedIn URL");
   if (/\bgithub\b/.test(key)) aliases.add("GitHub URL");
@@ -438,6 +641,24 @@ function aliasesFor(label: string) {
 
 function isSafePreparedValueForField(field: FillV2Field, value: string) {
   const key = normalizeKey(value);
+
+  if (isSensitiveGovernmentIdField(field)) {
+    return false;
+  }
+
+  if (["city", "preferred_work_location", "state", "postal_code", "address_1", "address_2"].includes(field.intent)) {
+    if (looksLikePhoneNumber(value) || /@/.test(value) || /^https?:\/\//i.test(value)) {
+      return false;
+    }
+  }
+
+  if (field.intent === "city" || field.intent === "preferred_work_location") {
+    return hasLetter(value) && !isCountryOnlyValue(value);
+  }
+
+  if (field.intent === "state") {
+    return hasLetter(value) && !isCountryOnlyValue(value);
+  }
 
   if (field.intent === "country") {
     return /\b(india|united states|usa|united kingdom|uk|canada|australia|germany|france|singapore)\b/.test(key);
@@ -456,6 +677,44 @@ function isSafePreparedValueForField(field: FillV2Field, value: string) {
   }
 
   return true;
+}
+
+function isSafeRetrievedProfileValueForField(field: FillV2Field, value: string) {
+  if (!isSafePreparedValueForField(field, value)) {
+    return false;
+  }
+
+  if (field.intent === "work_company" || field.intent === "work_title" || field.intent === "university") {
+    return /[a-z]/i.test(value) && !/^\d+(?:\.\d+)?$/.test(value.trim());
+  }
+
+  return true;
+}
+
+function looksLikePhoneNumber(value: string) {
+  const compact = value.trim();
+  const digits = compact.replace(/\D+/g, "");
+
+  if (digits.length < 7) {
+    return false;
+  }
+
+  const letters = compact.replace(/[^a-z]/gi, "");
+  return /^\+?[\d\s().-]+$/.test(compact) || letters.length <= 2;
+}
+
+function hasLetter(value: string) {
+  return /[a-z]/i.test(value);
+}
+
+function isCountryOnlyValue(value: string) {
+  const key = normalizeKey(value);
+  return /^(india|bharat|united states|usa|us|united kingdom|uk|australia|canada)$/.test(key);
+}
+
+function isSensitiveGovernmentIdField(field: FillV2Field) {
+  return field.intent === "government_id"
+    || /\baadhaar|aadhar|pan card|government id|national id|identity number\b/.test(normalizeKey(`${field.label} ${field.context}`));
 }
 
 function isPreparedSocialUrl(value: string) {
@@ -486,9 +745,11 @@ function normalizeAnswer(field: FillV2Field, value: string) {
 }
 
 function createAnswer(field: FillV2Field, value: string, source: FillV2Answer["source"], confidence: number): FillV2Answer {
+  const fittedValue = fitAnswerToFieldLimit(field, value);
+
   return {
     label: field.label,
-    value,
+    value: fittedValue,
     fieldId: field.id,
     inputType: field.inputType,
     options: field.options,
@@ -500,9 +761,50 @@ function createAnswer(field: FillV2Field, value: string, source: FillV2Answer["s
   };
 }
 
+function fitAnswerToFieldLimit(field: FillV2Field, value: string) {
+  const cleanValue = value.trim();
+  const maxLength = field.maxLength;
+
+  if (!maxLength || maxLength <= 0 || isExactValueField(field)) {
+    return cleanValue;
+  }
+
+  const target = maxLength < 20
+    ? maxLength
+    : maxLength <= 120
+      ? Math.max(1, maxLength - 5)
+      : Math.max(1, maxLength - 10);
+
+  if (cleanValue.length <= target) {
+    return cleanValue;
+  }
+
+  const truncated = cleanValue.slice(0, target).trimEnd();
+  const lastSpace = truncated.lastIndexOf(" ");
+  const wordSafe = lastSpace >= Math.floor(target * 0.65) ? truncated.slice(0, lastSpace) : truncated;
+
+  return wordSafe.replace(/[.,;:!?-]+$/, "").trim() || truncated;
+}
+
+function isExactValueField(field: FillV2Field) {
+  return [
+    "first_name",
+    "middle_name",
+    "last_name",
+    "full_name",
+    "email",
+    "confirm_email",
+    "phone",
+    "linkedin",
+    "github",
+    "portfolio",
+    "website",
+    "postal_code"
+  ].includes(field.intent);
+}
+
 function isOptionalPhoneCountryCodeField(field: FillV2Field) {
-  return !field.required
-    && field.intent === "country"
+  return field.intent === "country"
     && /\b(country code|country region code|search by country\/region or code|search by country region or code|dial code|phone code)\b/.test(normalizeKey(`${field.label} ${field.context}`));
 }
 
@@ -549,17 +851,78 @@ function inferCountryFromPhone(value: string | undefined) {
 }
 
 function normalizeCountry(value: string) {
+  return normalizeCountryOrUndefined(value) ?? value.trim();
+}
+
+function normalizeCountryOrUndefined(value: string | undefined) {
   const key = normalizeKey(value);
 
   if (/\bindia|indian\b/.test(key)) return "India";
   if (/\bunited states|usa|us\b/.test(key)) return "United States";
   if (/\bunited kingdom|uk\b/.test(key)) return "United Kingdom";
   if (/\baustralia\b/.test(key)) return "Australia";
-  return value.trim();
+  if (/\bcanada\b/.test(key)) return "Canada";
+  if (/\bgermany\b/.test(key)) return "Germany";
+  if (/\bfrance\b/.test(key)) return "France";
+  if (/\bsingapore\b/.test(key)) return "Singapore";
+  return undefined;
 }
 
 function formatLocation(city: string | undefined, state: string | undefined, country: string | undefined) {
   return [city, state, country].filter(Boolean).join(", ") || undefined;
+}
+
+function normalizePreferredLocation(student: StudentProfile | undefined, job: Job) {
+  const details = student?.completeProfile;
+  const jobLocation = preferredLocationFromJob(job.location);
+  const preferred = student?.preferredLocations?.map((value) => value.trim()).find(Boolean);
+  const profileLocation = formatLocation(
+    details?.city ?? inferCityFromAddress(details?.addressLine1) ?? inferCityFromAddress(details?.addressLine2),
+    details?.state,
+    normalizeCountryOrUndefined(details?.country) ?? inferCountryFromPhone(details?.phone)
+  );
+
+  return jobLocation ?? preferred ?? profileLocation;
+}
+
+function preferredLocationFromJob(value: string | undefined) {
+  const clean = value?.trim();
+
+  if (!clean) {
+    return undefined;
+  }
+
+  const key = normalizeKey(clean);
+
+  if (/\bremote\b/.test(key)) return "Remote";
+  if (/\bpune\b/.test(key)) return "Pune";
+  if (/\bbengaluru|bangalore|banglore\b/.test(key)) return "Bengaluru";
+  if (/\bnagpur\b/.test(key)) return "Nagpur";
+  if (/\bgurugram|gurgaon\b/.test(key)) return "Gurugram";
+  if (/\bhyderabad\b/.test(key)) return "Hyderabad";
+  if (/\bnoida\b/.test(key)) return "Noida";
+  if (/\bmumbai\b/.test(key)) return "Mumbai";
+  if (/\bdelhi|new delhi\b/.test(key)) return "Delhi";
+  if (/\bchennai\b/.test(key)) return "Chennai";
+  if (/\bkolkata\b/.test(key)) return "Kolkata";
+
+  return clean.split(/[,|/]/)[0]?.trim() || clean;
+}
+
+function inferCityFromAddress(value: string | undefined) {
+  const key = normalizeKey(value);
+
+  if (/\bbhiwani\b/.test(key)) return "Bhiwani";
+  if (/\bgurugram|gurgaon\b/.test(key)) return "Gurugram";
+  if (/\bdelhi|new delhi\b/.test(key)) return "Delhi";
+  if (/\bnoida\b/.test(key)) return "Noida";
+  if (/\bpune\b/.test(key)) return "Pune";
+  if (/\bmumbai\b/.test(key)) return "Mumbai";
+  if (/\bhyderabad\b/.test(key)) return "Hyderabad";
+  if (/\bbengaluru|bangalore|banglore\b/.test(key)) return "Bengaluru";
+  if (/\bchennai\b/.test(key)) return "Chennai";
+  if (/\bkolkata\b/.test(key)) return "Kolkata";
+  return undefined;
 }
 
 function normalizeUrl(value: string | undefined) {
@@ -579,6 +942,34 @@ function formatSalary(value: number | undefined, field: FillV2Field) {
 
   const descriptor = normalizeKey(`${field.label} ${field.context}`);
   return /\b(lpa|lakhs?|lakh per annum)\b/.test(descriptor) || field.driver === "number" ? String(value) : `${value} LPA`;
+}
+
+function defaultCurrentCtcFallback(field: FillV2Field) {
+  return field.driver === "number" ? "0" : "0 LPA";
+}
+
+function defaultExpectedCtcFallback(field: FillV2Field) {
+  return field.driver === "number" ? "30" : "30 LPA";
+}
+
+function formatExperienceYears(value: number | undefined, field: FillV2Field) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return field.driver === "custom_select" || field.inputType === "autocomplete"
+    ? `${value} ${value === 1 ? "year" : "years"}`
+    : String(value);
+}
+
+function formatNoticePeriod(value: number | undefined, field: FillV2Field) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return field.driver === "custom_select" || field.inputType === "autocomplete"
+    ? `${value} ${value === 1 ? "day" : "days"}`
+    : String(value);
 }
 
 function cleanDegree(value: string | undefined) {
@@ -619,6 +1010,22 @@ function hasWorkHistory(student: StudentProfile | undefined) {
     || (details?.totalExperienceYears ?? 0) > 0
     || (details?.employmentHistory?.length ?? 0) > 0
   );
+}
+
+function hasWorkedAtCompany(student: StudentProfile | undefined, company: string | undefined) {
+  const companyKey = normalizeKey(company);
+
+  if (!companyKey) {
+    return false;
+  }
+
+  const details = student?.completeProfile;
+  const candidates = [
+    details?.currentCompany,
+    ...(details?.employmentHistory ?? []).map((item) => item.company)
+  ].map(normalizeKey).filter(Boolean);
+
+  return candidates.some((candidate) => candidate.includes(companyKey) || companyKey.includes(candidate));
 }
 
 function choiceYes(options: string[]) {

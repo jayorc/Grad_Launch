@@ -34,6 +34,10 @@ export function isTransientStatusMessage(value: string | undefined | null) {
     return false;
   }
 
+  if (/\b(page is loaded|page loaded|screen is loaded|screen loaded|content is loaded|content loaded)\b/.test(normalized)) {
+    return true;
+  }
+
   if (/\b(active loading indicator|loading|please wait|processing|uploading|saving|submitting|spinner|progress|still working|one moment)\b/.test(normalized)) {
     return true;
   }
@@ -84,4 +88,14 @@ export async function writeBrowserDebug(workspacePath: string, label: string, pa
   } catch (_error) {
     // Best-effort debug trace only.
   }
+}
+
+export async function logBrowserLlmTrace(workspacePath: string | undefined, label: string, payload: unknown) {
+  console.log(`[GradLaunch][LLM] ${label}`, payload);
+
+  if (!workspacePath) {
+    return;
+  }
+
+  await writeBrowserDebug(workspacePath, label, payload);
 }

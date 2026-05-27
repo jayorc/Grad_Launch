@@ -5,8 +5,9 @@ import type { AgentHandoffKind, BrowserApplyReceipt } from "@gradlaunch/shared";
 import { getBrowserWorkspaceStorageDir, getLoggedBrowserProfileDir, getManagedBrowserProfileDir } from "../../config/storage";
 import { nowIso } from "../../lib/time";
 import { runFillEngine } from "./fill-engine";
-import { buildStageAnswerPlan, reflectOnStageAnswers } from "./answer";
-import { attachResume, collectLegacyFillFieldDebug, continueAfterResumeUploadIfReady, fillFormField, resolveKnownRequiredChoice } from "./fill";
+import { reflectOnStageAnswers } from "./answer";
+import { attachResume, collectLegacyFillFieldDebug, continueAfterResumeUploadIfReady, resolveKnownRequiredChoice } from "./fill";
+import { fillRepairFieldV2 } from "./fill-field-drivers";
 import { buildStageExecutionPlan, evaluateStageReadiness } from "./plan";
 import {
   bumpPlannerRetries,
@@ -42,7 +43,7 @@ import {
   observeBrowserPage
 } from "./observe";
 import { chromium, type Browser, type BrowserContext, type Dialog, type Page } from "./browser-driver";
-import type { BrowserAgentObservation, BrowserApplyInput, BrowserAvailability, BrowserFillField, HandoffRequest } from "./types";
+import type { BrowserAgentObservation, BrowserApplyInput, BrowserAvailability, BrowserFillField, HandoffRequest, StageAnswerPlan } from "./types";
 import { BrowserExecutionSessionService } from "./session";
 import { clearUserContinueRequest, clearUserStopRequest, consumeUserContinueConfirmation, didUserRequestStop, isLiveBotMounted, updateLiveBot } from "./ui";
 import { dedupeLabels, normalizeKey, pathExists, writeBrowserDebug } from "./util";
@@ -722,6 +723,14 @@ export class BrowserAgentEngine {
             stageAction = "stop";
           } else if (probe.classification.state === "start") {
             stageAction = "click_next";
+          } else if (probe.classification.state === "loading" || probe.classification.state === "empty") {
+            await updateLiveBot(activePage, {
+              step: `Stage ${stageIndex + 1}`,
+              mood: "thinking",
+              message: "The portal is still rendering the application controls, so I am waiting and re-scanning."
+            });
+            await activePage.waitForTimeout(Number(process.env.BROWSER_DYNAMIC_WAIT_MS ?? 1400)).catch(() => undefined);
+            continue;
           } else {
             await updateLiveBot(activePage, {
               step: `Stage ${stageIndex + 1}`,
@@ -978,7 +987,7 @@ export class BrowserAgentEngine {
           }
         }
 
-        let answerPlan: Awaited<ReturnType<typeof buildStageAnswerPlan>> | undefined;
+        let answerPlan: StageAnswerPlan | undefined;
         let failedRequiredAfterRetries: BrowserFillField[] = [];
 
         if (stageAction === "fill" && stageVisibleFields.length > 0) {
@@ -1767,7 +1776,12 @@ export class BrowserAgentEngine {
             stageIndex
           });
         }
-        const allowApplyStart = observation.pageState === "start" && stageVisibleFields.length === 0;
+        const allowApplyStart = shouldAllowApplyStartNavigation({
+          observation,
+          classificationState: activeClassification?.state,
+          stageAction,
+          visibleFieldCount: stageVisibleFields.length
+        });
         const navigation = await clickNextStageControl(context, activePage, { allowApplyStart });
 
         if (!navigation.clicked) {
@@ -2340,6 +2354,29 @@ function isResumeMethodChoiceObservation(observation: BrowserAgentObservation) {
     && /\b(without resume|without cv|copy paste|copy and paste)\b/.test(text);
 }
 
+function shouldAllowApplyStartNavigation(input: {
+  observation: BrowserAgentObservation;
+  classificationState?: string;
+  stageAction: string;
+  visibleFieldCount: number;
+}) {
+  if (input.observation.pageState === "start" || input.classificationState === "start") {
+    return true;
+  }
+
+  if (input.stageAction !== "click_next") {
+    return false;
+  }
+
+  const hasApplyControl = input.observation.controls.some((control) => {
+    const text = normalizeAgentText(`${control.text} ${control.label}`);
+    return /\b(apply|apply now|apply for this job|apply for this position|start application|continue application|begin application|i m interested|im interested)\b/.test(text)
+      && !/\b(sign in|signin|log in|login|google|email|password|forgot|create account|register|sign up)\b/.test(text);
+  });
+
+  return hasApplyControl && input.visibleFieldCount === 0;
+}
+
 function isTransientBlankObservation(observation: BrowserAgentObservation) {
   return observation.visibleFields.length === 0
     && observation.controls.length === 0
@@ -2367,11 +2404,7 @@ async function applyCurrentPageCompletionGuard(input: {
   const stillEmptyAttemptedLabels = input.failedFields.length > 0
     ? await getStillEmptyAttemptedRequiredLabels(input.page, input.failedFields)
     : [];
-  const unverifiedCriticalLabels = input.failedFields
-    .filter((field) => field.required || isLikelyRequiredAttemptedLabel(field.label))
-    .filter((field) => !/\b(address line 2|address 2|middle name|preferred name|apt|suite)\b/i.test(field.label))
-    .map((field) => field.label);
-  const guardLabels = dedupeLabels([...stillEmptyAttemptedLabels, ...unverifiedCriticalLabels]);
+  const guardLabels = dedupeLabels(stillEmptyAttemptedLabels);
   const outstandingRequired = dedupeLabels([...input.outstandingRequired, ...pageRequiredLabels, ...guardLabels]);
 
   const newlyGuardedLabels = dedupeLabels([...pageRequiredLabels, ...guardLabels])
@@ -2442,7 +2475,11 @@ async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: Br
             findNearbyLabelText(control),
             compactContainerText(control)
           ].filter(Boolean).join(" "));
-          const idMatches = Boolean(field.fieldId && control.getAttribute("data-gradlaunch-field-id") === field.fieldId);
+          const idMatches = Boolean(field.fieldId && [
+            control.getAttribute("data-gradlaunch-v2-field-id"),
+            control.getAttribute("data-gradlaunch-fast-field-id"),
+            control.getAttribute("data-gradlaunch-field-id")
+          ].includes(field.fieldId));
           const score = scoreDescriptor(descriptor, labelKey, field.inputType, control) + (idMatches ? 140 : 0);
 
           if (score > bestScore) {
@@ -2986,7 +3023,7 @@ async function attemptRepairFieldFill(
 ) {
   const trace = shouldTraceRepairField(field);
   const beforeDebug = trace ? await collectLegacyFillFieldDebug(page, field) : undefined;
-  const filled = await fillFormField(page, field);
+  const filled = await fillRepairFieldV2(page, field);
   const afterDebug = trace ? await collectLegacyFillFieldDebug(page, field) : undefined;
 
   if (trace) {
@@ -3160,6 +3197,9 @@ function isNonFieldRequiredLabel(label: string, job: BrowserApplyInput["job"]) {
 
   return normalized === jobTitle
     || normalized === company
+    || /\b(country code|country region code|search by country region or code|search by country\/region or code|dial code|phone code)\b/.test(normalized)
+    || /^(facebook|x fka twitter|twitter|website|personal website|portfolio website|github|instagram)$/.test(normalized)
+    || /\b(facebook|x fka twitter|twitter)\b/.test(normalized)
     || /^(easy apply|personal information|experience|education|your profiles|resume|privacy notice|imprint)$/.test(normalized);
 }
 

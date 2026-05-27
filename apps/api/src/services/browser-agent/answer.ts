@@ -2,7 +2,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import type { FilledField, Job, StudentMemory, StudentProfile } from "@gradlaunch/shared";
 import { cityFromLocationLabel, inferCountryFromPhoneNumber, resolveBestProfileLocation } from "../location-resolver";
 import type { BrowserFillField, StageAnswerPlan, StageReflectionResult, VisibleField } from "./types";
-import { dedupeLabels, jsonBlock, normalizeKey, writeBrowserDebug } from "./util";
+import { dedupeLabels, jsonBlock, logBrowserLlmTrace, normalizeKey, writeBrowserDebug } from "./util";
 
 type BuildAnswerPlanInput = {
   job: Job;
@@ -25,9 +25,21 @@ type AnswerCandidate = {
   reason: string;
 };
 
+type LlmReturnedFieldCandidate = {
+  fieldId?: string;
+  label?: string;
+  value?: string;
+  reason?: string;
+  question?: string;
+  field?: string;
+};
+
 type LangChainJsonInput = {
   prompt: string;
   system: string;
+  workspacePath?: string;
+  traceLabel?: string;
+  temperatureOverride?: number;
 };
 
 type ReflectStageInput = {
@@ -41,22 +53,7 @@ type ReflectStageInput = {
   workspacePath: string;
 };
 
-const stageAnswerPlanCache = new Map<string, StageAnswerPlan>();
-const maxStageAnswerPlanCacheEntries = 40;
-
 export async function buildStageAnswerPlan(input: BuildAnswerPlanInput): Promise<StageAnswerPlan> {
-  const cacheKey = buildStageAnswerPlanCacheKey(input);
-  const cached = stageAnswerPlanCache.get(cacheKey);
-
-  if (cached) {
-    await writeBrowserDebug(input.workspacePath, "answer-plan-cache-hit", {
-      visibleFieldCount: input.visibleFields.length,
-      answerCount: cached.answers.length,
-      unresolvedRequiredLabels: cached.unresolvedRequiredLabels
-    });
-    return cloneStageAnswerPlan(cached);
-  }
-
   const deterministicAnswers = createDeterministicAnswerMap(input.visibleFields, input.baseFields, input.student, input.job, input.memory, input.resumeText);
   const deterministicLabels = [...deterministicAnswers.values()].map((answer) => answer.label);
   const missingRequiredLabels = resolveUnansweredRequiredLabels(input.visibleFields, [...deterministicAnswers.values()]);
@@ -128,7 +125,6 @@ export async function buildStageAnswerPlan(input: BuildAnswerPlanInput): Promise
         summary: `Profile/prepared answers: ${deterministicAnswers.size}. LangChain answers: ${llmPlan.answers.size}. ${llmPlan.summary ?? ""}`.trim()
       };
 
-      rememberStageAnswerPlan(cacheKey, planned);
       return cloneStageAnswerPlan(planned);
     }
 
@@ -154,7 +150,6 @@ export async function buildStageAnswerPlan(input: BuildAnswerPlanInput): Promise
     summary: deterministicAnswers.size > 0 ? "Using stored GradLaunch profile facts and prepared answers for the visible fields." : undefined
   };
 
-  rememberStageAnswerPlan(cacheKey, planned);
   return cloneStageAnswerPlan(planned);
 }
 
@@ -192,21 +187,6 @@ function buildStageAnswerPlanCacheKey(input: BuildAnswerPlanInput) {
   const jobKey = `${normalizeKey(input.job.title)}|${normalizeKey(input.job.company)}|${normalizeKey(input.job.location)}`;
 
   return [visibleFieldKey, preparedFieldKey, correctionKey, studentKey, resumeKey, jobKey].join("###");
-}
-
-function rememberStageAnswerPlan(cacheKey: string, plan: StageAnswerPlan) {
-  stageAnswerPlanCache.delete(cacheKey);
-  stageAnswerPlanCache.set(cacheKey, cloneStageAnswerPlan(plan));
-
-  while (stageAnswerPlanCache.size > maxStageAnswerPlanCacheEntries) {
-    const firstKey = stageAnswerPlanCache.keys().next().value;
-
-    if (!firstKey) {
-      break;
-    }
-
-    stageAnswerPlanCache.delete(firstKey);
-  }
 }
 
 function cloneStageAnswerPlan(plan: StageAnswerPlan): StageAnswerPlan {
@@ -1762,41 +1742,6 @@ function getFieldAliases(label: string) {
 }
 
 async function askLlmForStageAnswers(input: BuildAnswerPlanInput) {
-  const prompt = [
-    "You are helping fill a job application form.",
-    "Return strict JSON only.",
-    "Choose answers using the student context first, then prepared application fields, then memory corrections.",
-    "Do not invent personal facts that are not present.",
-    "For current city/location autocomplete fields, use a concrete candidate location from profile, resume, address, or work history with city, region, and country. Do not copy the job office location if it conflicts with the candidate's country/profile location.",
-    "For every visible long-answer field such as cover letter, motivation, why, summary, bio, message to hiring team, comments, or additional information, return a field-specific answer.",
-    "Do not reuse the exact same paragraph across different long-answer fields. Tailor each answer to the field label, job title, company, and available student skills/projects.",
-    "For Message to the Hiring Team, write 2-4 concise sentences. For cover letter fields, write 4-6 concise sentences.",
-    "",
-    "Schema:",
-    "{",
-    '  "summary": "short summary",',
-    '  "answers": [{"fieldId":"...", "label":"...", "value":"...", "reason":"..."}]',
-    "}",
-    "",
-    `Job: ${input.job.title} at ${input.job.company}`,
-    `Description excerpt: ${input.job.description.slice(0, 1200)}`,
-    "",
-    `Student: ${JSON.stringify(createStudentProfileSummary(input.student))}`,
-    `Resume excerpt: ${JSON.stringify((input.resumeText ?? "").slice(0, 6000))}`,
-    `Prepared fields: ${JSON.stringify(input.baseFields)}`,
-    `Corrections: ${JSON.stringify(input.memory?.corrections ?? [])}`,
-    `Notes: ${JSON.stringify((input.memory?.notes ?? []).slice(0, 10))}`,
-    "",
-    `Visible fields: ${JSON.stringify(input.visibleFields)}`
-  ].join("\n");
-
-  const content = await callOpenAiCompatible(prompt);
-  const parsed = JSON.parse(jsonBlock(content)) as {
-    summary?: string;
-    answers?: Array<{ fieldId?: string; label?: string; value?: string; reason?: string }>;
-  };
-  const visibleById = new Map(input.visibleFields.map((field) => [field.id, field]));
-  const visibleByLabel = new Map(input.visibleFields.map((field) => [normalizeKey(field.label), field]));
   const prepared = createPreparedValueMap(input.baseFields, input.memory);
   const answers = new Map<string, {
     label: string;
@@ -1807,11 +1752,37 @@ async function askLlmForStageAnswers(input: BuildAnswerPlanInput) {
     required: boolean;
     reason: string;
   }>();
+  let answeredCount = 0;
 
-  for (const candidate of parsed.answers ?? []) {
-    const visibleField = (candidate.fieldId ? visibleById.get(candidate.fieldId) : undefined)
-      ?? (candidate.label ? visibleByLabel.get(normalizeKey(candidate.label)) : undefined)
-      ?? bestVisibleFieldForLlmCandidate(candidate, input.visibleFields);
+  for (const requestedField of input.visibleFields) {
+    if (requestedField.inputType === "file") {
+      continue;
+    }
+
+    const prompt = [
+      "Answer this one exact visible job application field using the supplied student, resume, prepared fields, and memory.",
+      "Return JSON only.",
+      "Schema:",
+      '{"fieldId":"...","label":"...","value":"...","reason":"..."}',
+      "",
+      `Job: ${input.job.title} at ${input.job.company}`,
+      `Description excerpt: ${input.job.description.slice(0, 1200)}`,
+      `Student: ${JSON.stringify(createStudentProfileSummary(input.student))}`,
+      `Resume excerpt: ${JSON.stringify((input.resumeText ?? "").slice(0, 6000))}`,
+      `Prepared fields: ${JSON.stringify(input.baseFields)}`,
+      `Corrections: ${JSON.stringify(input.memory?.corrections ?? [])}`,
+      `Notes: ${JSON.stringify((input.memory?.notes ?? []).slice(0, 10))}`,
+      `Target field id: ${requestedField.id}`,
+      `Target field label: ${requestedField.label}`,
+      `Field: ${JSON.stringify(requestedField)}`
+    ].join("\n");
+
+    const content = await callOpenAiCompatible(prompt, input.workspacePath, `stage-answer-${requestedField.id}`);
+    const parsed = JSON.parse(jsonBlock(content)) as LlmReturnedFieldCandidate & {
+      answer?: LlmReturnedFieldCandidate;
+    };
+    const candidate = parsed.answer ?? parsed;
+    const visibleField = requestedField;
     let value = String(candidate.value ?? "").trim();
     const resolvedLocationValue = visibleField
       ? resolveLocationFieldValue(visibleField, prepared, input.student, input.job, input.resumeText, value)
@@ -1822,8 +1793,35 @@ async function askLlmForStageAnswers(input: BuildAnswerPlanInput) {
     }
 
     if (!visibleField || visibleField.inputType === "file" || !value) {
+      await logBrowserLlmTrace(input.workspacePath, "stage-answer-field-discarded", {
+        requestedFieldId: requestedField.id,
+        requestedLabel: requestedField.label,
+        returnedFieldId: candidate.fieldId ?? "",
+        returnedLabel: candidate.label ?? "",
+        matchedFieldId: visibleField?.id ?? "",
+        matchedLabel: visibleField?.label ?? "",
+        value,
+        reason: candidate.reason ?? "",
+        discardedBecause: !visibleField ? "no_matching_visible_field" : !value ? "empty_value" : "file_field"
+      });
       continue;
     }
+
+    const referenceMatch = doesCandidateReferenceField(candidate, requestedField);
+
+    await logBrowserLlmTrace(input.workspacePath, "stage-answer-field", {
+      requestedFieldId: requestedField.id,
+      requestedLabel: requestedField.label,
+      returnedFieldId: candidate.fieldId ?? "",
+      returnedLabel: candidate.label ?? "",
+      returnedQuestion: candidate.question ?? "",
+      returnedField: candidate.field ?? "",
+      matchedFieldId: visibleField.id,
+      matchedLabel: visibleField.label,
+      mappingMode: referenceMatch ? "requested_field_confirmed" : "requested_field_forced",
+      answer: value,
+      reason: candidate.reason ?? ""
+    });
 
     answers.set(visibleField.id, {
       label: visibleField.label,
@@ -1834,30 +1832,25 @@ async function askLlmForStageAnswers(input: BuildAnswerPlanInput) {
       required: visibleField.required,
       reason: String(candidate.reason ?? "LLM selected a personalized answer.")
     });
+    answeredCount += 1;
   }
 
   await writeBrowserDebug(input.workspacePath, "llm-stage-answer-plan", {
     visibleFieldCount: input.visibleFields.length,
     answerCount: answers.size,
-    summary: parsed.summary
+    summary: `Generated ${answeredCount} field-level LLM answer(s).`
   });
 
   return {
-    summary: parsed.summary,
+    summary: `Generated ${answeredCount} field-level LLM answer(s).`,
     answers
   };
 }
 
 function bestVisibleFieldForLlmCandidate(
-  candidate: { label?: string; value?: string },
+  candidate: LlmReturnedFieldCandidate,
   visibleFields: VisibleField[]
 ) {
-  const candidateLabel = normalizeKey(candidate.label ?? "");
-
-  if (!candidateLabel) {
-    return undefined;
-  }
-
   let best: VisibleField | undefined;
   let bestScore = 0;
 
@@ -1866,16 +1859,7 @@ function bestVisibleFieldForLlmCandidate(
       continue;
     }
 
-    const fieldLabel = normalizeKey(`${field.label} ${field.context}`);
-    let score = tokenOverlapScore(candidateLabel, fieldLabel);
-
-    if (fieldLabel.includes(candidateLabel) || candidateLabel.includes(normalizeKey(field.label))) {
-      score += 60;
-    }
-
-    if (shouldAskLlmForField(field) && /\b(cover letter|motivation|why|summary|bio|about|describe|explain|additional information|message|comments?|hiring team)\b/.test(candidateLabel)) {
-      score += 35;
-    }
+    const score = scoreCandidateAgainstField(candidate, field);
 
     if (score > bestScore) {
       best = field;
@@ -1884,6 +1868,69 @@ function bestVisibleFieldForLlmCandidate(
   }
 
   return bestScore >= 45 ? best : undefined;
+}
+
+function resolveVisibleFieldCandidate(candidate: LlmReturnedFieldCandidate, visibleFields: VisibleField[]) {
+  const exactById = candidate.fieldId
+    ? visibleFields.find((field) => field.id === candidate.fieldId)
+    : undefined;
+
+  if (exactById) {
+    return exactById;
+  }
+
+  return bestVisibleFieldForLlmCandidate(candidate, visibleFields);
+}
+
+function doesCandidateReferenceField(candidate: LlmReturnedFieldCandidate, field: VisibleField) {
+  if (candidate.fieldId?.trim() === field.id) {
+    return true;
+  }
+
+  return scoreCandidateAgainstField(candidate, field) >= 80;
+}
+
+function scoreCandidateAgainstField(candidate: LlmReturnedFieldCandidate, field: VisibleField) {
+  const references = [
+    candidate.label,
+    candidate.question,
+    candidate.field,
+    candidate.reason
+  ].map((value) => normalizeKey(value ?? "")).filter(Boolean);
+
+  if (references.length === 0) {
+    return 0;
+  }
+
+  const fieldReferences = new Set([
+    normalizeKey(field.label),
+    normalizeKey(`${field.label} ${field.context}`),
+    ...getFieldAliases(field.label).map((alias) => normalizeKey(alias))
+  ].filter(Boolean));
+
+  let bestScore = 0;
+
+  for (const reference of references) {
+    for (const fieldReference of fieldReferences) {
+      let score = tokenOverlapScore(reference, fieldReference);
+
+      if (reference === fieldReference) {
+        score += 120;
+      } else if (fieldReference.includes(reference) || reference.includes(fieldReference)) {
+        score += 75;
+      }
+
+      if (shouldAskLlmForField(field) && /\b(cover letter|motivation|why|summary|bio|about|describe|explain|additional information|message|comments?|hiring team)\b/.test(reference)) {
+        score += 25;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+      }
+    }
+  }
+
+  return bestScore;
 }
 
 function tokenOverlapScore(left: string, right: string) {
@@ -1949,18 +1996,15 @@ export async function reflectOnStageAnswers(input: ReflectStageInput): Promise<S
     `Visible fields: ${JSON.stringify(input.visibleFields)}`
   ].join("\n");
 
-  const content = await callReflectionOpenAiCompatible(prompt);
+  const content = await callReflectionOpenAiCompatible(prompt, input.workspacePath);
   const parsed = JSON.parse(jsonBlock(content)) as {
     summary?: string;
-    answers?: Array<{ fieldId?: string; label?: string; value?: string; reason?: string }>;
+    answers?: Array<LlmReturnedFieldCandidate>;
   };
-  const visibleById = new Map(input.visibleFields.map((field) => [field.id, field]));
-  const visibleByLabel = new Map(input.visibleFields.map((field) => [normalizeKey(field.label), field]));
   const answers: BrowserFillField[] = [];
 
   for (const candidate of parsed.answers ?? []) {
-    const visibleField = (candidate.fieldId ? visibleById.get(candidate.fieldId) : undefined)
-      ?? (candidate.label ? visibleByLabel.get(normalizeKey(candidate.label)) : undefined);
+    const visibleField = resolveVisibleFieldCandidate(candidate, input.visibleFields);
     const value = String(candidate.value ?? "").trim();
 
     if (!visibleField || !value) {
@@ -1992,14 +2036,13 @@ export async function reflectOnStageAnswers(input: ReflectStageInput): Promise<S
   };
 }
 
-async function callOpenAiCompatible(prompt: string) {
+async function callOpenAiCompatible(prompt: string, workspacePath?: string, traceLabel = "langchain") {
   const content = await callLangChainJson({
     prompt,
-    system: [
-      "You generate safe, personalized answers for job application forms using only the provided context.",
-      "Use the resume excerpt and stored profile to write polished but concise answers for summary, bio, motivation, achievements, project, and experience fields.",
-      "When a field asks for a short paragraph, tailor it to the job without inventing facts."
-    ].join(" ")
+    system: "You help fill job application forms from the provided context and return clean JSON.",
+    workspacePath,
+    traceLabel,
+    temperatureOverride: 0.6
   });
 
   if (!content) {
@@ -2015,10 +2058,12 @@ function shouldUseLlm() {
 
 export async function callLangChainJson(input: LangChainJsonInput) {
   const baseURL = getOpenAiCompatibleBaseUrl();
+  const modelName = process.env.OPENAI_MODEL ?? process.env.LLM_MODEL ?? "gpt-4o-mini";
+  const temperature = input.temperatureOverride ?? Number(process.env.LLM_TEMPERATURE ?? 0.65);
   const model = new ChatOpenAI({
     apiKey: process.env.OPENAI_API_KEY,
-    model: process.env.OPENAI_MODEL ?? process.env.LLM_MODEL ?? "gpt-4o-mini",
-    temperature: Number(process.env.LLM_TEMPERATURE ?? 0.35),
+    model: modelName,
+    temperature,
     configuration: baseURL
       ? { baseURL }
       : undefined,
@@ -2032,6 +2077,13 @@ export async function callLangChainJson(input: LangChainJsonInput) {
     ["system", input.system],
     ["human", input.prompt]
   ];
+  await logBrowserLlmTrace(input.workspacePath, `${input.traceLabel ?? "langchain"}-request`, {
+    model: modelName,
+    temperature,
+    baseURL: baseURL ?? "default",
+    system: input.system,
+    prompt: input.prompt
+  });
   const response = await jsonModel.invoke(messages).catch(async (error) => {
     if (isJsonModeError(error)) {
       return model.invoke(messages);
@@ -2039,8 +2091,14 @@ export async function callLangChainJson(input: LangChainJsonInput) {
 
     throw error;
   });
+  const content = messageContentToString(response.content);
+  await logBrowserLlmTrace(input.workspacePath, `${input.traceLabel ?? "langchain"}-response`, {
+    model: modelName,
+    temperature,
+    content
+  });
 
-  return messageContentToString(response.content);
+  return content;
 }
 
 export function isLangChainAnswerEnabled() {
@@ -2287,9 +2345,15 @@ function shouldUseReflection(input: ReflectStageInput) {
     && (input.missingRequiredLabels.length > 0 || input.validationMessages.length > 0);
 }
 
-async function callReflectionOpenAiCompatible(prompt: string) {
+async function callReflectionOpenAiCompatible(prompt: string, workspacePath?: string) {
   const endpoint = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1/chat/completions";
   const model = process.env.OPENAI_MODEL ?? process.env.LLM_MODEL ?? "gpt-4o-mini";
+  await logBrowserLlmTrace(workspacePath, "reflection-request", {
+    model,
+    endpoint,
+    system: "You are a reflection agent that improves browser form-filling plans using only supplied context.",
+    prompt
+  });
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -2325,6 +2389,11 @@ async function callReflectionOpenAiCompatible(prompt: string) {
   if (!content) {
     throw new Error("Reflection LLM response did not include content.");
   }
+
+  await logBrowserLlmTrace(workspacePath, "reflection-response", {
+    model,
+    content
+  });
 
   return content;
 }

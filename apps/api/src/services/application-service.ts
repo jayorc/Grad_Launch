@@ -186,10 +186,7 @@ export class ApplicationService {
       existingApplication ? this.applications.listRunsByApplication(application.id) : Promise.resolve([]),
       existingApplication ? this.agentRepository.getLatestBrowserExecutionSessionForApplication(application.id) : Promise.resolve(undefined)
     ]);
-    const fields = mergeFilledFields(
-      existingRuns[0]?.filledFields ?? [],
-      buildFilledFields(student, job, resume, application.generatedArtifacts)
-    );
+    const fields = buildFilledFields(student, job, resume, application.generatedArtifacts);
 
     const preparingRun: ApplicationRun = {
       id: createId("run"),
@@ -321,9 +318,10 @@ export class ApplicationService {
     const wantsAutoSubmit = input.intent === "auto_submit";
     const canAutoSubmit = wantsAutoSubmit && (browserCapability?.status === "available" || browserCapability?.status === "partial");
     const now = nowIso();
+    const currentPreparedFields = buildFilledFields(student, job, resume, refreshedApplication.generatedArtifacts);
     const reviewedFields = normalizeReviewedFields(
       input.reviewedFields,
-      latestRun?.filledFields ?? buildFilledFields(student, job, resume, refreshedApplication.generatedArtifacts)
+      currentPreparedFields
     );
     const latestBrowserSession = await this.agentRepository.getLatestBrowserExecutionSessionForApplication(application.id);
     const browserReceipt = canAutoSubmit
@@ -479,29 +477,6 @@ function normalizeReviewedFields(reviewedFields: ApplicationRun["filledFields"],
       value: field.value.trim()
     }))
     .filter((field) => field.label.length > 0);
-}
-
-function mergeFilledFields(primaryFields: ApplicationRun["filledFields"], generatedFields: ApplicationRun["filledFields"]) {
-  const merged = new Map<string, ApplicationRun["filledFields"][number]>();
-
-  for (const field of generatedFields) {
-    merged.set(normalizeFieldKey(field.label), field);
-  }
-
-  for (const field of primaryFields) {
-    const normalizedLabel = normalizeFieldKey(field.label);
-    const generatedField = merged.get(normalizedLabel);
-
-    if (shouldUsePrimaryFieldValue(field, generatedField)) {
-      merged.set(normalizeFieldKey(field.label), field);
-    }
-  }
-
-  return [...merged.values()];
-}
-
-function normalizeFieldKey(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function buildSubmissionConfirmation(input: {
@@ -665,11 +640,12 @@ function createUploadedDocumentList(resume?: ResumeRecord) {
 }
 
 function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRecord, artifacts?: Application["generatedArtifacts"]): ApplicationRun["filledFields"] {
+  const details = student.completeProfile;
   const nameParts = student.fullName.trim().split(/\s+/).filter(Boolean);
   const firstName = nameParts[0] ?? student.fullName;
   const lastName = nameParts.slice(1).join(" ");
-  const phoneCountryHint = student.completeProfile?.country ?? student.completeProfile?.nationality;
-  const phoneNumber = normalizeApplicationPhone(student.completeProfile?.phone, phoneCountryHint)
+  const phoneCountryHint = details?.country ?? details?.nationality;
+  const phoneNumber = normalizeApplicationPhone(details?.phone, phoneCountryHint)
     ?? normalizeApplicationPhone(extractPhoneNumber(resume?.extractedText), phoneCountryHint)
     ?? normalizeApplicationPhone(process.env.DEFAULT_STUDENT_PHONE, phoneCountryHint);
   const resolvedLocation = resolveBestProfileLocation({
@@ -678,25 +654,37 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
     resumeText: resume?.extractedText,
     phone: phoneNumber
   });
-  const preferredLocation = resolvedLocation?.label ?? getPreferredLocation(student, job, resume, phoneNumber);
-  const city = resolvedLocation?.city ?? cityFromLocationLabel(preferredLocation) ?? preferredLocation;
-  const country = process.env.DEFAULT_STUDENT_COUNTRY
+  const profileCity = sanitizeLocationLabel(details?.city)
+    ?? cityFromLocationLabel(details?.addressLine1)
+    ?? cityFromLocationLabel(details?.addressLine2);
+  const profileCountry = normalizeKnownCountry(details?.country)
     ?? inferCountryFromPhoneNumber(phoneNumber)
+    ?? normalizeKnownCountry(details?.nationality);
+  const profileLocation = sanitizeLocationLabel([profileCity ?? details?.addressLine1, details?.state, profileCountry].filter(Boolean).join(", "));
+  const resolvedCity = isCountryOnlyLocation(resolvedLocation?.city) ? undefined : sanitizeLocationLabel(resolvedLocation?.city);
+  const preferredLocation = sanitizeLocationLabel(student.preferredLocations[0])
+    ?? resolvedLocation?.label
+    ?? getPreferredLocation(student, job, resume, phoneNumber);
+  const currentLocation = profileLocation ?? resolvedLocation?.label ?? preferredLocation;
+  const fallbackCity = cityFromLocationLabel(currentLocation);
+  const city = profileCity ?? resolvedCity ?? (isCountryOnlyLocation(fallbackCity) ? undefined : fallbackCity) ?? "";
+  const country = profileCountry
     ?? resolvedLocation?.country
-    ?? inferCountryFromLocationLabel(preferredLocation)
+    ?? inferCountryFromLocationLabel(currentLocation)
+    ?? process.env.DEFAULT_STUDENT_COUNTRY
     ?? "India";
   const roleTarget = getPreferredRoleTarget(student, job);
-  const linkedInUrl = normalizeApplicationProfileUrl(student.completeProfile?.linkedInUrl, "linkedin")
+  const linkedInUrl = normalizeApplicationProfileUrl(details?.linkedInUrl, "linkedin")
     ?? normalizeApplicationProfileUrl(extractUrl(resume?.extractedText, /linkedin\.com\/[^\s)>,]+/i), "linkedin")
     ?? normalizeApplicationProfileUrl(process.env.DEFAULT_STUDENT_LINKEDIN, "linkedin");
-  const githubUrl = normalizeApplicationProfileUrl(student.completeProfile?.githubUrl, "github")
+  const githubUrl = normalizeApplicationProfileUrl(details?.githubUrl, "github")
     ?? normalizeApplicationProfileUrl(extractUrl(resume?.extractedText, /github\.com\/[^\s)>,]+/i), "github");
-  const portfolioUrl = normalizeApplicationProfileUrl(student.completeProfile?.portfolioUrl, "generic");
-  const websiteUrl = normalizeApplicationProfileUrl(student.completeProfile?.websiteUrl, "generic")
+  const portfolioUrl = normalizeApplicationProfileUrl(details?.portfolioUrl, "generic");
+  const websiteUrl = normalizeApplicationProfileUrl(details?.websiteUrl, "generic")
     ?? portfolioUrl
     ?? normalizeApplicationProfileUrl(extractUrl(resume?.extractedText, /https?:\/\/(?![^\s)>,]*(?:linkedin|github)\.com)[^\s)>,]+/i), "generic")
     ?? normalizeApplicationProfileUrl(process.env.DEFAULT_STUDENT_WEBSITE, "generic");
-  const currentCtc = formatSalaryLpa(student.completeProfile?.currentSalaryLpa)
+  const currentCtc = formatSalaryLpa(details?.currentSalaryLpa)
     ?? extractCompensation(resume?.extractedText, /current\s+(?:ctc|salary|compensation)[:\s-]*([^\n,;]+)/i)
     ?? process.env.DEFAULT_CURRENT_CTC
     ?? "";
@@ -710,9 +698,16 @@ function buildFilledFields(student: StudentProfile, job: Job, resume?: ResumeRec
     { label: "Email", value: student.email },
     { label: "Confirm your email", value: student.email },
     { label: "City", value: city },
-    { label: "Location", value: preferredLocation },
-    { label: "Location (City)", value: preferredLocation },
+    { label: "Current location", value: currentLocation },
+    { label: "Location", value: currentLocation },
+    { label: "Location (City)", value: city || currentLocation },
     { label: "Country", value: country },
+    { label: "Address", value: details?.addressLine1 ?? currentLocation },
+    { label: "Address line 1", value: details?.addressLine1 ?? currentLocation },
+    { label: "Street address", value: details?.addressLine1 ?? currentLocation },
+    { label: "Address line 2", value: details?.addressLine2 ?? "" },
+    { label: "State", value: details?.state ?? resolvedLocation?.region ?? "" },
+    { label: "Postal code", value: details?.postalCode ?? "" },
     { label: "Phone number", value: phoneNumber ?? "" },
     { label: "Phone", value: phoneNumber ?? "" },
     { label: "Mobile", value: phoneNumber ?? "" },
@@ -1045,6 +1040,26 @@ function sanitizeLocationLabel(value: string | undefined) {
   return compact;
 }
 
+function isCountryOnlyLocation(value: string | undefined) {
+  const normalized = value?.toLowerCase().replace(/[^a-z]+/g, " ").trim();
+  return /^(india|bharat|united states|usa|us|united kingdom|uk|australia|canada)$/.test(normalized ?? "");
+}
+
+function normalizeKnownCountry(value: string | undefined) {
+  const normalized = value?.toLowerCase().replace(/[^a-z]+/g, " ").trim();
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (/^(india|bharat|indian)$/.test(normalized)) return "India";
+  if (/^(united states|usa|us|america)$/.test(normalized)) return "United States";
+  if (/^(united kingdom|uk|britain|england)$/.test(normalized)) return "United Kingdom";
+  if (normalized === "australia") return "Australia";
+  if (normalized === "canada") return "Canada";
+  return undefined;
+}
+
 function sanitizeDegree(value: string | undefined) {
   const trimmed = value?.trim();
 
@@ -1084,75 +1099,6 @@ function buildCoverLetterExcerpt(student: StudentProfile, job: Job, roleTarget: 
     `I would be glad to contribute to ${job.company}'s team with a practical, detail-oriented approach to building reliable backend systems and supporting product delivery in ${workModeText}.`,
     `With my academic foundation and hands-on project work, I am confident I can add value while continuing to grow in a role aligned with ${preferredLocation} opportunities.`
   ].join(" ");
-}
-
-function shouldUsePrimaryFieldValue(
-  primaryField: ApplicationRun["filledFields"][number],
-  generatedField: ApplicationRun["filledFields"][number] | undefined
-) {
-  const primaryValue = primaryField.value.trim();
-
-  if (!primaryValue) {
-    return false;
-  }
-
-  if (!generatedField) {
-    return true;
-  }
-
-  const labelKey = normalizeFieldKey(primaryField.label);
-  const generatedValue = generatedField.value.trim();
-
-  if (isWeakFieldValue(labelKey, primaryValue) && !isWeakFieldValue(labelKey, generatedValue)) {
-    return false;
-  }
-
-  if (isLocationFieldKey(labelKey) && generatedValue && locationCountriesConflict(primaryValue, generatedValue)) {
-    return false;
-  }
-
-  return true;
-}
-
-function isWeakFieldValue(labelKey: string, value: string) {
-  const normalized = value.trim().toLowerCase();
-
-  if (!normalized) {
-    return true;
-  }
-
-  if (["a", "an", "na", "n a", "none", "unknown"].includes(normalized)) {
-    return true;
-  }
-
-  if (labelKey === "target role") {
-    return normalizeRoleLabel(value) === undefined;
-  }
-
-  if (isLocationFieldKey(labelKey)) {
-    return sanitizeLocationLabel(value) === undefined;
-  }
-
-  if (labelKey === "message to the hiring team" || labelKey === "why are you interested in this role") {
-    return /\baspiring\s+(a|an|sw|sde|dev)\b/i.test(value) || /\bbecoming a a\b/i.test(value);
-  }
-
-  if (labelKey === "website") {
-    return /(^https?:\/\/github\.com\/?$)|(^https?:\/\/(?:www\.)?github\.com\/?$)|(^github\.com\/?$)/i.test(value.trim());
-  }
-
-  return false;
-}
-
-function isLocationFieldKey(labelKey: string) {
-  return labelKey === "preferred location" || labelKey === "location" || labelKey === "location city" || labelKey === "city";
-}
-
-function locationCountriesConflict(primaryValue: string, generatedValue: string) {
-  const primaryCountry = inferCountryFromLocationLabel(primaryValue);
-  const generatedCountry = inferCountryFromLocationLabel(generatedValue);
-
-  return Boolean(primaryCountry && generatedCountry && primaryCountry !== generatedCountry);
 }
 
 function refreshApplicationArtifactsIfNeeded(

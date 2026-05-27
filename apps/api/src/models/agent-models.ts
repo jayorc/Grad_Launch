@@ -105,12 +105,35 @@ const memoryCorrectionSchema = new Schema(
   { _id: false }
 );
 
+const portalPatternSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    domain: { type: String, required: true },
+    urlPattern: { type: String, required: false },
+    fieldLabel: { type: String, required: true },
+    normalizedLabel: { type: String, required: false },
+    autocomplete: { type: String, required: false },
+    widgetKind: { type: String, required: false },
+    valueKind: { type: String, required: false },
+    domPathSignature: { type: String, required: false },
+    strategy: { type: String, required: true },
+    queryMode: { type: String, required: false },
+    successCount: { type: Number, required: true, default: 0 },
+    verificationEvidence: { type: [String], default: [] },
+    failureReason: { type: String, required: false },
+    notes: { type: [String], default: [] },
+    lastUsedAt: { type: String, required: true }
+  },
+  { _id: false }
+);
+
 const studentMemorySchema = new Schema(
   {
     studentId: { type: String, required: true, unique: true, index: true },
     successfulApplicationCount: { type: Number, required: true, default: 0 },
     blockedSourceTypes: { type: [String], default: [] },
     recentHandoffKinds: { type: [String], default: [] },
+    portalPatterns: { type: [portalPatternSchema], default: [] },
     corrections: { type: [memoryCorrectionSchema], default: [] },
     notes: { type: [String], default: [] },
     lastUpdatedAt: { type: String, required: true }

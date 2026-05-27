@@ -7,8 +7,7 @@ Click fill browser
   -> application-routes.ts
   -> ApplicationService.fillJobInBrowser()
   -> prepare student/job/resume/profile fields
-  -> AihawkAdapterService.applyWithBrowser()
-  -> BrowserApplyService.apply()
+  -> BrowserAgentAdapterService.applyWithBrowser()
   -> BrowserAgentEngine.apply()
 
 BrowserAgentEngine

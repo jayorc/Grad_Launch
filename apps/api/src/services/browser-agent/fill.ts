@@ -2227,7 +2227,13 @@ async function commitTextLikeLocator(target: Locator, field: BrowserFillField, k
   }
 
   if (kind === "phone" || isPhoneLikeFillField(field)) {
-    return fillIntlPhoneLocator(target, field);
+    const phoneCommitted = await fillIntlPhoneLocator(target, field);
+
+    if (phoneCommitted) {
+      return true;
+    }
+
+    kind = "text";
   }
 
   const selectAllKey = process.platform === "darwin" ? "Meta+A" : "Control+A";

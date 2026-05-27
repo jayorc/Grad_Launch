@@ -389,20 +389,44 @@ export async function probeAndReobservePage(input: {
   stageIndex: number;
 }) {
   await input.page.waitForLoadState("domcontentloaded", { timeout: 1200 }).catch(() => undefined);
-  await input.page.waitForTimeout(500).catch(() => undefined);
   await clickSoftGate(input.page).catch(() => undefined);
   await input.page.evaluate(() => {
     window.scrollBy({ top: Math.max(320, window.innerHeight * 0.75), behavior: "auto" });
   }).catch(() => undefined);
-  await input.page.waitForTimeout(450).catch(() => undefined);
+  const waitSchedule = isWorkdayPage(input.page.url()) ? [700, 1400, 2400] : [500, 450];
+  let protectedCheckpoint: Awaited<ReturnType<typeof detectProtectedCheckpoint>> = { blocked: false };
+  let stageSnapshot: Awaited<ReturnType<typeof collectStageSnapshot>> | undefined;
+  let visibleFields: BrowserAgentObservation["visibleFields"] = [];
+  let observation: BrowserAgentObservation | undefined;
+  let uploadVisible = false;
+  let validationMessages: string[] = [];
+  let classification: PageClassification | undefined;
 
-  const protectedCheckpoint = await detectProtectedCheckpoint(input.page).catch(() => ({ blocked: false as const }));
-  const stageSnapshot = await collectStageSnapshot(input.page).catch(() => undefined);
-  const visibleFields = stageSnapshot?.visibleFields ?? [];
-  const observation = stageSnapshot?.observation ?? await collectFallbackObservation(input.page);
-  const uploadVisible = stageSnapshot?.uploadVisible ?? false;
-  const validationMessages = stageSnapshot?.validationMessages ?? [];
-  const classification = classifyPage({
+  for (const waitMs of waitSchedule) {
+    await input.page.waitForTimeout(waitMs).catch(() => undefined);
+    protectedCheckpoint = await detectProtectedCheckpoint(input.page).catch(() => ({ blocked: false as const }));
+    stageSnapshot = await collectStageSnapshot(input.page).catch(() => undefined);
+    visibleFields = stageSnapshot?.visibleFields ?? [];
+    observation = stageSnapshot?.observation ?? await collectFallbackObservation(input.page);
+    uploadVisible = stageSnapshot?.uploadVisible ?? false;
+    validationMessages = stageSnapshot?.validationMessages ?? [];
+    classification = classifyPage({
+      ...observation,
+      validationMessages
+    });
+
+    if (
+      protectedCheckpoint.blocked
+      || uploadVisible
+      || visibleFields.length > 0
+      || !["empty", "loading", "unknown"].includes(classification.state)
+    ) {
+      break;
+    }
+  }
+
+  observation ??= await collectFallbackObservation(input.page);
+  classification ??= classifyPage({
     ...observation,
     validationMessages
   });
@@ -431,6 +455,10 @@ export async function probeAndReobservePage(input: {
     recovered: !protectedCheckpoint.blocked
       && (visibleFields.length > 0 || uploadVisible || ["start", "review", "submit", "resume_upload"].includes(classification.state))
   };
+}
+
+function isWorkdayPage(url: string) {
+  return /workdayjobs\.com|myworkdayjobs\.com|wd\d+\.myworkdayjobs\.com/i.test(url);
 }
 
 async function collectFallbackObservation(page: Page) {

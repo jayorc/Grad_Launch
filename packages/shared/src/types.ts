@@ -504,6 +504,24 @@ export interface StudentMemory {
   successfulApplicationCount: number;
   blockedSourceTypes: string[];
   recentHandoffKinds: AgentHandoffKind[];
+  portalPatterns: Array<{
+    id: string;
+    domain: string;
+    urlPattern?: string;
+    fieldLabel: string;
+    normalizedLabel?: string;
+    autocomplete?: string;
+    widgetKind?: string;
+    valueKind?: string;
+    domPathSignature?: string;
+    strategy: string;
+    queryMode?: "answer" | "first_token" | "typed_prefix";
+    successCount: number;
+    verificationEvidence?: string[];
+    failureReason?: string;
+    notes?: string[];
+    lastUsedAt: string;
+  }>;
   corrections: Array<{
     label: string;
     value: string;

@@ -18,6 +18,7 @@ export class StudentMemoryService {
       successfulApplicationCount: 0,
       blockedSourceTypes: [],
       recentHandoffKinds: [],
+      portalPatterns: [],
       corrections: [],
       notes: [`Memory initialized ${createId("memory_note")}.`],
       lastUpdatedAt: nowIso()
@@ -81,6 +82,67 @@ export class StudentMemoryService {
     return this.repository.saveStudentMemory({
       ...memory,
       corrections: [...correctionMap.values()].slice(0, 50),
+      lastUpdatedAt: timestamp
+    });
+  }
+
+  async recordPortalPattern(input: {
+    studentId: string;
+    domain: string;
+    urlPattern?: string;
+    fieldLabel: string;
+    normalizedLabel?: string;
+    autocomplete?: string;
+    widgetKind?: string;
+    valueKind?: string;
+    domPathSignature?: string;
+    strategy: string;
+    queryMode?: "answer" | "first_token" | "typed_prefix";
+    verificationEvidence?: string[];
+    failureReason?: string;
+    note?: string;
+  }) {
+    const memory = await this.get(input.studentId);
+    const timestamp = nowIso();
+    const key = [
+      normalize(input.domain),
+      normalize(input.normalizedLabel ?? input.fieldLabel),
+      normalize(input.widgetKind ?? ""),
+      normalize(input.valueKind ?? "")
+    ].join("::");
+    const patternMap = new Map(memory.portalPatterns.map((item) => {
+      const itemKey = [
+        normalize(item.domain),
+        normalize(item.normalizedLabel ?? item.fieldLabel),
+        normalize(item.widgetKind ?? ""),
+        normalize(item.valueKind ?? "")
+      ].join("::");
+      return [itemKey, item] as const;
+    }));
+    const existing = patternMap.get(key);
+
+    patternMap.set(key, {
+      id: existing?.id ?? createId("portal_pattern"),
+      domain: input.domain,
+      urlPattern: input.urlPattern ?? existing?.urlPattern,
+      fieldLabel: input.fieldLabel,
+      normalizedLabel: input.normalizedLabel ?? existing?.normalizedLabel,
+      autocomplete: input.autocomplete ?? existing?.autocomplete,
+      widgetKind: input.widgetKind ?? existing?.widgetKind,
+      valueKind: input.valueKind ?? existing?.valueKind,
+      domPathSignature: input.domPathSignature ?? existing?.domPathSignature,
+      strategy: input.strategy,
+      queryMode: input.queryMode ?? existing?.queryMode,
+      successCount: (existing?.successCount ?? 0) + 1,
+      verificationEvidence: dedupeValues([...(input.verificationEvidence ?? []), ...(existing?.verificationEvidence ?? [])]).slice(0, 10),
+      failureReason: input.failureReason ?? existing?.failureReason,
+      notes: input.note ? dedupeValues([input.note, ...(existing?.notes ?? [])]).slice(0, 10) : existing?.notes ?? [],
+      lastUsedAt: timestamp
+    });
+
+    return this.repository.saveStudentMemory({
+      ...memory,
+      portalPatterns: [...patternMap.values()].slice(0, 100),
       lastUpdatedAt: timestamp
     });
   }

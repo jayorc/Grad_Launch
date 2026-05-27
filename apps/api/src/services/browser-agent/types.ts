@@ -41,6 +41,18 @@ export type VisibleField = {
   inputType: string;
   options: string[];
   context: string;
+  maxLength?: number;
+  name?: string;
+  placeholder?: string;
+  autocomplete?: string;
+  ariaLabel?: string;
+  ariaDescribedBy?: string;
+  pattern?: string;
+  inputMode?: string;
+  sectionLabel?: string;
+  helpText?: string;
+  labelSource?: string;
+  domPathSignature?: string;
 };
 
 export type ObservedControl = {

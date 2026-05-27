@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { chromium } from "../apps/api/src/services/browser-agent/browser-driver";
-import { fillFormField } from "../apps/api/src/services/browser-agent/fill";
+import { fillRepairFieldV2 } from "../apps/api/src/services/browser-agent/fill-field-drivers";
 import type { BrowserFillField } from "../apps/api/src/services/browser-agent/types";
 
 const chromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -43,11 +43,11 @@ async function runScenario(
   await page.setContent(buildSmokeHtml({ comboboxRole: true, shadowPopup: options.shadowPopup }), { waitUntil: "domcontentloaded" });
   console.log(`running ${options.name}`);
 
-  const filled = await withTimeout("fillFormField", fillFormField(page, legacyCityField));
+  const filled = await withTimeout("fillRepairFieldV2", fillRepairFieldV2(page, legacyCityField));
   const committed = await page.locator("#city-input").inputValue();
   const selected = await page.locator("#selected-city").textContent();
 
-  assert.equal(filled, true, `${options.name}: fillFormField should report success`);
+  assert.equal(filled, true, `${options.name}: fillRepairFieldV2 should report success`);
   assert.equal(committed, "Gurugram, Haryana, India", `${options.name}: committed value should match selected city`);
   assert.equal(selected, "Gurugram, Haryana, India", `${options.name}: selected city should match`);
 

@@ -1,4 +1,5 @@
 import type { Frame, Locator, Page } from "./browser-driver";
+import type { BrowserFillField } from "./types";
 import type { FillV2Adapter, FillV2Answer, FillV2Field } from "./fill-engine";
 
 type LocatedField = {
@@ -10,6 +11,25 @@ type DropdownScope = {
   frame: Frame;
   popupMarker: string;
 };
+
+type VerificationSnapshot = {
+  matched: boolean;
+  invalid: boolean;
+  openPopup: boolean;
+  actualPreview: string;
+};
+
+type RuntimeWidgetFamily =
+  | "native_text"
+  | "aria_combobox"
+  | "searchable_combobox"
+  | "intl_phone"
+  | "hidden_input_shell"
+  | "chip_input"
+  | "contenteditable"
+  | "choice"
+  | "native_select"
+  | "unknown";
 
 
 export async function fillV2Field(page: Page, field: FillV2Field, answer: FillV2Answer, adapter: FillV2Adapter) {
@@ -27,39 +47,320 @@ export async function fillV2Field(page: Page, field: FillV2Field, answer: FillV2
     return true;
   }
 
-  if (isLocationField(field) && (field.driver === "text" || field.driver === "textarea" || field.driver === "contenteditable")) {
-    return fillLocationAutocomplete(page, located.frame, located.locator, field, answer, adapter);
+  const runtimeFamily = await detectWidgetFamily(located.locator, field);
+  const strategies = buildFillStrategies(field, runtimeFamily);
+
+  for (const strategy of strategies) {
+    const filled = await runFillStrategy(strategy, page, located.frame, located.locator, field, answer, adapter, runtimeFamily);
+
+    if (!filled) {
+      continue;
+    }
+
+    await page.waitForTimeout(140).catch(() => undefined);
+
+    if (await verifyV2Field(page, field, answer)) {
+      return true;
+    }
   }
 
+  return false;
+}
+
+export async function fillRepairFieldV2(page: Page, field: BrowserFillField) {
+  const repairField = createRepairField(field);
+  const repairAnswer: FillV2Answer = {
+    label: repairField.label,
+    value: field.value,
+    fieldId: repairField.id,
+    inputType: repairField.inputType,
+    options: repairField.options,
+    required: repairField.required,
+    reason: field.reason ?? "Repair retry using V2 field strategies.",
+    intent: repairField.intent,
+    source: "fallback",
+    confidence: 0.78
+  };
+
+  return fillV2Field(page, repairField, repairAnswer, genericRepairAdapter);
+}
+
+const genericRepairAdapter: FillV2Adapter = {
+  id: "repair",
+  label: "Repair adapter",
+  matches: () => true,
+  selectQuery: (_field, answer) => answer.value.split(",")[0]?.trim() || answer.value.trim()
+};
+
+function buildFillStrategies(field: FillV2Field, runtimeFamily: RuntimeWidgetFamily) {
+  const strategies: string[] = [];
+
   if (field.driver === "choice") {
-    return fillChoice(located.locator, answer);
+    return ["choice"];
   }
 
   if (field.driver === "native_select") {
-    return fillNativeSelect(located.locator, answer);
+    return ["native_select"];
+  }
+
+  if (field.driver === "phone") {
+    if (runtimeFamily === "intl_phone" || field.portalPattern?.strategy === "intl_phone") {
+      strategies.push("phone_widget", "plain_text");
+    } else {
+      strategies.push("plain_text", "phone_widget");
+    }
+
+    return strategies;
   }
 
   if (field.driver === "custom_select") {
     if (isPhoneCountryCodeField(field)) {
-      return fillCountryCodeSelect(page, located.frame, located.locator, field, answer, adapter);
+      strategies.push("country_code_select", "custom_select");
+      return strategies;
+    }
+
+    if (adapterPrefersCustomSelect(field)) {
+      strategies.push("adapter_custom_select");
     }
 
     if (isLocationField(field)) {
-      return fillCustomSelect(located.frame, located.locator, field, answer, adapter);
+      strategies.push("location_autocomplete", "custom_select", "keyboard_commit");
+      return strategies;
     }
 
-    if (adapter.fillCustomSelect && await adapter.fillCustomSelect({ page, field, answer })) {
+    if (runtimeFamily === "searchable_combobox" || runtimeFamily === "aria_combobox" || field.portalPattern?.queryMode) {
+      strategies.push("custom_select", "keyboard_commit");
+      return strategies;
+    }
+
+    strategies.push("custom_select", "keyboard_commit");
+    return strategies;
+  }
+
+  if (isLocationField(field) && (field.driver === "text" || field.driver === "textarea" || field.driver === "contenteditable")) {
+    strategies.push("location_autocomplete", "reactive_text", "plain_text");
+    return strategies;
+  }
+
+  if (runtimeFamily === "hidden_input_shell") {
+    strategies.push("reactive_text", "plain_text");
+    return strategies;
+  }
+
+  if (runtimeFamily === "contenteditable") {
+    return ["reactive_text", "plain_text"];
+  }
+
+  return ["reactive_text", "plain_text"];
+}
+
+function createRepairField(field: BrowserFillField): FillV2Field {
+  const inputType = field.inputType ?? "text";
+  const inputKey = normalizeRepair(inputType);
+  const labelKey = normalizeRepair(field.label);
+  const driver = inputKey === "textarea"
+    ? "textarea"
+    : inputKey === "select"
+      ? "native_select"
+      : inputKey === "radio" || inputKey === "checkbox"
+        ? "choice"
+        : inputKey === "email"
+          ? "email"
+          : inputKey === "tel" || inputKey === "phone"
+            ? "phone"
+            : inputKey === "number"
+              ? "number"
+              : inputKey === "date"
+                ? "date"
+                : inputKey === "contenteditable"
+                  ? "contenteditable"
+                  : inputKey === "combobox" || inputKey === "autocomplete"
+                    ? "custom_select"
+                    : "text";
+  const intent = /\bphone|mobile|contact\b/.test(labelKey)
+    ? "phone"
+    : /\bemail\b/.test(labelKey)
+      ? "email"
+      : /\bcountry\b/.test(labelKey)
+        ? "country"
+        : /\bstate|province|region\b/.test(labelKey)
+          ? "state"
+          : /\bcity|location\b/.test(labelKey)
+            ? "city"
+            : /\b(ctc|salary|compensation)\b/.test(labelKey) && /\b(expected|desired|target)\b/.test(labelKey)
+              ? "expected_ctc"
+              : /\b(ctc|salary|compensation)\b/.test(labelKey)
+                ? "current_ctc"
+                : /\b(cover letter|motivation|message|comments?|why|summary|bio|about|describe|explain)\b/.test(labelKey)
+                  ? "prose"
+                  : "unknown";
+  const widgetKind = driver === "choice"
+    ? "choice_group"
+    : driver === "native_select"
+      ? "native_select"
+      : driver === "custom_select"
+        ? "combobox"
+        : driver === "phone"
+          ? "phone_input"
+          : driver === "email"
+            ? "email_input"
+            : driver === "number"
+              ? "numeric_input"
+              : driver === "date"
+                ? "date_input"
+                : driver === "textarea"
+                  ? "textarea"
+                  : driver === "contenteditable"
+                    ? "contenteditable"
+                    : "text_input";
+  const valueKind = intent === "phone"
+    ? "phone"
+    : intent === "email"
+      ? "email"
+      : ["country", "state", "city"].includes(intent)
+        ? "location"
+        : ["current_ctc", "expected_ctc"].includes(intent)
+          ? "money"
+          : intent === "prose"
+            ? "prose"
+            : driver === "choice" || driver === "native_select" || driver === "custom_select"
+              ? "choice"
+              : "text";
+
+  return {
+    id: field.fieldId ?? `repair-${labelKey || "field"}`,
+    label: field.label,
+    required: Boolean(field.required),
+    tagName: driver === "textarea" ? "textarea" : driver === "native_select" ? "select" : "input",
+    inputType,
+    options: field.options ?? [],
+    context: "",
+    adapterId: "repair",
+    driver,
+    intent,
+    confidence: 0.72,
+    widgetKind,
+    valueKind,
+    intentCandidates: [{ intent, score: 72, reasons: ["Repair-mode inference from current label and input type."] }],
+    signature: {
+      semanticLabel: intent === "unknown" ? field.label : intent.replace(/_/g, " "),
+      normalizedLabel: labelKey,
+      section: "",
+      widgetKind,
+      valueKind,
+      options: field.options ?? []
+    }
+  };
+}
+
+function normalizeRepair(value: string | undefined) {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+async function runFillStrategy(
+  strategy: string,
+  page: Page,
+  frame: Frame,
+  locator: Locator,
+  field: FillV2Field,
+  answer: FillV2Answer,
+  adapter: FillV2Adapter,
+  runtimeFamily: RuntimeWidgetFamily
+) {
+  switch (strategy) {
+    case "choice":
+      return fillChoice(locator, answer);
+    case "native_select":
+      return fillNativeSelect(locator, answer);
+    case "country_code_select":
+      return fillCountryCodeSelect(page, frame, locator, field, answer, adapter);
+    case "adapter_custom_select":
+      return adapter.fillCustomSelect ? adapter.fillCustomSelect({ page, field, answer }) : false;
+    case "location_autocomplete":
+      return fillLocationAutocomplete(page, frame, locator, field, answer, adapter);
+    case "custom_select":
+      return fillCustomSelect(frame, locator, field, answer, adapter);
+    case "keyboard_commit":
+      await locator.click({ force: true, timeout: 900 }).catch(() => undefined);
+      await page.keyboard.press("ArrowDown").catch(() => undefined);
+      await page.keyboard.press("Enter").catch(() => undefined);
+      await page.keyboard.press("Tab").catch(() => undefined);
       return true;
+    case "phone_widget":
+      return fillPhone(page, frame, locator, answer);
+    case "reactive_text":
+      return fillReactiveText(locator, answer.value, runtimeFamily);
+    case "plain_text":
+      return fillTextLike(locator, answer.value);
+    default:
+      return false;
+  }
+}
+
+function adapterPrefersCustomSelect(field: FillV2Field) {
+  return Boolean(field.portalPattern?.strategy === "adapter_custom_select");
+}
+
+function selectQueryForField(field: FillV2Field, answer: FillV2Answer, adapter: FillV2Adapter) {
+  const adapterQuery = adapter.selectQuery?.(field, answer);
+
+  if (field.portalPattern?.queryMode === "answer") {
+    return answer.value.trim();
+  }
+
+  if (field.portalPattern?.queryMode === "typed_prefix") {
+    return answer.value.trim().slice(0, Math.min(18, answer.value.trim().length));
+  }
+
+  if (field.portalPattern?.queryMode === "first_token") {
+    return answer.value.split(",")[0]?.trim() ?? answer.value.trim();
+  }
+
+  return adapterQuery ?? answer.value.split(",")[0]?.trim() ?? answer.value.trim();
+}
+
+async function detectWidgetFamily(locator: Locator, field: FillV2Field): Promise<RuntimeWidgetFamily> {
+  return locator.evaluate((control, field) => {
+    if (!(control instanceof HTMLElement)) {
+      return "unknown";
     }
 
-    return fillCustomSelect(located.frame, located.locator, field, answer, adapter);
-  }
+    const descriptor = normalize([
+      control.tagName,
+      control.getAttribute("role"),
+      control.getAttribute("class"),
+      control.getAttribute("aria-haspopup"),
+      control.getAttribute("aria-autocomplete"),
+      control.getAttribute("data-testid"),
+      control.closest("[class]")?.getAttribute("class"),
+      field.domPathSignature,
+      field.placeholder,
+      field.autocomplete
+    ].filter(Boolean).join(" "));
 
-  if (field.driver === "phone") {
-    return fillPhone(page, located.frame, located.locator, answer);
-  }
+    if (control instanceof HTMLSelectElement) return "native_select";
+    if (control.isContentEditable) return "contenteditable";
+    if (field.driver === "choice") return "choice";
+    if (/\biti__|intl|dial|country code|phone code\b/.test(descriptor)) return "intl_phone";
+    if ((control.getAttribute("role") === "combobox" || control.getAttribute("aria-haspopup")) && control.getAttribute("aria-autocomplete")) {
+      return "searchable_combobox";
+    }
+    if (control.getAttribute("role") === "combobox" || /\bcombobox|listbox|select2|react select|dropdown\b/.test(descriptor)) {
+      return "aria_combobox";
+    }
+    if (control.querySelector("input[type='hidden']") && (control.querySelector("[class*='selected' i], [class*='singleValue' i], [class*='chip' i], [class*='tag' i]") || control.textContent?.trim())) {
+      return "hidden_input_shell";
+    }
+    if (control.querySelector("[class*='chip' i], [class*='tag' i], [class*='token' i], [class*='pill' i]")) {
+      return "chip_input";
+    }
 
-  return fillTextLike(located.locator, answer.value);
+    return "native_text";
+
+    function normalize(value: string | null | undefined) {
+      return (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
+    }
+  }, field).catch(() => "unknown");
 }
 
 export async function verifyV2Field(page: Page, field: FillV2Field, answer: FillV2Answer) {
@@ -69,69 +370,141 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
     return false;
   }
 
-  return located.locator.evaluate((control, { answer, field }) => {
+  const snapshot: VerificationSnapshot | undefined = await located.locator.evaluate((control, { answer, field }) => {
     if (!(control instanceof HTMLElement)) {
-      return false;
+      return {
+        matched: false,
+        invalid: false,
+        openPopup: false,
+        actualPreview: ""
+      };
     }
 
     const expected = normalize(answer.value);
     const rawExpected = answer.value;
 
     if (!expected) {
-      return false;
+      return {
+        matched: false,
+        invalid: false,
+        openPopup: false,
+        actualPreview: ""
+      };
     }
+
+    const invalid = hasBlockingValidation(control);
 
     if (field.driver === "phone") {
       const expectedDigits = answer.value.replace(/\D+/g, "");
       const input = control instanceof HTMLInputElement ? control : control.querySelector("input[type='tel'], input[inputmode='tel'], input");
       const actualDigits = input instanceof HTMLInputElement ? input.value.replace(/\D+/g, "") : "";
       const localDigits = expectedDigits.slice(-10);
-      return actualDigits.endsWith(localDigits) || actualDigits.includes(expectedDigits);
+      return {
+        matched: actualDigits.endsWith(localDigits) || actualDigits.includes(expectedDigits),
+        invalid,
+        openPopup: false,
+        actualPreview: actualDigits
+      };
     }
 
     if (control instanceof HTMLSelectElement) {
       const selected = control.selectedOptions[0];
-      return matches(normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`), expected);
+      const actual = normalize(`${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`);
+      return {
+        matched: matches(actual, expected),
+        invalid,
+        openPopup: false,
+        actualPreview: actual
+      };
     }
 
     if (isChoice(control)) {
-      return matches(normalize(selectedChoiceText(control)), expected);
+      const selectedText = normalize(selectedChoiceText(control));
+
+      return {
+        matched: matches(selectedText, expected)
+          || isAffirmativeExpected(expected) && /\b(on|yes|agree|accept|consent|confirm|privacy|terms|notice|acknowledge|read|understand)\b/.test(selectedText),
+        invalid,
+        openPopup: false,
+        actualPreview: selectedText
+      };
     }
 
     const value = committedValue(control);
     const rawValue = committedRawValue(control);
+    const openPopup = hasOpenAutocomplete(control);
 
     if (!value || /^(select|select an option|choose|choose an option|none selected|not selected|search)$/.test(value)) {
       if (!isCountryCodeField(field)) {
-        return false;
+        return {
+          matched: false,
+          invalid,
+          openPopup,
+          actualPreview: rawValue
+        };
       }
     }
 
     if (isCountryCodeField(field)) {
-      return countryCodeMatches(countryCodeRawValue(control), rawExpected);
+      return {
+        matched: countryCodeMatches(countryCodeRawValue(control), rawExpected),
+        invalid,
+        openPopup,
+        actualPreview: rawValue
+      };
     }
 
-    if (field.intent === "country" || field.intent === "state" || field.intent === "city") {
-      if (hasOpenAutocomplete(control)) {
-        return false;
-      }
-
-      return locationMatches(rawValue, rawExpected, field.intent);
+    if (field.intent === "country" || field.intent === "state" || field.intent === "city" || field.intent === "preferred_work_location") {
+      return {
+        matched: !openPopup && locationMatches(rawValue, rawExpected, field.intent),
+        invalid,
+        openPopup,
+        actualPreview: rawValue
+      };
     }
 
-    return matches(value, expected);
+    return {
+      matched: matches(value, expected),
+      invalid,
+      openPopup,
+      actualPreview: rawValue
+    };
 
     function committedValue(element: HTMLElement) {
       return normalize(committedRawValue(element));
     }
 
     function committedRawValue(element: HTMLElement) {
+      const container = findFieldContainer(element) ?? element.parentElement ?? element;
+      const relatedText = Array.from(container.querySelectorAll([
+        "input[type='hidden']",
+        "[aria-selected='true']",
+        "[data-selected='true']",
+        "[data-state='checked']",
+        "[class*='singleValue' i]",
+        "[class*='single-value' i]",
+        "[class*='selected' i]",
+        "[class*='token' i]",
+        "[class*='chip' i]",
+        "[class*='tag' i]",
+        "[class*='pill' i]"
+      ].join(",")))
+        .map((candidate) => {
+          if (candidate instanceof HTMLInputElement || candidate instanceof HTMLTextAreaElement) {
+            return candidate.value;
+          }
+
+          return candidate.textContent ?? "";
+        })
+        .filter(Boolean)
+        .join(" ");
+
       if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-        return element.value;
+        return `${element.value} ${relatedText}`.trim();
       }
 
       if (element.isContentEditable) {
-        return element.textContent ?? "";
+        return `${element.textContent ?? ""} ${relatedText}`.trim();
       }
 
       return [
@@ -141,7 +514,8 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
         element.getAttribute("aria-valuetext"),
         element.getAttribute("title"),
         element.innerText,
-        element.textContent
+        element.textContent,
+        relatedText
       ].filter(Boolean).join(" ");
     }
 
@@ -186,9 +560,10 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
     }
 
     function selectedChoiceText(element: HTMLElement) {
-      const group = element instanceof HTMLInputElement && element.name
-        ? Array.from(document.querySelectorAll(`input[name="${CSS.escape(element.name)}"]`)) as HTMLElement[]
-        : Array.from((element.closest("fieldset, [role='radiogroup'], [role='group'], form") ?? element.parentElement ?? element)
+      const local = findLocalChoiceGroup(element);
+      const group = local.length > 0
+        ? local
+        : Array.from((element.closest("fieldset, [role='radiogroup'], [role='group']") ?? element.parentElement ?? element)
           .querySelectorAll("input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox']")) as HTMLElement[];
       const selected = group.find((item) => item instanceof HTMLInputElement && item.checked || item.getAttribute("aria-checked") === "true");
 
@@ -205,8 +580,57 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
       ].filter(Boolean).join(" ");
     }
 
+    function findLocalChoiceGroup(element: HTMLElement) {
+      let ancestor: Element | null = element.parentElement;
+      let best: HTMLElement[] = [];
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      for (let depth = 0; depth < 8 && ancestor; depth += 1) {
+        const choices = Array.from(ancestor.querySelectorAll("input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox']")) as HTMLElement[];
+        const visibleChoices = choices.filter(isUsableChoice);
+
+        if (visibleChoices.length === 0 || visibleChoices.length > 6) {
+          ancestor = ancestor.parentElement;
+          continue;
+        }
+
+        const text = normalize(ancestor.textContent);
+        let score = 80 - depth * 8 - Math.min(text.length / 20, 60);
+
+        if (visibleChoices.length > 1) score += 35;
+        if (/\b(yes|no|agree|decline)\b/.test(text)) score += 20;
+        if (ancestor.matches("fieldset, [role='radiogroup'], [role='group'], [class*='question' i], [class*='radio' i]")) score += 25;
+
+        if (score > bestScore) {
+          best = visibleChoices;
+          bestScore = score;
+        }
+
+        ancestor = ancestor.parentElement;
+      }
+
+      return best;
+    }
+
+    function isUsableChoice(element: HTMLElement) {
+      return isVisible(element) || hasVisibleChoiceLabel(element);
+    }
+
+    function hasVisibleChoiceLabel(element: HTMLElement) {
+      if (!(element instanceof HTMLInputElement) || !element.id) {
+        return false;
+      }
+
+      const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
+      return Boolean(label && isVisible(label));
+    }
+
     function matches(actual: string, expected: string) {
       return actual === expected || actual.includes(expected) || expected.includes(actual);
+    }
+
+    function isAffirmativeExpected(value: string) {
+      return /^(yes|true|agree|accept|consent|confirm|i agree)$/.test(value);
     }
 
     function isCountryCodeField(field: { label: string; context?: string; intent: string }) {
@@ -310,6 +734,23 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
       return false;
     }
 
+    function hasBlockingValidation(element: HTMLElement) {
+      const container = findFieldContainer(element) ?? element.parentElement ?? element;
+      const descriptor = normalize([
+        element.getAttribute("aria-invalid"),
+        container?.getAttribute("aria-invalid"),
+        container?.getAttribute("data-invalid"),
+        container?.className,
+        container?.querySelector("[aria-live], .error, [class*='error' i], [class*='invalid' i]")?.textContent ?? ""
+      ].filter(Boolean).join(" "));
+
+      return /\btrue|invalid|error|required\b/.test(descriptor);
+    }
+
+    function findFieldContainer(element: HTMLElement) {
+      return element.closest("label, fieldset, [role='group'], [role='radiogroup'], [role='combobox'], [aria-haspopup], [class*='field' i], [class*='input' i], [class*='select' i], section, article, div");
+    }
+
     function canonicalLocation(raw: string) {
       const normalized = normalize(raw);
 
@@ -400,7 +841,9 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
     function normalize(value: string | null | undefined) {
       return (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
     }
-  }, { answer, field }).catch(() => false);
+  }, { answer, field }).catch(() => undefined);
+
+  return Boolean(snapshot?.matched) && !snapshot?.invalid && !snapshot?.openPopup;
 }
 
 export async function collectFillV2FieldDebug(page: Page, field: FillV2Field) {
@@ -524,6 +967,25 @@ async function fillTextLike(locator: Locator, value: string) {
   return true;
 }
 
+async function fillReactiveText(locator: Locator, value: string, runtimeFamily: RuntimeWidgetFamily) {
+  const target = await resolveTypingLocator(locator);
+
+  if (!target) {
+    return false;
+  }
+
+  const seeded = await seedReactiveText(target, value);
+
+  if (!seeded && runtimeFamily !== "contenteditable") {
+    return false;
+  }
+
+  await target.press("Tab", { timeout: 350 }).catch(() => undefined);
+  await target.blur().catch(() => undefined);
+  await target.page().waitForTimeout(Number(process.env.BROWSER_REAL_TYPE_COMMIT_WAIT_MS ?? 120)).catch(() => undefined);
+  return true;
+}
+
 async function fillLocationAutocomplete(page: Page, frame: Frame, locator: Locator, field: FillV2Field, answer: FillV2Answer, adapter: FillV2Adapter) {
   let activeLocator = locator;
   let activeFrame = frame;
@@ -533,7 +995,7 @@ async function fillLocationAutocomplete(page: Page, frame: Frame, locator: Locat
     return false;
   }
 
-  const query = adapter.selectQuery?.(field, answer) ?? answer.value.split(",")[0]?.trim() ?? answer.value;
+  const query = selectQueryForField(field, answer, adapter);
   const isComboboxField = await locator.evaluate((element) => element instanceof HTMLElement && element.getAttribute("role") === "combobox").catch(() => false);
 
   if (isComboboxField) {
@@ -557,9 +1019,10 @@ async function fillLocationAutocomplete(page: Page, frame: Frame, locator: Locat
   }
 
   let dropdownScope = await waitForDropdownScope(activeFrame, activeLocator);
+  let sawDropdown = Boolean(dropdownScope);
 
   if (dropdownScope) {
-    await waitForMatchingLocationOption(dropdownScope, answer.value, query);
+    const sawMatchingOption = await waitForMatchingLocationOption(dropdownScope, answer.value, query);
 
     if (await waitAndClickLocationOption(page, field, query, answer.value, dropdownScope)) {
       await target.press("Tab", { timeout: 350 }).catch(() => undefined);
@@ -569,7 +1032,7 @@ async function fillLocationAutocomplete(page: Page, frame: Frame, locator: Locat
       }
     }
 
-    if (await commitComboboxSuggestionByKeyboard(page, dropdownScope, answer.value, target)) {
+    if (sawMatchingOption && await commitComboboxSuggestionByKeyboard(page, dropdownScope, answer.value, target)) {
       await target.press("Tab", { timeout: 350 }).catch(() => undefined);
       await page.waitForTimeout(180).catch(() => undefined);
       if (await verifyV2Field(page, field, answer)) {
@@ -587,17 +1050,22 @@ async function fillLocationAutocomplete(page: Page, frame: Frame, locator: Locat
   }
 
   dropdownScope = await waitForDropdownScope(activeFrame, activeLocator) ?? dropdownScope;
+  sawDropdown = sawDropdown || Boolean(dropdownScope);
 
   if (dropdownScope) {
-    await waitForMatchingLocationOption(dropdownScope, answer.value, query);
+    const sawMatchingOption = await waitForMatchingLocationOption(dropdownScope, answer.value, query);
+
+    if (sawMatchingOption && await commitDropdownByKeyboard(page, dropdownScope)) {
+      await target.press("Tab", { timeout: 350 }).catch(() => undefined);
+      await page.waitForTimeout(180).catch(() => undefined);
+      if (await verifyV2Field(page, field, answer)) {
+        return true;
+      }
+    }
   }
 
-  if (dropdownScope && await commitDropdownByKeyboard(page, dropdownScope)) {
-    await target.press("Tab", { timeout: 350 }).catch(() => undefined);
-    await page.waitForTimeout(180).catch(() => undefined);
-    if (await verifyV2Field(page, field, answer)) {
-      return true;
-    }
+  if (field.intent === "preferred_work_location" && sawDropdown) {
+    return false;
   }
 
   await realType(target, answer.value).catch(() => undefined);
@@ -658,7 +1126,7 @@ async function fillPhone(page: Page, frame: Frame, locator: Locator, answer: Fil
 }
 
 async function fillCountryCodeSelect(page: Page, frame: Frame, locator: Locator, field: FillV2Field, answer: FillV2Answer, adapter: FillV2Adapter) {
-  const baseQuery = adapter.selectQuery?.(field, answer) ?? answer.value.split(",")[0]?.trim() ?? answer.value;
+  const baseQuery = selectQueryForField(field, answer, adapter);
   const dialDigits = inferDialDigitsFromCountry(baseQuery) ?? inferDialDigitsFromCountry(answer.value);
   const queries = [...new Set([baseQuery, dialDigits ? `+${dialDigits}` : undefined, dialDigits].filter(Boolean) as string[])];
 
@@ -763,18 +1231,118 @@ async function fillChoice(locator: Locator, answer: FillV2Answer) {
       return false;
     }
 
-    best.choice.click();
-    best.choice.dispatchEvent(new Event("input", { bubbles: true }));
-    best.choice.dispatchEvent(new Event("change", { bubbles: true }));
+    clickChoiceControl(best.choice, /^(yes|true|agree|accept|i agree)$/.test(expected));
     return true;
 
     function choiceGroup(element: HTMLElement) {
-      if (element instanceof HTMLInputElement && element.name) {
-        return Array.from(document.querySelectorAll(`input[name="${CSS.escape(element.name)}"]`)) as HTMLElement[];
+      const local = findLocalChoiceGroup(element);
+
+      if (local.length > 0) {
+        return local;
       }
 
-      return Array.from((element.closest("fieldset, [role='radiogroup'], [role='group'], form") ?? element.parentElement ?? element)
-        .querySelectorAll("input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox']")) as HTMLElement[];
+      if (element instanceof HTMLInputElement && element.name) {
+        const named = Array.from(document.querySelectorAll(`input[name="${CSS.escape(element.name)}"]`)) as HTMLElement[];
+        const visibleNamed = named.filter(isUsableChoice);
+
+        if (visibleNamed.length > 1 && visibleNamed.length <= 4) {
+          return visibleNamed;
+        }
+      }
+
+      return Array.from((element.closest("fieldset, [role='radiogroup'], [role='group']") ?? element.parentElement ?? element)
+          .querySelectorAll("input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox']")) as HTMLElement[];
+    }
+
+    function findLocalChoiceGroup(element: HTMLElement) {
+      let ancestor: Element | null = element.parentElement;
+      let best: HTMLElement[] = [];
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      for (let depth = 0; depth < 8 && ancestor; depth += 1) {
+        const choices = Array.from(ancestor.querySelectorAll("input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox']")) as HTMLElement[];
+        const visibleChoices = choices.filter(isUsableChoice);
+
+        if (visibleChoices.length === 0 || visibleChoices.length > 6) {
+          ancestor = ancestor.parentElement;
+          continue;
+        }
+
+        const text = normalize(ancestor.textContent);
+        let score = 80 - depth * 8 - Math.min(text.length / 20, 60);
+
+        if (visibleChoices.length > 1) score += 35;
+        if (/\b(yes|no|agree|decline)\b/.test(text)) score += 20;
+        if (ancestor.matches("fieldset, [role='radiogroup'], [role='group'], [class*='question' i], [class*='radio' i]")) score += 25;
+
+        if (score > bestScore) {
+          best = visibleChoices;
+          bestScore = score;
+        }
+
+        ancestor = ancestor.parentElement;
+      }
+
+      return best;
+    }
+
+    function clickChoiceControl(choice: HTMLElement, forceChecked: boolean) {
+      const target = choiceClickTarget(choice) ?? choice;
+
+      target.scrollIntoView?.({ block: "center", inline: "center" });
+      choice.focus?.();
+
+      try {
+        target.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, view: window }));
+        target.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, view: window }));
+      } catch (_error) {
+        target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+        target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+      }
+
+      target.click();
+
+      if (choice instanceof HTMLInputElement && choice.type === "radio" && !choice.checked) {
+        setNativeChecked(choice, true);
+      }
+
+      if (choice instanceof HTMLInputElement && choice.type === "checkbox" && forceChecked && !choice.checked) {
+        setNativeChecked(choice, true);
+      }
+
+      choice.dispatchEvent(new Event("input", { bubbles: true }));
+      choice.dispatchEvent(new Event("change", { bubbles: true }));
+      choice.dispatchEvent(new Event("blur", { bubbles: true }));
+    }
+
+    function choiceClickTarget(choice: HTMLElement) {
+      if (choice instanceof HTMLInputElement && choice.id) {
+        const label = document.querySelector(`label[for="${CSS.escape(choice.id)}"]`);
+
+        if (label instanceof HTMLElement && isVisible(label)) {
+          return label;
+        }
+      }
+
+      const closestLabel = choice.closest("label");
+
+      if (closestLabel instanceof HTMLElement && isVisible(closestLabel)) {
+        return closestLabel;
+      }
+
+      const row = choice.closest("button, [role='radio'], [role='checkbox'], [role='button'], [aria-checked], [tabindex], [class*='checkbox'], [class*='radio']");
+
+      return row instanceof HTMLElement && isVisible(row) ? row : undefined;
+    }
+
+    function setNativeChecked(input: HTMLInputElement, checked: boolean) {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked");
+
+      if (descriptor?.set) {
+        descriptor.set.call(input, checked);
+      } else {
+        input.checked = checked;
+      }
     }
 
     function scoreChoice(element: HTMLElement, expected: string) {
@@ -789,7 +1357,7 @@ async function fillChoice(locator: Locator, answer: FillV2Answer) {
 
       if (text === expected) score += 100;
       if (text.includes(expected) || expected.includes(text)) score += 70;
-      if (/^(yes|true|agree|accept|i agree)$/.test(expected) && /\b(yes|agree|accept|consent|confirm)\b/.test(text)) score += 90;
+      if (/^(yes|true|agree|accept|i agree)$/.test(expected) && /\b(yes|agree|accept|consent|confirm|privacy|terms|notice|acknowledge|read|understand)\b/.test(text)) score += 90;
       if (/^(no|false|decline|do not|dont|not now|no thanks)$/.test(expected) && /\b(no|decline|do not|none|not now)\b/.test(text)) score += 90;
 
       return score;
@@ -798,11 +1366,30 @@ async function fillChoice(locator: Locator, answer: FillV2Answer) {
     function normalize(raw: string | null | undefined) {
       return (raw ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
     }
+
+    function isUsableChoice(element: HTMLElement) {
+      return isVisible(element) || hasVisibleChoiceLabel(element);
+    }
+
+    function hasVisibleChoiceLabel(element: HTMLElement) {
+      if (!(element instanceof HTMLInputElement) || !element.id) {
+        return false;
+      }
+
+      const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
+      return Boolean(label && isVisible(label));
+    }
+
+    function isVisible(element: Element) {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    }
   }, answer).catch(() => false);
 }
 
 async function fillCustomSelect(frame: Frame, locator: Locator, field: FillV2Field, answer: FillV2Answer, adapter: FillV2Adapter) {
-  const query = adapter.selectQuery?.(field, answer) ?? answer.value.split(",")[0]?.trim() ?? answer.value;
+  const query = selectQueryForField(field, answer, adapter);
   const locationField = isLocationField(field);
 
   await locator.scrollIntoViewIfNeeded().catch(() => undefined);
@@ -818,9 +1405,9 @@ async function fillCustomSelect(frame: Frame, locator: Locator, field: FillV2Fie
   dropdownScope = await waitForDropdownScope(frame, locator) ?? dropdownScope;
 
   if (locationField) {
-    await waitForMatchingLocationOption(dropdownScope, answer.value, query);
+    const sawMatchingOption = await waitForMatchingLocationOption(dropdownScope, answer.value, query);
 
-    if (await commitComboboxSuggestionByKeyboard(frame.page(), dropdownScope, answer.value)) {
+    if (sawMatchingOption && await commitComboboxSuggestionByKeyboard(frame.page(), dropdownScope, answer.value)) {
       await frame.page().keyboard.press("Tab").catch(() => undefined);
       await frame.page().waitForTimeout(180).catch(() => undefined);
       if (await verifyV2Field(frame.page(), field, answer)) {
@@ -836,7 +1423,7 @@ async function fillCustomSelect(frame: Frame, locator: Locator, field: FillV2Fie
       }
     }
 
-    if (await commitDropdownByKeyboard(frame.page(), dropdownScope)) {
+    if (sawMatchingOption && await commitDropdownByKeyboard(frame.page(), dropdownScope)) {
       await frame.page().keyboard.press("Tab").catch(() => undefined);
       await frame.page().waitForTimeout(180).catch(() => undefined);
       if (await verifyV2Field(frame.page(), field, answer)) {
@@ -1241,13 +1828,82 @@ async function findV2Locator(page: Page, field: FillV2Field): Promise<LocatedFie
     for (const selector of selectors) {
       const locator = frame.locator(selector).first();
 
-      if (await locator.count().catch(() => 0) > 0) {
+      if (await isUsableFieldLocator(locator, field)) {
         return { frame, locator };
       }
     }
   }
 
+  const semantic = await findBySemanticLocator(page, field);
+
+  if (semantic) {
+    return semantic;
+  }
+
   return findByLabel(page, field);
+}
+
+async function findBySemanticLocator(page: Page, field: FillV2Field): Promise<LocatedField | undefined> {
+  const labelVariants = uniqueFieldStrings([
+    field.label,
+    field.ariaLabel,
+    field.placeholder
+  ]);
+  const placeholderVariants = uniqueFieldStrings([field.placeholder, field.label]);
+  const roleCandidates = semanticRolesForField(field);
+
+  for (const frame of page.frames()) {
+    for (const label of labelVariants) {
+      const exact = frame.getByLabel(label, { exact: true }).first();
+
+      if (await isUsableFieldLocator(exact, field)) {
+        return { frame, locator: exact };
+      }
+
+      const fuzzy = frame.getByLabel(label).first();
+
+      if (await isUsableFieldLocator(fuzzy, field)) {
+        return { frame, locator: fuzzy };
+      }
+    }
+
+    for (const role of roleCandidates) {
+      for (const label of labelVariants) {
+        const exact = frame.getByRole(role, { name: label, exact: true }).first();
+
+        if (await isUsableFieldLocator(exact, field)) {
+          return { frame, locator: exact };
+        }
+
+        const fuzzy = frame.getByRole(role, { name: new RegExp(escapeFieldRegExp(label), "i") }).first();
+
+        if (await isUsableFieldLocator(fuzzy, field)) {
+          return { frame, locator: fuzzy };
+        }
+      }
+    }
+
+    for (const placeholder of placeholderVariants) {
+      const locator = frame.getByPlaceholder(placeholder, { exact: true }).first();
+
+      if (await isUsableFieldLocator(locator, field)) {
+        return { frame, locator };
+      }
+    }
+
+    const attributeLocators = [
+      field.name ? frame.locator(`[name="${cssEscape(field.name)}"]`).first() : undefined,
+      field.autocomplete ? frame.locator(`[autocomplete="${cssEscape(field.autocomplete)}"]`).first() : undefined
+    ].filter((locator): locator is Locator => Boolean(locator));
+
+    for (const locator of attributeLocators) {
+      if (await isUsableFieldLocator(locator, field)) {
+        return { frame, locator };
+      }
+    }
+  }
+
+  return undefined;
 }
 
 async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField | undefined> {
@@ -1274,13 +1930,39 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
           control.getAttribute("placeholder"),
           control.getAttribute("name"),
           control.id,
+          control.getAttribute("autocomplete"),
+          control.getAttribute("aria-describedby")?.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? "").join(" "),
           control.getAttribute("aria-labelledby")?.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? "").join(" "),
           control.id ? document.querySelector(`label[for="${CSS.escape(control.id)}"]`)?.textContent : "",
           control.closest("label")?.textContent,
           control.closest("fieldset")?.querySelector("legend")?.textContent,
           control.parentElement?.textContent
         ].filter(Boolean).join(" "));
-        const score = tokenScore(expected, label);
+        const section = normalize(control.closest("fieldset, section, article, [role='group'], [class*='section' i], [class*='step' i], [class*='card' i]")?.textContent ?? "");
+
+        if (isIncompatibleControl(field, control, label)) {
+          continue;
+        }
+
+        let score = tokenScore(expected, label);
+
+        if (field.label && label.includes(normalize(field.label))) score += 36;
+        if (field.ariaLabel && label.includes(normalize(field.ariaLabel))) score += 24;
+        if (field.placeholder && label.includes(normalize(field.placeholder))) score += 18;
+        if (field.autocomplete && normalize(control.getAttribute("autocomplete")) === normalize(field.autocomplete)) score += 28;
+        if (field.name && normalize(control.getAttribute("name")) === normalize(field.name)) score += 24;
+        if (field.sectionLabel && section.includes(normalize(field.sectionLabel))) score += 16;
+
+        if (field.widgetKind === "phone_input" && control instanceof HTMLInputElement && (control.type === "tel" || normalize(control.getAttribute("inputmode")) === "tel")) score += 26;
+        if (field.widgetKind === "email_input" && control instanceof HTMLInputElement && control.type === "email") score += 26;
+        if (field.widgetKind === "numeric_input" && control instanceof HTMLInputElement && control.type === "number") score += 22;
+        if (field.widgetKind === "textarea" && control.tagName.toLowerCase() === "textarea") score += 22;
+        if (field.widgetKind === "native_select" && control.tagName.toLowerCase() === "select") score += 22;
+        if ((field.widgetKind === "combobox" || field.widgetKind === "autocomplete") && (control.getAttribute("role") === "combobox" || control.getAttribute("aria-haspopup"))) score += 22;
+
+        if (field.portalPattern?.domPathSignature && normalize(field.portalPattern.domPathSignature).includes(normalize(control.tagName.toLowerCase()))) {
+          score += 8;
+        }
 
         if (score > bestScore) {
           best = control;
@@ -1288,7 +1970,7 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
         }
       }
 
-      if (!best || bestScore < 45) {
+      if (!best || bestScore < 52) {
         return false;
       }
 
@@ -1322,6 +2004,40 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
         return Boolean(element.id && document.querySelector(`label[for="${CSS.escape(element.id)}"]`) && isVisible(document.querySelector(`label[for="${CSS.escape(element.id)}"]`)!));
       }
 
+      function isIncompatibleControl(field: { label: string; intent: string; driver?: string; inputType?: string }, control: HTMLElement, label: string) {
+        const inputType = control instanceof HTMLInputElement ? normalize(control.type) : "";
+
+        if (["city", "preferred_work_location", "state", "country", "address_1", "address_2", "postal_code"].includes(field.intent)) {
+          return inputType === "tel"
+            || inputType === "email"
+            || /\b(phone|mobile|telephone|contact number|email|e mail)\b/.test(label);
+        }
+
+        if (field.intent === "prose") {
+          const wanted = normalize(`${field.label}`);
+          const wantsReason = /\breason\b/.test(wanted) && /\b(change|job)\b/.test(wanted);
+          const wantsExpertise = /\b(expertise|technical|overall technical|tell us)\b/.test(wanted);
+
+          if (wantsReason && /\b(expertise|technical|overall technical|tell us)\b/.test(label) && !/\breason\b/.test(label)) {
+            return true;
+          }
+
+          if (wantsExpertise && /\breason\b/.test(label) && !/\b(expertise|technical|overall technical|tell us)\b/.test(label)) {
+            return true;
+          }
+        }
+
+        if (field.intent === "phone") {
+          return /\b(city|location|address|country|state|province|postal|zip)\b/.test(label);
+        }
+
+        if (field.intent === "email" || field.intent === "confirm_email") {
+          return /\b(city|location|phone|mobile|address)\b/.test(label);
+        }
+
+        return false;
+      }
+
       function isVisible(element: Element) {
         const rect = element.getBoundingClientRect();
         const style = window.getComputedStyle(element);
@@ -1339,6 +2055,86 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
   }
 
   return undefined;
+}
+
+async function isUsableFieldLocator(locator: Locator, field: FillV2Field) {
+  const count = await locator.count().catch(() => 0);
+
+  if (count === 0) {
+    return false;
+  }
+
+  return locator.evaluate((control, field) => {
+    if (!(control instanceof HTMLElement)) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(control);
+    const rect = control.getBoundingClientRect();
+
+    if (rect.width <= 0 || rect.height <= 0 || style.display === "none" || style.visibility === "hidden" || Number(style.opacity || "1") <= 0) {
+      return false;
+    }
+
+    const inputType = control instanceof HTMLInputElement ? normalize(control.type) : "";
+    const label = normalize([
+      control.getAttribute("aria-label"),
+      control.getAttribute("placeholder"),
+      control.getAttribute("name"),
+      control.id,
+      control.getAttribute("autocomplete"),
+      control.id ? document.querySelector(`label[for="${CSS.escape(control.id)}"]`)?.textContent : "",
+      control.closest("label")?.textContent,
+      control.closest("fieldset")?.querySelector("legend")?.textContent,
+      control.parentElement?.textContent
+    ].filter(Boolean).join(" "));
+
+    if (["hidden", "submit", "button", "image", "reset"].includes(inputType)) {
+      return false;
+    }
+
+    if (field.intent === "phone") {
+      return !/\b(city|location|address|country|state|province|postal|zip)\b/.test(label);
+    }
+
+    if (field.intent === "email" || field.intent === "confirm_email") {
+      return !/\b(city|location|phone|mobile|address)\b/.test(label);
+    }
+
+    if (["city", "preferred_work_location", "state", "country", "address_1", "address_2", "postal_code"].includes(field.intent)) {
+      return inputType !== "tel" && inputType !== "email" && !/\b(phone|mobile|telephone|contact number|email|e mail)\b/.test(label);
+    }
+
+    return true;
+
+    function normalize(raw: string | null | undefined) {
+      return (raw ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
+    }
+  }, field).catch(() => false);
+}
+
+function uniqueFieldStrings(values: Array<string | undefined>) {
+  return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value && value.length > 1)))];
+}
+
+function semanticRolesForField(field: FillV2Field): Array<"textbox" | "combobox" | "radio" | "checkbox" | "spinbutton"> {
+  if (field.driver === "choice") {
+    return field.inputType === "checkbox" ? ["checkbox"] : ["radio", "checkbox"];
+  }
+
+  if (field.driver === "native_select" || field.driver === "custom_select") {
+    return ["combobox", "textbox"];
+  }
+
+  if (field.driver === "number") {
+    return ["spinbutton", "textbox"];
+  }
+
+  return ["textbox", "combobox"];
+}
+
+function escapeFieldRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function resolveTypingLocator(locator: Locator) {
@@ -2554,7 +3350,7 @@ function parsePhone(value: string) {
 }
 
 function isLocationField(field: FillV2Field) {
-  return field.intent === "country" || field.intent === "state" || field.intent === "city";
+  return field.intent === "country" || field.intent === "state" || field.intent === "city" || field.intent === "preferred_work_location";
 }
 
 function isPhoneCountryCodeField(field: FillV2Field) {

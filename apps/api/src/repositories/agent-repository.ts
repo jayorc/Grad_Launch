@@ -610,6 +610,31 @@ function mapMemory(memory: Record<string, unknown>): StudentMemory {
     recentHandoffKinds: Array.isArray(memory.recentHandoffKinds)
       ? memory.recentHandoffKinds.map((kind) => String(kind) as StudentMemory["recentHandoffKinds"][number])
       : [],
+    portalPatterns: Array.isArray(memory.portalPatterns)
+      ? memory.portalPatterns.map((entry) => {
+          const next = entry as Record<string, unknown>;
+          return {
+            id: String(next.id ?? ""),
+            domain: String(next.domain ?? ""),
+            urlPattern: typeof next.urlPattern === "string" ? next.urlPattern : undefined,
+            fieldLabel: String(next.fieldLabel ?? ""),
+            normalizedLabel: typeof next.normalizedLabel === "string" ? next.normalizedLabel : undefined,
+            autocomplete: typeof next.autocomplete === "string" ? next.autocomplete : undefined,
+            widgetKind: typeof next.widgetKind === "string" ? next.widgetKind : undefined,
+            valueKind: typeof next.valueKind === "string" ? next.valueKind : undefined,
+            domPathSignature: typeof next.domPathSignature === "string" ? next.domPathSignature : undefined,
+            strategy: String(next.strategy ?? "generic"),
+            queryMode: typeof next.queryMode === "string"
+              ? next.queryMode as NonNullable<StudentMemory["portalPatterns"][number]["queryMode"]>
+              : undefined,
+            successCount: Number(next.successCount ?? 0),
+            verificationEvidence: Array.isArray(next.verificationEvidence) ? next.verificationEvidence.map(String) : [],
+            failureReason: typeof next.failureReason === "string" ? next.failureReason : undefined,
+            notes: Array.isArray(next.notes) ? next.notes.map(String) : [],
+            lastUsedAt: String(next.lastUsedAt ?? "")
+          };
+        })
+      : [],
     corrections: Array.isArray(memory.corrections)
       ? memory.corrections.map((entry) => {
           const next = entry as Record<string, unknown>;

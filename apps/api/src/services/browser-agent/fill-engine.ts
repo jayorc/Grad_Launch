@@ -53,6 +53,7 @@ export type FillV2Intent =
   | "country"
   | "state"
   | "city"
+  | "preferred_work_location"
   | "postal_code"
   | "address_1"
   | "address_2"
@@ -63,6 +64,13 @@ export type FillV2Intent =
   | "current_ctc"
   | "expected_ctc"
   | "notice_period"
+  | "total_experience"
+  | "office_work_choice"
+  | "bond_obligation_choice"
+  | "previous_employer_choice"
+  | "shift_flexibility_choice"
+  | "notice_buyout_choice"
+  | "government_id"
   | "degree_name"
   | "degree_type"
   | "university"
@@ -83,11 +91,69 @@ export type FillV2Intent =
   | "prose"
   | "unknown";
 
+export type FillV2IntentCandidate = {
+  intent: FillV2Intent;
+  score: number;
+  reasons: string[];
+};
+
+export type FillV2WidgetKind =
+  | "text_input"
+  | "textarea"
+  | "numeric_input"
+  | "email_input"
+  | "phone_input"
+  | "date_input"
+  | "choice_group"
+  | "native_select"
+  | "combobox"
+  | "autocomplete"
+  | "contenteditable"
+  | "file_input"
+  | "unknown";
+
+export type FillV2ValueKind =
+  | "name"
+  | "email"
+  | "phone"
+  | "country"
+  | "location"
+  | "money"
+  | "number"
+  | "date"
+  | "yes_no"
+  | "choice"
+  | "url"
+  | "prose"
+  | "experience"
+  | "authorization"
+  | "consent"
+  | "identifier"
+  | "text"
+  | "unknown";
+
+export type FillV2FieldSignature = {
+  semanticLabel: string;
+  normalizedLabel: string;
+  section: string;
+  widgetKind: FillV2WidgetKind;
+  valueKind: FillV2ValueKind;
+  expectedFormat?: string;
+  options: string[];
+};
+
+export type FillV2PortalPattern = NonNullable<StudentMemory["portalPatterns"]>[number];
+
 export type FillV2Field = VisibleField & {
   driver: FillV2DriverKind;
   intent: FillV2Intent;
   adapterId: string;
   confidence: number;
+  widgetKind: FillV2WidgetKind;
+  valueKind: FillV2ValueKind;
+  intentCandidates: FillV2IntentCandidate[];
+  signature: FillV2FieldSignature;
+  portalPattern?: FillV2PortalPattern;
 };
 
 export type FillV2Answer = BrowserFillField & {
@@ -221,7 +287,10 @@ async function fillAnswersOnce(
       continue;
     }
 
-    const shouldTraceLocationField = field.intent === "city" || field.intent === "state" || field.intent === "country";
+    const shouldTraceLocationField = field.intent === "city"
+      || field.intent === "preferred_work_location"
+      || field.intent === "state"
+      || field.intent === "country";
     const before = await verifyV2Field(input.page, field, answer);
     const beforeDebug = shouldTraceLocationField ? await collectFillV2FieldDebug(input.page, field).catch(() => undefined) : undefined;
 
@@ -297,7 +366,7 @@ function shouldFillAnswer(answer: FillV2Answer) {
     return false;
   }
 
-  if (answer.intent === "unknown" && answer.source !== "prepared" && answer.source !== "memory") {
+  if (answer.intent === "unknown" && answer.source !== "prepared" && answer.source !== "memory" && !answer.required) {
     return false;
   }
 
