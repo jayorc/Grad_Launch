@@ -1055,7 +1055,13 @@ export class BrowserAgentEngine {
           for (const attempt of autonomousFill.attempts) {
             const key = attempt.field.label.toLowerCase().trim();
             const verified = attempt.verified;
-            await writeBrowserDebug(workspacePath, verified ? "filled-field" : "failed-to-fill-field", {
+            const eventName = verified
+              ? attempt.alreadySatisfied
+                ? "already-satisfied-field"
+                : "filled-field"
+              : "failed-to-fill-field";
+
+            await writeBrowserDebug(workspacePath, eventName, {
               stageIndex,
               round: attempt.round,
               fieldId: attempt.field.fieldId,
@@ -2447,14 +2453,14 @@ async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: Br
       for (const field of fields) {
         const control = findBestControl(field);
 
-        if (control && isEmptyControl(control)) {
+        if (control && (isEmptyControl(control) || !controlValueMatchesExpected(control, field))) {
           missing.push(field.label);
         }
       }
 
       return missing;
 
-      function findBestControl(field: { label: string; inputType?: string; fieldId?: string }) {
+      function findBestControl(field: { label: string; inputType?: string; fieldId?: string; value?: string }) {
         const labelKey = normalize(field.label);
         const controls = searchRoots.flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select"))) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
         let best: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | undefined;
@@ -2544,6 +2550,100 @@ async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: Br
         }
 
         return !control.value.trim();
+      }
+
+      function controlValueMatchesExpected(
+        control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+        field: { label: string; value?: string }
+      ) {
+        const expectedRaw = field.value ?? "";
+        const expected = normalize(expectedRaw);
+
+        if (!expected) {
+          return true;
+        }
+
+        const actualRaw = controlActualText(control);
+        const actual = normalize(actualRaw);
+
+        if (!actual || isEmptySelectText(actual)) {
+          return false;
+        }
+
+        if (valueMatches(actual, expected)) {
+          return true;
+        }
+
+        const label = normalize(field.label);
+
+        if (/\b(phone|mobile|contact)\b/.test(label)) {
+          const actualDigits = actualRaw.replace(/\D+/g, "");
+          const expectedDigits = expectedRaw.replace(/\D+/g, "");
+          return Boolean(expectedDigits && actualDigits.endsWith(expectedDigits.slice(-10)));
+        }
+
+        if (/\b(ctc|salary|compensation|package|pay)\b/.test(label)) {
+          return numberCore(actualRaw) === numberCore(expectedRaw);
+        }
+
+        if (/\b(experience|notice period)\b/.test(label)) {
+          return numberCore(actualRaw) === numberCore(expectedRaw) || valueMatches(actual, expected.replace(/\bdays?|years?|months?\b/g, "").trim());
+        }
+
+        if (/\b(city|location|country|state|province|region)\b/.test(label)) {
+          return locationCore(actualRaw) === locationCore(expectedRaw);
+        }
+
+        return false;
+      }
+
+      function controlActualText(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
+        if (control instanceof HTMLSelectElement) {
+          const selected = control.selectedOptions[0];
+          return `${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`.trim();
+        }
+
+        const container = control.closest("[role='combobox'], [aria-haspopup='listbox'], [data-radix-select-trigger], [data-headlessui-state], [class*='select'], [class*='combobox'], [class*='field'], [class*='input']")
+          ?? control.parentElement;
+
+        return [
+          control.value,
+          control.getAttribute("data-value"),
+          control.getAttribute("aria-valuetext"),
+          container?.getAttribute("data-value"),
+          container?.getAttribute("aria-valuetext"),
+          ...Array.from(container?.querySelectorAll("[aria-selected='true'], [data-selected='true'], [class*='singleValue' i], [class*='selected' i], [class*='token' i], [class*='chip' i], input[type='hidden']") ?? [])
+            .map((item) => item instanceof HTMLInputElement ? item.value : item.textContent ?? "")
+        ].filter(Boolean).join(" ");
+      }
+
+      function valueMatches(actual: string, expected: string) {
+        return actual === expected
+          || actual.includes(expected)
+          || expected.includes(actual);
+      }
+
+      function numberCore(value: string) {
+        return (value.match(/\d+(?:\.\d+)?/)?.[0] ?? "").replace(/^0+(?=\d)/, "");
+      }
+
+      function locationCore(value: string) {
+        const key = normalize(value);
+
+        if (/\bgurugram|gurgaon\b/.test(key)) return "gurugram";
+        if (/\bbengaluru|bangalore|banglore\b/.test(key)) return "bengaluru";
+        if (/\bbhiwani\b/.test(key)) return "bhiwani";
+        if (/\bnoida\b/.test(key)) return "noida";
+        if (/\bhyderabad\b/.test(key)) return "hyderabad";
+        if (/\bpune\b/.test(key)) return "pune";
+        if (/\bmumbai\b/.test(key)) return "mumbai";
+
+        return key
+          .replace(/\b(india|australia|canada|united states|usa|united kingdom|uk)\b/g, " ")
+          .replace(/\b(haryana|bihar|maharashtra|karnataka|uttar pradesh|telangana|tamil nadu|west bengal|new south wales|california|washington|texas|new york)\b/g, " ")
+          .replace(/\b(city|location|state|region|country)\b/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
       }
 
       function isEmptySelectText(value: string) {
@@ -2797,7 +2897,8 @@ async function getStillEmptyAttemptedRequiredLabels(page: Page, failedFields: Br
     }, requiredFields.map((field) => ({
       label: field.label,
       inputType: field.inputType,
-      fieldId: field.fieldId
+      fieldId: field.fieldId,
+      value: field.value
     }))).catch(() => []);
 
     missingLabels.push(...frameMissing);
@@ -2813,7 +2914,7 @@ function isLikelyRequiredAttemptedLabel(label: string) {
     return false;
   }
 
-  return /\b(address line 1|street address|country|state|province|city|zip|postal|email|phone|mobile|degree name|type of degree|degree type|university|college|school|institution|start date|end date|graduation date|work experience|past working experience)\b/.test(normalized)
+  return /\b(address line 1|street address|country|state|province|city|zip|postal|email|phone|mobile|degree name|type of degree|degree type|university|college|school|institution|start date|end date|graduation date|work experience|past working experience|total experience|current company|preferred work location|work location|notice period|current ctc|expected ctc|ctc|salary|compensation|bond|obligation|buyout|shift|associated previously)\b/.test(normalized)
     && !/\b(address line 2|middle name|preferred first|preferred last|preferred name)\b/.test(normalized);
 }
 

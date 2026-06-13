@@ -2,6 +2,7 @@ import type { FilledField, Job, StudentMemory, StudentProfile } from "@gradlaunc
 import { callLangChainJson, createStudentProfileSummary, isLangChainAnswerEnabled, retrieveProfileAnswer } from "./answer";
 import { jsonBlock, logBrowserLlmTrace, normalizeKey, writeBrowserDebug } from "./util";
 import type { FillV2Answer, FillV2Field, FillV2Input, FillV2Intent } from "./fill-engine";
+import { readV2FieldCurrentValue } from "./fill-field-drivers";
 
 type PreparedValue = {
   value: string;
@@ -23,6 +24,13 @@ async function buildFillV2AnswersUncached(input: FillV2Input, fields: FillV2Fiel
       continue;
     }
 
+    const acceptedExisting = await resolveAcceptedExistingAnswer(field, input);
+
+    if (acceptedExisting) {
+      answers.set(field.id, acceptedExisting);
+      continue;
+    }
+
     const deterministic = resolveDeterministicAnswer(field, input, prepared);
 
     if (deterministic) {
@@ -31,7 +39,18 @@ async function buildFillV2AnswersUncached(input: FillV2Input, fields: FillV2Fiel
     }
 
     if (field.intent === "prose") {
+      if (isResumeUploadLikeField(field)) {
+        continue;
+      }
+
       if (isTextProseField(field)) {
+        const existingValue = await readExistingProseValue(input, field);
+
+        if (existingValue) {
+          answers.set(field.id, createAnswer(field, existingValue, "memory", 0.98));
+          continue;
+        }
+
         proseFields.push(field);
       } else if (field.required) {
         unresolvedRequiredLabels.push(field.label);
@@ -152,6 +171,67 @@ async function buildFillV2AnswersUncached(input: FillV2Input, fields: FillV2Fiel
   };
 }
 
+async function resolveAcceptedExistingAnswer(field: FillV2Field, input: FillV2Input) {
+  if (field.intent !== "preferred_work_location") {
+    return undefined;
+  }
+
+  const existingValue = await readV2FieldCurrentValue(input.page, field);
+
+  if (!existingValue || !isAcceptableExistingPreferredLocation(existingValue, input)) {
+    return undefined;
+  }
+
+  return createAnswer(field, existingValue, "memory", 0.98);
+}
+
+function isAcceptableExistingPreferredLocation(value: string, input: FillV2Input) {
+  const actual = canonicalLocationKey(value);
+
+  if (!actual) {
+    return false;
+  }
+
+  const details = input.student?.completeProfile;
+  const allowed = [
+    ...(input.student?.preferredLocations ?? []),
+    preferredLocationFromJob(input.job.location),
+    details?.city
+  ].filter((item): item is string => Boolean(item?.trim()));
+
+  return allowed.some((candidate) => {
+    const expected = canonicalLocationKey(candidate);
+    return Boolean(expected && (actual === expected || actual.includes(expected) || expected.includes(actual)));
+  });
+}
+
+async function readExistingProseValue(input: FillV2Input, field: FillV2Field) {
+  const value = await readV2FieldCurrentValue(input.page, field);
+  const cleanValue = value?.trim();
+
+  if (!cleanValue || !isMeaningfulExistingProseValue(field, cleanValue)) {
+    return undefined;
+  }
+
+  return cleanValue;
+}
+
+function isMeaningfulExistingProseValue(field: FillV2Field, value: string) {
+  const key = normalizeKey(value);
+  const labelKey = normalizeKey(field.label);
+  const placeholderKey = normalizeKey(field.placeholder);
+
+  if (value.length < 12 || isUnsafeProseValue(value)) {
+    return false;
+  }
+
+  if (key === labelKey || key === placeholderKey) {
+    return false;
+  }
+
+  return !/^(select|search|choose|enter answer|type answer|value is required|required)$/i.test(value.trim());
+}
+
 function resolveDeterministicAnswer(
   field: FillV2Field,
   input: FillV2Input,
@@ -227,7 +307,13 @@ function shouldPreferProfileValue(field: FillV2Field) {
     "preferred_work_location",
     "postal_code",
     "address_1",
-    "address_2"
+    "address_2",
+    "current_ctc",
+    "expected_ctc",
+    "notice_period",
+    "total_experience",
+    "work_company",
+    "work_title"
   ].includes(field.intent);
 }
 
@@ -298,11 +384,11 @@ function resolveProfileValue(
     case "expected_ctc":
       return formatSalary(student?.expectedSalaryLpa, field);
     case "current_ctc":
-      return formatSalary(details?.currentSalaryLpa, field) ?? (field.required ? defaultCurrentCtcFallback(field) : undefined);
+      return formatSalary(details?.currentSalaryLpa, field);
     case "notice_period":
       return formatNoticePeriod(details?.noticePeriodDays, field);
     case "total_experience":
-      return formatExperienceYears(details?.totalExperienceYears, field) ?? (field.required ? formatExperienceYears(0, field) : undefined);
+      return formatExperienceYears(details?.totalExperienceYears, field);
     case "office_work_choice":
       return choiceYes(field.options) ?? "Yes";
     case "bond_obligation_choice":
@@ -328,7 +414,7 @@ function resolveProfileValue(
     case "work_experience_choice":
       return hasWorkHistory(student) ? choiceYes(field.options) : choiceNo(field.options);
     case "work_company":
-      return details?.currentCompany ?? employment?.company ?? (field.required ? "Not Applicable" : undefined);
+      return details?.currentCompany ?? employment?.company;
     case "work_title":
       return details?.currentTitle ?? employment?.title;
     case "work_start":
@@ -400,7 +486,7 @@ async function askLangChainForProseAnswers(input: FillV2Input, fields: FillV2Fie
     const field = requestedField;
     const value = candidate.value?.trim();
 
-    if (!value) {
+    if (!value || isUnsafeProseValue(value)) {
       await logBrowserLlmTrace(input.workspacePath, "fill-v2-prose-field-discarded", {
         requestedFieldId: requestedField.id,
         requestedLabel: requestedField.label,
@@ -410,7 +496,7 @@ async function askLangChainForProseAnswers(input: FillV2Input, fields: FillV2Fie
         matchedFieldId: field.id,
         matchedLabel: field.label,
         value: value ?? "",
-        discardedBecause: "empty_value"
+        discardedBecause: !value ? "empty_value" : "unsafe_file_like_value"
       });
       continue;
     }
@@ -498,71 +584,83 @@ function resolveRequiredBestEffortFallback(field: FillV2Field, student: StudentP
     return choiceNo(field.options) ?? "No";
   }
 
-  switch (field.intent) {
-    case "current_ctc":
-      return formatSalary(details?.currentSalaryLpa, field) ?? defaultCurrentCtcFallback(field);
-    case "expected_ctc":
-      return formatSalary(student?.expectedSalaryLpa, field) ?? defaultExpectedCtcFallback(field);
-    case "preferred_work_location":
-      return normalizePreferredLocation(student, job) ?? "Bhiwani, Haryana, India";
-    case "work_company":
-      return details?.currentCompany ?? details?.employmentHistory?.[0]?.company ?? "Not Applicable";
-    case "notice_buyout_choice":
-      return "No";
-    case "notice_period":
-      return formatNoticePeriod(details?.noticePeriodDays, field) ?? "Immediate";
-    case "total_experience":
-      return formatExperienceYears(details?.totalExperienceYears ?? 0, field) ?? "0";
-    case "prose":
-      return resolveProseFallback(field, student, job);
-    case "unknown":
-      break;
-    default:
-      return undefined;
-  }
-
-  if (!isTextLikeField(field)) {
+  if (!shouldAllowRequiredFallback(field)) {
     return undefined;
   }
 
-  if (/\b(current company|company|employer|organization)\b/.test(descriptor)) {
-    return details?.currentCompany ?? details?.employmentHistory?.[0]?.company ?? "Not Applicable";
+  switch (field.intent) {
+    case "current_ctc":
+      return formatSalary(details?.currentSalaryLpa, field);
+    case "expected_ctc":
+      return formatSalary(student?.expectedSalaryLpa, field);
+    case "preferred_work_location":
+      return normalizePreferredLocation(student, job);
+    case "work_company":
+      return details?.currentCompany ?? details?.employmentHistory?.[0]?.company;
+    case "work_title":
+      return details?.currentTitle ?? details?.employmentHistory?.[0]?.title;
+    case "notice_buyout_choice":
+      return "No";
+    case "notice_period":
+      return formatNoticePeriod(details?.noticePeriodDays, field);
+    case "total_experience":
+      return formatExperienceYears(details?.totalExperienceYears, field);
+    case "prose":
+      return isClearProseFallbackField(field) ? resolveProseFallback(field, student, job) : undefined;
+    case "unknown":
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
+function shouldAllowRequiredFallback(field: FillV2Field) {
+  if (field.driver === "choice") {
+    return true;
   }
 
-  if (/\b(preferred|work)\b/.test(descriptor) && /\b(location|city)\b/.test(descriptor)) {
-    return normalizePreferredLocation(student, job) ?? "Bhiwani, Haryana, India";
+  if (field.intent === "unknown") {
+    return false;
   }
 
-  if (/\b(current|present|existing|last|previous|annual)\b/.test(descriptor) && /\b(ctc|salary|compensation|package|pay)\b/.test(descriptor)) {
-    return formatSalary(details?.currentSalaryLpa, field) ?? defaultCurrentCtcFallback(field);
+  if (field.intent === "prose") {
+    return isClearProseFallbackField(field);
   }
 
-  if (/\b(expected|desired|target|asking|minimum)\b/.test(descriptor) && /\b(ctc|salary|compensation|package|pay)\b/.test(descriptor)) {
-    return formatSalary(student?.expectedSalaryLpa, field) ?? defaultExpectedCtcFallback(field);
+  if (!isTextLikeField(field)) {
+    return true;
   }
 
-  if (/\bnotice period buyout|notice buyout|buyout\b/.test(descriptor)) {
-    return "No";
+  if (!STRICT_REQUIRED_TEXT_INTENTS.has(field.intent)) {
+    return false;
   }
 
-  if (/\bnotice period|joining time|available to join|availability to join\b/.test(descriptor)) {
-    return formatNoticePeriod(details?.noticePeriodDays, field) ?? "Immediate";
+  return field.confidence >= 0.8;
+}
+
+function isClearProseFallbackField(field: FillV2Field) {
+  const descriptor = normalizeKey(`${field.label} ${field.context}`);
+  if (isResumeUploadLikeField(field)) {
+    return false;
   }
 
-  if (/\b(total|overall|years?)\b/.test(descriptor) && /\b(experience|exp)\b/.test(descriptor)) {
-    return formatExperienceYears(details?.totalExperienceYears ?? 0, field) ?? "0";
-  }
-
-  if (/\b(reason|expertise|why|describe|explain|tell us|about|summary|message|comments?)\b/.test(descriptor)) {
-    return resolveProseFallback({ ...field, intent: "prose" }, student, job);
-  }
-
-  return "Not Applicable";
+  return /\b(cover letter|motivation|why|message|hiring team|additional information|comments?|technical expertise|overall technical|reason for job change|job change reason)\b/.test(descriptor);
 }
 
 function isTextLikeField(field: FillV2Field) {
   return ["text", "textarea", "number", "contenteditable", "email", "phone"].includes(field.driver);
 }
+
+const STRICT_REQUIRED_TEXT_INTENTS = new Set<FillV2Field["intent"]>([
+  "current_ctc",
+  "expected_ctc",
+  "preferred_work_location",
+  "work_company",
+  "work_title",
+  "notice_period",
+  "total_experience",
+  "prose"
+]);
 
 function createPreparedMap(baseFields: FilledField[], memory: StudentMemory | undefined) {
   const map = new Map<string, PreparedValue>();
@@ -646,6 +744,10 @@ function isSafePreparedValueForField(field: FillV2Field, value: string) {
     return false;
   }
 
+  if (field.intent === "prose" && isUnsafeProseValue(value)) {
+    return false;
+  }
+
   if (["city", "preferred_work_location", "state", "postal_code", "address_1", "address_2"].includes(field.intent)) {
     if (looksLikePhoneNumber(value) || /@/.test(value) || /^https?:\/\//i.test(value)) {
       return false;
@@ -726,6 +828,22 @@ function isPreparedSocialUrl(value: string) {
   } catch (_error) {
     return /\bgithub\.com\b|\blinkedin\.com\b/i.test(value);
   }
+}
+
+function isResumeUploadLikeField(field: FillV2Field) {
+  const descriptor = normalizeKey(`${field.label} ${field.context} ${field.domPathSignature ?? ""}`);
+  const label = normalizeKey(field.label);
+
+  return /^(resume|cv|curriculum vitae|upload resume|upload cv)$/.test(label)
+    || /\b(resume upload|upload resume|upload cv|from device|from computer|drag and drop)\b/.test(descriptor);
+}
+
+function isUnsafeProseValue(value: string) {
+  const trimmed = value.trim();
+  const normalized = normalizeKey(trimmed);
+
+  return /^[\w .()[\]-]+\.(pdf|doc|docx|rtf|txt)$/i.test(trimmed)
+    || /\b(uploaded resume|pre filled based on uploaded resume|resume file|cv file)\b/.test(normalized);
 }
 
 function normalizeAnswer(field: FillV2Field, value: string) {
@@ -875,14 +993,84 @@ function formatLocation(city: string | undefined, state: string | undefined, cou
 function normalizePreferredLocation(student: StudentProfile | undefined, job: Job) {
   const details = student?.completeProfile;
   const jobLocation = preferredLocationFromJob(job.location);
-  const preferred = student?.preferredLocations?.map((value) => value.trim()).find(Boolean);
+  const preferredLocations = student?.preferredLocations?.map((value) => value.trim()).filter(Boolean) ?? [];
+  const jobMatchedPreferred = preferredLocationMentionedInJob(preferredLocations, job);
+  const preferred = preferredLocations[0];
   const profileLocation = formatLocation(
     details?.city ?? inferCityFromAddress(details?.addressLine1) ?? inferCityFromAddress(details?.addressLine2),
     details?.state,
     normalizeCountryOrUndefined(details?.country) ?? inferCountryFromPhone(details?.phone)
   );
 
-  return jobLocation ?? preferred ?? profileLocation;
+  return jobLocation ?? jobMatchedPreferred ?? preferred ?? profileLocation;
+}
+
+function preferredLocationMentionedInJob(preferredLocations: string[], job: Job) {
+  const jobText = normalizeKey([
+    job.location,
+    job.title,
+    job.company,
+    job.description?.slice(0, 5000)
+  ].filter(Boolean).join(" "));
+
+  if (!jobText) {
+    return undefined;
+  }
+
+  for (const location of preferredLocations) {
+    const normalized = preferredLocationFromJob(location);
+    const aliases = locationAliasesForJobMatch(normalized ?? location);
+
+    if (aliases.some((alias) => alias && jobText.includes(alias))) {
+      return normalized ?? location;
+    }
+  }
+
+  return undefined;
+}
+
+function locationAliasesForJobMatch(value: string) {
+  const key = normalizeKey(value);
+  const aliases = new Set<string>([key]);
+
+  if (/\bbengaluru|bangalore|banglore\b/.test(key)) {
+    aliases.add("bengaluru");
+    aliases.add("bangalore");
+    aliases.add("banglore");
+  }
+
+  if (/\bgurugram|gurgaon\b/.test(key)) {
+    aliases.add("gurugram");
+    aliases.add("gurgaon");
+  }
+
+  return [...aliases].filter(Boolean);
+}
+
+function canonicalLocationKey(value: string | undefined) {
+  const key = normalizeKey(value);
+
+  if (!key) {
+    return "";
+  }
+
+  if (/\bgurugram|gurgaon\b/.test(key)) return "gurugram";
+  if (/\bbengaluru|bangalore|banglore\b/.test(key)) return "bengaluru";
+  if (/\bbhiwani\b/.test(key)) return "bhiwani";
+  if (/\bnoida\b/.test(key)) return "noida";
+  if (/\bhyderabad\b/.test(key)) return "hyderabad";
+  if (/\bpune\b/.test(key)) return "pune";
+  if (/\bmumbai\b/.test(key)) return "mumbai";
+  if (/\bdelhi|new delhi\b/.test(key)) return "delhi";
+  if (/\bchennai\b/.test(key)) return "chennai";
+  if (/\bkolkata\b/.test(key)) return "kolkata";
+
+  return key
+    .replace(/\b(india|australia|canada|united states|usa|united kingdom|uk)\b/g, " ")
+    .replace(/\b(haryana|bihar|maharashtra|karnataka|uttar pradesh|telangana|tamil nadu|west bengal|new south wales|california|washington|texas|new york)\b/g, " ")
+    .replace(/\b(city|location|state|region|country)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function preferredLocationFromJob(value: string | undefined) {
@@ -942,14 +1130,6 @@ function formatSalary(value: number | undefined, field: FillV2Field) {
 
   const descriptor = normalizeKey(`${field.label} ${field.context}`);
   return /\b(lpa|lakhs?|lakh per annum)\b/.test(descriptor) || field.driver === "number" ? String(value) : `${value} LPA`;
-}
-
-function defaultCurrentCtcFallback(field: FillV2Field) {
-  return field.driver === "number" ? "0" : "0 LPA";
-}
-
-function defaultExpectedCtcFallback(field: FillV2Field) {
-  return field.driver === "number" ? "30" : "30 LPA";
 }
 
 function formatExperienceYears(value: number | undefined, field: FillV2Field) {
@@ -1029,14 +1209,14 @@ function hasWorkedAtCompany(student: StudentProfile | undefined, company: string
 }
 
 function choiceYes(options: string[]) {
-  return options.find((option) => /\b(i agree|agree|accept|acknowledge|confirm|yes)\b/i.test(option))
-    ?? options.find((option) => /^yes\b/i.test(option))
+  return options.find((option) => /^(yes|true|agree|i agree|accept|acknowledge|confirm)$/i.test(option.trim()))
+    ?? options.find((option) => option.length <= 60 && /\b(i agree|agree|accept|acknowledge|confirm|yes)\b/i.test(option))
     ?? "Yes";
 }
 
 function choiceNo(options: string[]) {
-  return options.find((option) => /\b(no thanks|no thank you|decline|do not|don t|dont|not now|skip)\b/i.test(option))
-    ?? options.find((option) => /^no\b/i.test(option))
+  return options.find((option) => /^(no|false|decline|do not|don t|dont|not now|skip)$/i.test(option.trim()))
+    ?? options.find((option) => option.length <= 60 && /\b(no thanks|no thank you|decline|do not|don t|dont|not now|skip|no)\b/i.test(option))
     ?? "No";
 }
 
@@ -1047,9 +1227,20 @@ function matchOption(value: string, options: string[]) {
     return undefined;
   }
 
+  const exact = options.find((option) => normalizeKey(option) === valueKey);
+
+  if (exact) {
+    return exact;
+  }
+
   return options.find((option) => {
     const optionKey = normalizeKey(option);
-    return optionKey === valueKey || optionKey.includes(valueKey) || valueKey.includes(optionKey);
+
+    if (/^(yes|no|true|false|agree|accept|decline)$/.test(valueKey) && optionKey.length > 20) {
+      return false;
+    }
+
+    return optionKey.includes(valueKey) || valueKey.includes(optionKey);
   });
 }
 

@@ -163,6 +163,14 @@ export async function buildFillV2FieldGraph(input: FillV2Input): Promise<{
         context: field.context.slice(0, 220),
         sectionLabel: field.sectionLabel,
         labelSource: field.labelSource,
+        ownerLabelText: field.ownerLabelText,
+        ownerLabelSource: field.ownerLabelSource,
+        ownershipConfidence: field.ownershipConfidence,
+        ownershipCandidates: field.ownershipCandidates?.slice(0, 3),
+        labelRect: field.labelRect,
+        controlRect: field.controlRect,
+        questionBoundaryRect: field.questionBoundaryRect,
+        accessibleName: field.accessibleName,
         placeholder: field.placeholder,
         helpText: field.helpText,
         domPathSignature: field.domPathSignature,
@@ -194,7 +202,10 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         "input",
         "textarea",
         "select",
+        "spl-textarea",
+        "oc-textarea",
         "[contenteditable='true']",
+        "[role='textbox']",
         "[role='combobox']",
         "[role='radio']",
         "[role='checkbox']",
@@ -232,6 +243,7 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
           || `fill-v2-${index}-${normalizeId(label)}`;
 
         control.setAttribute("data-gradlaunch-v2-field-id", id);
+        control.setAttribute("data-gradlaunch-v2-control-id", id);
 
         fields.push({
           id,
@@ -252,7 +264,8 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
           sectionLabel,
           helpText,
           labelSource: labelDetails.source,
-          domPathSignature: buildDomPathSignature(control)
+          domPathSignature: buildDomPathSignature(control),
+          ...buildOwnershipMetadata(control, id, label, labelDetails.source)
         });
       }
 
@@ -262,6 +275,10 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
 
       function isFillCandidate(control: HTMLElement) {
         if (control.getAttribute("aria-disabled") === "true" || control.closest("[hidden], [aria-hidden='true'], .datasetField__row--sample, [id*='sample']")) {
+          return false;
+        }
+
+        if (isCustomControlWrapper(control) && hasNestedNativeFillControl(control)) {
           return false;
         }
 
@@ -284,6 +301,48 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         }
 
         return isVisible(control);
+      }
+
+      function isCustomControlWrapper(control: HTMLElement) {
+        return !(control instanceof HTMLInputElement)
+          && !(control instanceof HTMLTextAreaElement)
+          && !(control instanceof HTMLSelectElement)
+          && !control.isContentEditable;
+      }
+
+      function hasNestedNativeFillControl(control: HTMLElement) {
+        const roots: Array<Element | ShadowRoot> = control.shadowRoot ? [control, control.shadowRoot] : [control];
+
+        for (let index = 0; index < roots.length; index += 1) {
+          const root = roots[index];
+          const nestedControls = Array.from(root.querySelectorAll("input, textarea, select, [contenteditable='true']")) as HTMLElement[];
+
+          for (const nested of nestedControls) {
+            if (nested === control) {
+              continue;
+            }
+
+            if (nested instanceof HTMLInputElement && ["hidden", "submit", "button", "image", "reset", "file"].includes(nested.type)) {
+              continue;
+            }
+
+            if (nested instanceof HTMLInputElement && nested.disabled || nested instanceof HTMLTextAreaElement && nested.disabled || nested instanceof HTMLSelectElement && nested.disabled) {
+              continue;
+            }
+
+            if (isVisible(nested)) {
+              return true;
+            }
+          }
+
+          for (const descendant of Array.from(root.querySelectorAll("*")) as HTMLElement[]) {
+            if (descendant.shadowRoot) {
+              roots.push(descendant.shadowRoot);
+            }
+          }
+        }
+
+        return false;
       }
 
       function findFieldLabelDetails(control: Element): { text: string; source: string } {
@@ -347,6 +406,21 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
       }
 
       function findChoiceGroupLabelDetails(control: Element) {
+        const wrapperText = clean(control.closest("label")?.textContent ?? "");
+
+        if (wrapperText && !isGenericLabel(wrapperText) && !isChoiceOptionLabel(wrapperText)) {
+          return { text: wrapperText, source: "wrapper" };
+        }
+
+        if (control.id) {
+          const direct = queryFirst(`label[for="${CSS.escape(control.id)}"]`, control);
+          const directText = clean(direct?.textContent ?? "");
+
+          if (directText && !isGenericLabel(directText) && !isChoiceOptionLabel(directText)) {
+            return { text: directText, source: "for" };
+          }
+        }
+
         const fieldset = control.closest("fieldset");
         const legend = fieldset?.querySelector("legend")?.textContent;
 
@@ -471,6 +545,299 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         return parts.join(" > ");
       }
 
+      function buildOwnershipMetadata(control: HTMLElement, controlId: string, fallbackLabel: string, fallbackSource: string) {
+        const ownership = inferOwnershipDetails(control, fallbackLabel, fallbackSource);
+        const questionContainer = findQuestionContainer(control);
+        const siblingControls = Array.from((questionContainer ?? control.parentElement ?? control).querySelectorAll("input, textarea, select, [contenteditable='true'], [role='combobox'], [role='radio'], [role='checkbox'], [aria-haspopup]")) as HTMLElement[];
+
+        for (const sibling of siblingControls) {
+          if (!sibling.getAttribute("data-gradlaunch-v2-control-id")) {
+            const siblingId = sibling.getAttribute("data-gradlaunch-v2-field-id")
+              || sibling.getAttribute("data-gradlaunch-fast-field-id")
+              || sibling.getAttribute("data-gradlaunch-field-id");
+
+            if (siblingId) {
+              sibling.setAttribute("data-gradlaunch-v2-control-id", siblingId);
+            }
+          }
+        }
+
+        return {
+          controlId,
+          ownerLabelText: ownership.label,
+          ownerLabelSource: ownership.source,
+          accessibleName: clean(computeAccessibleName(control)),
+          accessibleDescription: clean(computeAccessibleDescription(control)),
+          ownershipConfidence: ownership.confidence,
+          ownershipCandidates: ownership.candidates,
+          labelRect: ownership.labelElement ? rectSnapshot(ownership.labelElement) : undefined,
+          controlRect: rectSnapshot(control),
+          questionBoundaryRect: questionContainer ? rectSnapshot(questionContainer) : undefined,
+          siblingControlIds: siblingControls
+            .map((sibling) => sibling.getAttribute("data-gradlaunch-v2-control-id") || sibling.getAttribute("data-gradlaunch-v2-field-id") || "")
+            .filter((value) => value && value !== controlId)
+        };
+      }
+
+      function inferOwnershipDetails(control: HTMLElement, fallbackLabel: string, fallbackSource: string) {
+        const directLabelElement = findDirectLabelElement(control, fallbackSource);
+        const directLabel = clean(fallbackLabel || computeAccessibleName(control));
+        const directConfidence = ownershipSourceConfidence(fallbackSource);
+        const visualCandidates = findVisualQuestionCandidates(control).slice(0, 3);
+        const directCandidate = directLabel
+          ? {
+              label: directLabel,
+              source: fallbackSource || "fallback",
+              confidence: directConfidence,
+              labelElement: directLabelElement
+            }
+          : undefined;
+        const bestVisual = visualCandidates[0];
+        const candidates = [
+          ...(directCandidate ? [directCandidate] : []),
+          ...visualCandidates
+        ]
+          .filter((candidate, index, list) => list.findIndex((item) => normalize(item.label) === normalize(candidate.label)) === index)
+          .sort((left, right) => right.confidence - left.confidence);
+        const chosen = chooseOwnershipCandidate(directCandidate, bestVisual, candidates);
+
+        return {
+          label: chosen?.label ?? directLabel,
+          source: chosen?.source ?? fallbackSource,
+          confidence: chosen?.confidence ?? directConfidence,
+          labelElement: chosen?.labelElement,
+          candidates: candidates.map((candidate) => ({
+            label: candidate.label,
+            source: candidate.source,
+            confidence: candidate.confidence
+          }))
+        };
+      }
+
+      function chooseOwnershipCandidate(
+        directCandidate: { label: string; source: string; confidence: number; labelElement?: HTMLElement } | undefined,
+        bestVisual: { label: string; source: string; confidence: number; labelElement?: HTMLElement } | undefined,
+        candidates: Array<{ label: string; source: string; confidence: number; labelElement?: HTMLElement }>
+      ) {
+        if (!directCandidate) {
+          return bestVisual ?? candidates[0];
+        }
+
+        if (!bestVisual) {
+          return directCandidate;
+        }
+
+        if (["for", "aria-labelledby", "wrapper", "legend", "visual_question", "inferred_question", "question"].includes(directCandidate.source) && !isGenericLabel(directCandidate.label)) {
+          return directCandidate;
+        }
+
+        if (bestVisual.confidence >= directCandidate.confidence + 0.08 || isGenericLabel(directCandidate.label)) {
+          return bestVisual;
+        }
+
+        return directCandidate;
+      }
+
+      function findDirectLabelElement(control: HTMLElement, source: string) {
+        if (source === "for" && control.id) {
+          const label = queryFirst(`label[for="${CSS.escape(control.id)}"]`, control);
+          return label instanceof HTMLElement ? label : undefined;
+        }
+
+        if (source === "wrapper") {
+          const label = control.closest("label");
+          return label instanceof HTMLElement ? label : undefined;
+        }
+
+        if (source === "legend") {
+          const legend = control.closest("fieldset")?.querySelector("legend");
+          return legend instanceof HTMLElement ? legend : undefined;
+        }
+
+        if (source === "aria-labelledby") {
+          const id = control.getAttribute("aria-labelledby")?.split(/\s+/).find(Boolean);
+          const element = id ? getElementById(id) : undefined;
+          return element instanceof HTMLElement ? element : undefined;
+        }
+
+        return undefined;
+      }
+
+      function findVisualQuestionCandidates(control: HTMLElement) {
+        const controlRect = control.getBoundingClientRect();
+        const questionElements = roots
+          .flatMap((root) => Array.from(root.querySelectorAll("label, legend, h1, h2, h3, h4, p, span, div, strong, b"))) as HTMLElement[];
+        const candidates: Array<{ label: string; source: string; confidence: number; labelElement: HTMLElement }> = [];
+
+        for (const element of questionElements) {
+          if (!isVisible(element) || element.contains(control) && !(element instanceof HTMLLabelElement)) {
+            continue;
+          }
+
+          const rawText = element.innerText || element.textContent || "";
+
+          if (isCompositeQuestionElement(element, rawText)) {
+            continue;
+          }
+
+          const label = cleanQuestionLabel(rawText);
+
+          if (!isQuestionLabel(label, rawText)) {
+            continue;
+          }
+
+          const rect = element.getBoundingClientRect();
+          const relation = labelControlOwnershipRelation(rect, controlRect);
+
+          if (!relation) {
+            continue;
+          }
+
+          if (hasInterveningQuestionLabel(element, control, questionElements)) {
+            continue;
+          }
+
+          const horizontalDistance = rect.right < controlRect.left
+            ? controlRect.left - rect.right
+            : rect.left > controlRect.right
+              ? rect.left - controlRect.right
+              : 0;
+          const leftDistance = Math.abs(rect.left - controlRect.left);
+
+          if (horizontalDistance > Math.max(460, controlRect.width * 3)) {
+            continue;
+          }
+
+          const overlap = Math.min(rect.right, controlRect.right) - Math.max(rect.left, controlRect.left);
+          const alignmentBonus = overlap > 0 ? 0.12 : 0;
+          const score = 1
+            - Math.min(relation.distance / 360, 0.72)
+            - Math.min(leftDistance / 900, 0.18)
+            - Math.min(horizontalDistance / 900, 0.12)
+            + alignmentBonus
+            + relation.bonus
+            + (element instanceof HTMLLabelElement ? 0.08 : 0);
+          const confidence = Math.max(0.05, Math.min(0.98, score));
+
+          candidates.push({
+            label,
+            source: "visual_question",
+            confidence,
+            labelElement: element
+          });
+        }
+
+        return candidates.sort((left, right) => right.confidence - left.confidence);
+      }
+
+      function labelControlOwnershipRelation(labelRect: DOMRect, controlRect: DOMRect) {
+        if (labelRect.height <= 0 || labelRect.width <= 0 || controlRect.height <= 0 || controlRect.width <= 0) {
+          return undefined;
+        }
+
+        const labelCenterY = labelRect.top + labelRect.height / 2;
+        const controlCenterY = controlRect.top + controlRect.height / 2;
+        const verticalOverlap = Math.min(labelRect.bottom, controlRect.bottom) - Math.max(labelRect.top, controlRect.top);
+        const horizontalGap = labelRect.right < controlRect.left
+          ? controlRect.left - labelRect.right
+          : labelRect.left > controlRect.right
+            ? labelRect.left - controlRect.right
+            : 0;
+
+        const above = labelRect.bottom <= controlRect.top + 8 && labelRect.top < controlRect.top - 4;
+
+        if (above) {
+          const distance = Math.max(0, controlRect.top - labelRect.bottom);
+
+          if (distance > 420) {
+            return undefined;
+          }
+
+          return {
+            kind: "above",
+            distance,
+            bonus: 0
+          };
+        }
+
+        const sameRowLeft = labelRect.left < controlRect.left - 4
+          && labelRect.right <= controlRect.left + 18
+          && Math.abs(labelCenterY - controlCenterY) <= Math.max(22, Math.min(labelRect.height, controlRect.height) * 0.9)
+          && verticalOverlap > Math.min(labelRect.height, controlRect.height) * 0.25
+          && horizontalGap <= Math.max(360, controlRect.width * 2.5);
+
+        if (sameRowLeft) {
+          return {
+            kind: "same_row_left",
+            distance: Math.abs(labelCenterY - controlCenterY),
+            bonus: 0.08
+          };
+        }
+
+        return undefined;
+      }
+
+      function ownershipSourceConfidence(source: string) {
+        if (source === "for" || source === "aria-labelledby") return 0.98;
+        if (source === "wrapper" || source === "legend") return 0.92;
+        if (source === "visual_question" || source === "question") return 0.86;
+        if (source === "aria-label") return 0.78;
+        if (source === "placeholder") return 0.58;
+        if (source === "nearby") return 0.5;
+        if (source === "name") return 0.35;
+        return 0.42;
+      }
+
+      function computeAccessibleName(control: HTMLElement) {
+        const labelledBy = control.getAttribute("aria-labelledby");
+
+        if (labelledBy) {
+          const text = labelledBy
+            .split(/\s+/)
+            .map((id) => getElementById(id)?.textContent ?? "")
+            .join(" ");
+
+          if (clean(text)) {
+            return text;
+          }
+        }
+
+        return [
+          control.getAttribute("aria-label"),
+          control.id ? queryFirst(`label[for="${CSS.escape(control.id)}"]`, control)?.textContent : "",
+          control.closest("label")?.textContent,
+          control.closest("fieldset")?.querySelector("legend")?.textContent,
+          control.getAttribute("placeholder"),
+          control.getAttribute("name")
+        ].filter(Boolean).join(" ");
+      }
+
+      function computeAccessibleDescription(control: HTMLElement) {
+        const describedBy = control.getAttribute("aria-describedby");
+
+        if (!describedBy) {
+          return "";
+        }
+
+        return describedBy
+          .split(/\s+/)
+          .map((id) => getElementById(id)?.textContent ?? "")
+          .join(" ");
+      }
+
+      function rectSnapshot(element: Element) {
+        const rect = element.getBoundingClientRect();
+
+        return {
+          top: Math.round(rect.top),
+          right: Math.round(rect.right),
+          bottom: Math.round(rect.bottom),
+          left: Math.round(rect.left),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        };
+      }
+
       function inferInputType(control: HTMLElement) {
         if (control instanceof HTMLInputElement) {
           if (isSearchBackedInput(control)) {
@@ -481,6 +848,10 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         }
 
         if (control instanceof HTMLTextAreaElement) {
+          return "textarea";
+        }
+
+        if (isTextareaLikeControl(control)) {
           return "textarea";
         }
 
@@ -497,6 +868,15 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         }
 
         return control.getAttribute("role") || "text";
+      }
+
+      function isTextareaLikeControl(control: HTMLElement) {
+        const tag = control.tagName.toLowerCase();
+
+        return tag.includes("textarea")
+          || control.getAttribute("role") === "textbox"
+          || Boolean(control.querySelector("textarea"))
+          || Boolean(control.shadowRoot?.querySelector("textarea"));
       }
 
       function isSearchBackedInput(control: HTMLInputElement) {
@@ -623,8 +1003,13 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
 
       function isNoise(label: string, context: string, control: HTMLElement) {
         const key = normalize(`${label} ${context}`);
+        const labelKey = normalize(label);
 
         if (isGenericLabel(label) && !context) {
+          return true;
+        }
+
+        if (/^(resume|cv|curriculum vitae|upload resume|upload cv)$/.test(labelKey) && !(control instanceof HTMLInputElement && control.type === "file")) {
           return true;
         }
 
@@ -697,6 +1082,7 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
           const required = !isKnownOptionalField(label, context) && (hasFieldLocalRequiredMarker(rawText) || isRequired(control, rawText, context));
 
           control.setAttribute("data-gradlaunch-v2-field-id", id);
+          control.setAttribute("data-gradlaunch-v2-control-id", id);
           markQuestionControlAssigned(control, assignedControls);
 
           const sameId = items.find((item) => item.id === id);
@@ -725,6 +1111,7 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
             sameId.pattern = sameId.pattern || control.getAttribute("pattern") || undefined;
             sameId.inputMode = sameId.inputMode || control.getAttribute("inputmode") || ("inputMode" in control ? (control as HTMLInputElement).inputMode || undefined : undefined);
             sameId.domPathSignature = sameId.domPathSignature || buildDomPathSignature(control);
+            Object.assign(sameId, buildOwnershipMetadata(control, id, label, "visual_question"));
 
             continue;
           }
@@ -747,8 +1134,9 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
             inputMode: control.getAttribute("inputmode") ?? ("inputMode" in control ? (control as HTMLInputElement).inputMode || undefined : undefined),
             sectionLabel: clean(findSectionLabel(control)),
             helpText: clean(findHelpText(control)),
-            labelSource: "inferred_question",
-            domPathSignature: buildDomPathSignature(control)
+            labelSource: "visual_question",
+            domPathSignature: buildDomPathSignature(control),
+            ...buildOwnershipMetadata(control, id, label, "visual_question")
           });
         }
       }
@@ -818,6 +1206,18 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
           return nested;
         }
 
+        const componentControl = findControlInQuestionContainer(labelElement, assignedControls, questionElements);
+
+        if (componentControl) {
+          return componentControl;
+        }
+
+        const domSequential = findNextDomQuestionControl(labelElement, assignedControls, questionElements);
+
+        if (domSequential) {
+          return domSequential;
+        }
+
         const blockControl = findQuestionBlockControl(labelElement, assignedControls, questionElements);
 
         if (blockControl) {
@@ -843,6 +1243,10 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
               continue;
             }
 
+            if (hasInterveningQuestionLabel(labelElement, control, questionElements)) {
+              continue;
+            }
+
             const score = scoreQuestionControl(labelRect, control.getBoundingClientRect(), depth);
 
             if (score > 0 && (!best || score > best.score)) {
@@ -854,6 +1258,10 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
             .filter((control): control is HTMLElement => control instanceof HTMLElement && isFillCandidate(control) && !isQuestionControlAssigned(control, assignedControls));
 
           for (const control of siblingControls) {
+            if (hasInterveningQuestionLabel(labelElement, control, questionElements)) {
+              continue;
+            }
+
             const score = scoreQuestionControl(labelRect, control.getBoundingClientRect(), depth);
 
             if (score > 0 && (!best || score > best.score)) {
@@ -873,6 +1281,10 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
             .filter((control): control is HTMLElement => control instanceof HTMLElement && isFillCandidate(control) && !isQuestionControlAssigned(control, assignedControls));
 
           for (const control of controls) {
+            if (hasInterveningQuestionLabel(labelElement, control, questionElements)) {
+              continue;
+            }
+
             const score = scoreQuestionControl(labelRect, control.getBoundingClientRect(), 5);
 
             if (score > 0 && (!best || score > best.score)) {
@@ -882,6 +1294,120 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         }
 
         return best?.control;
+      }
+
+      function findNextDomQuestionControl(labelElement: HTMLElement, assignedControls: WeakSet<HTMLElement>, questionElements: HTMLElement[]) {
+        const nextQuestion = questionElements
+          .filter((candidate) => {
+            if (candidate === labelElement || candidate.contains(labelElement) || labelElement.contains(candidate) || !isVisible(candidate)) {
+              return false;
+            }
+
+            const raw = candidate.innerText || candidate.textContent || "";
+
+            if (!isQuestionLabel(cleanQuestionLabel(raw), raw) || isCompositeQuestionElement(candidate, raw)) {
+              return false;
+            }
+
+            return Boolean(labelElement.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING);
+          })
+          .sort((left, right) => {
+            if (left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+            if (left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+            return 0;
+          })[0];
+        const controls = roots
+          .flatMap((root) => Array.from(root.querySelectorAll("input, textarea, select, [contenteditable='true'], [role='combobox'], [role='radio'], [role='checkbox'], [aria-haspopup]")))
+          .filter((control): control is HTMLElement => {
+            if (!(control instanceof HTMLElement) || !isFillCandidate(control) || isQuestionControlAssigned(control, assignedControls) || labelElement.contains(control)) {
+              return false;
+            }
+
+            const afterLabel = Boolean(labelElement.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+            if (!afterLabel) {
+              return false;
+            }
+
+            if (nextQuestion && !Boolean(control.compareDocumentPosition(nextQuestion) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+              return false;
+            }
+
+            return true;
+          });
+
+        if (controls.length === 0 || controls.length > 4) {
+          return undefined;
+        }
+
+        return controls[0];
+      }
+
+      function findControlInQuestionContainer(labelElement: HTMLElement, assignedControls: WeakSet<HTMLElement>, questionElements: HTMLElement[]) {
+        let ancestor: Element | null = labelElement.parentElement;
+
+        for (let depth = 0; depth < 7 && ancestor; depth += 1) {
+          if (!isLikelyQuestionFieldContainer(ancestor)) {
+            ancestor = ancestor.parentElement;
+            continue;
+          }
+
+          const controls = Array.from(ancestor.querySelectorAll("input, textarea, select, [contenteditable='true'], [role='combobox'], [role='radio'], [role='checkbox'], [aria-haspopup]"))
+            .filter((control): control is HTMLElement => control instanceof HTMLElement && isFillCandidate(control) && !isQuestionControlAssigned(control, assignedControls) && !labelElement.contains(control));
+
+          if (controls.length === 0 || controls.length > 8) {
+            ancestor = ancestor.parentElement;
+            continue;
+          }
+
+          const localQuestionLabels = questionElements.filter((candidate) => {
+            if (!ancestor?.contains(candidate) || candidate.contains(labelElement) && candidate !== labelElement || labelElement.contains(candidate) || candidate.contains(controls[0])) {
+              return false;
+            }
+
+            const raw = candidate.innerText || candidate.textContent || "";
+            return isQuestionLabel(cleanQuestionLabel(raw), raw) && !isCompositeQuestionElement(candidate, raw);
+          });
+
+          if (localQuestionLabels.length > 3) {
+            ancestor = ancestor.parentElement;
+            continue;
+          }
+
+          const labelRect = labelElement.getBoundingClientRect();
+          let best: { control: HTMLElement; score: number } | undefined;
+
+          for (const control of controls) {
+            if (hasInterveningQuestionLabel(labelElement, control, questionElements)) {
+              continue;
+            }
+
+            const following = Boolean(labelElement.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING);
+            const score = scoreQuestionControl(labelRect, control.getBoundingClientRect(), depth)
+              + (following ? 80 : 0)
+              + (controls.length === 1 ? 80 : 0);
+
+            if (score > 0 && (!best || score > best.score)) {
+              best = { control, score };
+            }
+          }
+
+          if (best) {
+            return best.control;
+          }
+
+          ancestor = ancestor.parentElement;
+        }
+
+        return undefined;
+      }
+
+      function isLikelyQuestionFieldContainer(element: Element) {
+        const tag = element.tagName.toLowerCase();
+        const descriptor = normalize(`${tag} ${element.id ?? ""} ${element.getAttribute("class") ?? ""} ${element.getAttribute("data-testid") ?? ""}`);
+
+        return /^sr-question-field/.test(tag)
+          || /\b(question field|question-field|screening question|screening-question|application question|application-question|form question|form-question)\b/.test(descriptor);
       }
 
       function findNextSequentialQuestionControl(labelElement: HTMLElement, assignedControls: WeakSet<HTMLElement>, questionElements: HTMLElement[]) {
@@ -1021,12 +1547,18 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
 
       function scoreQuestionControl(labelRect: DOMRect, controlRect: DOMRect, depth: number) {
         const vertical = controlRect.top - labelRect.bottom;
-        const sameRow = Math.abs(controlRect.top - labelRect.top) < 28;
-        const below = vertical >= -16 && vertical <= 360;
+        const labelCenterY = labelRect.top + labelRect.height / 2;
+        const controlCenterY = controlRect.top + controlRect.height / 2;
+        const verticalOverlap = Math.min(labelRect.bottom, controlRect.bottom) - Math.max(labelRect.top, controlRect.top);
+        const sameRowLeft = labelRect.left < controlRect.left - 4
+          && labelRect.right <= controlRect.left + 18
+          && Math.abs(labelCenterY - controlCenterY) <= Math.max(22, Math.min(labelRect.height, controlRect.height) * 0.9)
+          && verticalOverlap > Math.min(labelRect.height, controlRect.height) * 0.25;
+        const below = vertical >= -8 && vertical <= 360 && labelRect.top < controlRect.top - 4;
         const horizontalOverlap = Math.min(labelRect.right, controlRect.right) - Math.max(labelRect.left, controlRect.left);
         const nearLeft = Math.abs(controlRect.left - labelRect.left) < 160;
 
-        if (!sameRow && !below) {
+        if (!sameRowLeft && !below) {
           return 0;
         }
 
@@ -1035,7 +1567,7 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         }
 
         return 200
-          - Math.max(0, vertical)
+          - (sameRowLeft ? Math.abs(labelCenterY - controlCenterY) : Math.max(0, vertical))
           - Math.abs(controlRect.left - labelRect.left) / 4
           - depth * 12;
       }
@@ -1150,16 +1682,13 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
             }
 
             const rect = candidate.getBoundingClientRect();
+            const relation = labelControlOwnershipRelation(rect, controlRect);
 
-            if (rect.top > controlRect.bottom + 20) {
+            if (!relation) {
               continue;
             }
 
-            const verticalDistance = rect.bottom <= controlRect.top
-              ? controlRect.top - rect.bottom
-              : Math.max(0, rect.top - controlRect.bottom);
-
-            if (verticalDistance > 260) {
+            if (relation.distance > 260) {
               continue;
             }
 
@@ -1173,7 +1702,7 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
               continue;
             }
 
-            let score = 260 - verticalDistance - Math.min(horizontalDistance / 3, 90);
+            let score = 260 - relation.distance - Math.min(horizontalDistance / 3, 90) + relation.bonus * 100;
 
             if (/\*/.test(raw)) score += 45;
             if (/\?/.test(text)) score += 25;
@@ -1196,6 +1725,10 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         let bestScore = Number.NEGATIVE_INFINITY;
 
         for (let depth = 0; depth < 8 && current; depth += 1) {
+          if (/^sr-question-field/.test(current.tagName.toLowerCase())) {
+            return current;
+          }
+
           const controls = Array.from(current.querySelectorAll("input:not([type='hidden']), textarea, select, [role='radio'], [role='checkbox'], [role='combobox']"));
 
           if (controls.length > 0 && controls.length <= 10) {
@@ -1205,6 +1738,7 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
             if (/\*/.test(current.textContent ?? "")) score += 25;
             if (/\?/.test(text)) score += 14;
             if (current.matches("fieldset, [role='radiogroup'], [role='group'], section, article, [class*='question' i], [class*='field' i], [class*='input' i]")) score += 20;
+            if (/^sr-question-field/.test(current.tagName.toLowerCase())) score += 80;
 
             if (score > bestScore) {
               best = current;
@@ -1224,6 +1758,10 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
         let bestScore = Number.NEGATIVE_INFINITY;
 
         for (let depth = 0; depth < 8 && current; depth += 1) {
+          if (/^sr-question-field/.test(current.tagName.toLowerCase())) {
+            return current;
+          }
+
           const choices = Array.from(current.querySelectorAll("input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox']")) as HTMLElement[];
           const visibleChoices = choices.filter((choice) => isVisible(choice) || hasVisibleChoiceTarget(choice));
 
@@ -1239,6 +1777,7 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
           if (/\*/.test(current.textContent ?? "")) score += 25;
           if (/\?/.test(text)) score += 14;
           if (current.matches("fieldset, [role='radiogroup'], [role='group'], [class*='question' i], [class*='radio' i], [class*='checkbox' i]")) score += 28;
+          if (/^sr-question-field/.test(current.tagName.toLowerCase())) score += 80;
 
           if (score > bestScore) {
             best = current;
@@ -1283,13 +1822,13 @@ async function discoverDomFields(page: Page): Promise<VisibleField[]> {
           return false;
         }
 
-        if (/\b(fields? marked|marked with|required fields?|all fields|this field is required|there are some errors|show details|select an option|choose an option|cannot find your city|click here|upload|drag and drop)\b/.test(normalized)) {
+        if (/\b(fields? marked|marked with|required fields?|all fields|this field is required|there are some errors|show details|select an option|choose an option|cannot find your city|click here|upload|drag and drop|stage \d+|classified page|visible input fields?|filling should happen|fill engine|gradlaunch|browser agent|detected .* fillable fields?)\b/.test(normalized)) {
           return false;
         }
 
         return /\*/.test(raw)
           || /\?/.test(text)
-          || /\b(experience|company|expertise|reason|location|office|hybrid|bond|obligation|associated|shift|night|notice period|ctc|salary|privacy|consent|authorization|sponsorship)\b/.test(normalized);
+          || /\b(experience|company|expertise|reason|location|office|hybrid|bond|obligation|associated|shift|night|notice period|ctc|salary|privacy|consent|declare|declaration|authorization|sponsorship)\b/.test(normalized);
       }
 
       function isCompositeQuestionElement(element: HTMLElement, rawText: string) {
@@ -1673,10 +2212,7 @@ function inferIntentCandidates(field: VisibleField): FillV2IntentCandidate[] {
   const inputMode = normalizeKey(field.inputMode);
   const scores = new Map<FillV2Intent, { score: number; reasons: Set<string> }>();
   const add = (intent: FillV2Intent, score: number, reason: string) => {
-    const existing = scores.get(intent) ?? { score: 0, reasons: new Set<string>() };
-    existing.score += score;
-    existing.reasons.add(reason);
-    scores.set(intent, existing);
+    adjustIntentScore(scores, intent, score, reason);
   };
 
   if (inputType === "email" || autocomplete.includes("email")) add("email", 55, "Native email signal.");
@@ -1791,6 +2327,8 @@ function inferIntentCandidates(field: VisibleField): FillV2IntentCandidate[] {
     add("sponsorship", /\bsponsorship|permit|visa\b/.test(descriptor) ? 18 : 0, "Yes/No options align with sponsorship.");
   }
 
+  applyHardIntentDisambiguation(field, label, descriptor, scores);
+
   const ranked = [...scores.entries()]
     .filter(([, value]) => value.score > 0)
     .map(([intent, value]) => ({
@@ -1810,6 +2348,79 @@ function inferIntentCandidates(field: VisibleField): FillV2IntentCandidate[] {
   }
 
   return ranked.slice(0, 3);
+}
+
+function adjustIntentScore(
+  scores: Map<FillV2Intent, { score: number; reasons: Set<string> }>,
+  intent: FillV2Intent,
+  delta: number,
+  reason: string
+) {
+  if (!delta) {
+    return;
+  }
+
+  const existing = scores.get(intent) ?? { score: 0, reasons: new Set<string>() };
+  existing.score += delta;
+  existing.reasons.add(reason);
+  scores.set(intent, existing);
+}
+
+function applyHardIntentDisambiguation(
+  field: VisibleField,
+  label: string,
+  descriptor: string,
+  scores: Map<FillV2Intent, { score: number; reasons: Set<string> }>
+) {
+  const yesNoLike = hasYesNoOptions(field.options);
+
+  if (/\b(current company|current employer|current organization)\b/.test(label)) {
+    adjustIntentScore(scores, "work_company", 120, "Exact company label should dominate.");
+    adjustIntentScore(scores, "work_title", -38, "Company field should not collapse into title.");
+    adjustIntentScore(scores, "prose", -85, "Company field is factual, not prose.");
+    adjustIntentScore(scores, "city", -55, "Company field is not a location field.");
+    adjustIntentScore(scores, "preferred_work_location", -55, "Company field is not a preferred location field.");
+  }
+
+  if (/\b(technical expertise|overall technical|technical skills?|core expertise)\b/.test(label)) {
+    adjustIntentScore(scores, "prose", 118, "Technical expertise is best handled as a prose-style answer.");
+    adjustIntentScore(scores, "work_company", -90, "Expertise field should not inherit company context.");
+    adjustIntentScore(scores, "work_title", -55, "Expertise field should not inherit title context.");
+    adjustIntentScore(scores, "city", -45, "Expertise field should not inherit location context.");
+    adjustIntentScore(scores, "preferred_work_location", -45, "Expertise field should not inherit location context.");
+    adjustIntentScore(scores, "notice_period", -35, "Expertise field should not inherit notice period context.");
+  }
+
+  if (/\b(reason for job change|job change reason|why.*change|reason.*change)\b/.test(label)) {
+    adjustIntentScore(scores, "prose", 124, "Reason-for-change field expects an explanation.");
+    adjustIntentScore(scores, "work_company", -95, "Reason-for-change field is not company data.");
+    adjustIntentScore(scores, "work_title", -50, "Reason-for-change field is not title data.");
+    adjustIntentScore(scores, "city", -40, "Reason-for-change field is not location data.");
+    adjustIntentScore(scores, "preferred_work_location", -40, "Reason-for-change field is not location data.");
+    adjustIntentScore(scores, "current_ctc", -40, "Reason-for-change field is not compensation data.");
+  }
+
+  if (/\b(bond|obligation)\b/.test(label) && !/\b(reason|describe|explain)\b/.test(descriptor)) {
+    adjustIntentScore(scores, "bond_obligation_choice", yesNoLike ? 120 : 82, "Bond or obligation label strongly implies a yes/no answer.");
+    adjustIntentScore(scores, "preferred_work_location", -78, "Bond field is not a location field.");
+    adjustIntentScore(scores, "city", -58, "Bond field is not a city field.");
+    adjustIntentScore(scores, "work_company", -72, "Bond field is not company data.");
+    adjustIntentScore(scores, "prose", yesNoLike ? -45 : -18, "Bond field should stay concise unless the page clearly asks for details.");
+  }
+
+  if (/\b(notice period buyout|notice buyout|buyout)\b/.test(label)) {
+    adjustIntentScore(scores, "notice_buyout_choice", yesNoLike ? 122 : 86, "Buyout label strongly implies a buyout choice.");
+    adjustIntentScore(scores, "notice_period", -92, "Buyout question is distinct from notice period length.");
+    adjustIntentScore(scores, "current_ctc", -55, "Buyout question is not compensation.");
+    adjustIntentScore(scores, "preferred_work_location", -62, "Buyout question is not location.");
+    adjustIntentScore(scores, "prose", yesNoLike ? -32 : -12, "Buyout field should remain concise.");
+  }
+
+  if (/\b(notice period|joining time|availability to join|available to join)\b/.test(label) && !/\bbuyout\b/.test(label)) {
+    adjustIntentScore(scores, "notice_period", 96, "Notice-period label should dominate its classification.");
+    adjustIntentScore(scores, "notice_buyout_choice", -80, "Notice period length is not buyout choice.");
+    adjustIntentScore(scores, "prose", -24, "Notice period field is factual.");
+  }
 }
 
 function buildIntentDescriptor(field: VisibleField) {

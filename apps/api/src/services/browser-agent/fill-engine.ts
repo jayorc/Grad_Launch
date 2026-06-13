@@ -275,8 +275,9 @@ async function fillAnswersOnce(
   round: number
 ) {
   const attempts: FillV2AutonomousAttempt[] = [];
+  const orderedAnswers = orderAnswersForSequentialFill(dedupeAnswers(answers), fields);
 
-  for (const answer of dedupeAnswers(answers)) {
+  for (const answer of orderedAnswers) {
     if (await input.shouldStop?.()) {
       break;
     }
@@ -308,6 +309,7 @@ async function fillAnswersOnce(
     const filled = await fillV2Field(input.page, field, answer, adapter);
     await input.page.waitForTimeout(filled ? 60 : 120).catch(() => undefined);
     const verified = await verifyV2Field(input.page, field, answer);
+    const blockersAfter = await collectBlockers(input);
     const afterDebug = shouldTraceLocationField ? await collectFillV2FieldDebug(input.page, field).catch(() => undefined) : undefined;
 
     attempts.push({
@@ -328,9 +330,15 @@ async function fillAnswersOnce(
       valuePreview: answer.value.length > 80 ? `${answer.value.slice(0, 77)}...` : answer.value,
       filled,
       verified,
+      blockersAfter,
       fieldDebugBefore: beforeDebug,
       fieldDebugAfter: afterDebug
     });
+
+    if (shouldHaltSequentialFill(field, answer, verified, blockersAfter)) {
+      await input.onStatus?.(`Stopping after "${answer.label}" because this text field did not verify cleanly and I do not want to contaminate later fields.`);
+      break;
+    }
   }
 
   return attempts;
@@ -370,7 +378,15 @@ function shouldFillAnswer(answer: FillV2Answer) {
     return false;
   }
 
+  if (answer.intent === "prose" && looksLikeResumeFileName(answer.value)) {
+    return false;
+  }
+
   return answer.confidence >= 0.55;
+}
+
+function looksLikeResumeFileName(value: string) {
+  return /^[\w .()[\]-]+\.(pdf|doc|docx|rtf|txt)$/i.test(value.trim());
 }
 
 function dedupeAnswers(answers: FillV2Answer[]) {
@@ -386,6 +402,112 @@ function dedupeAnswers(answers: FillV2Answer[]) {
   }
 
   return [...byKey.values()];
+}
+
+function orderAnswersForSequentialFill(answers: FillV2Answer[], fields: FillV2Field[]) {
+  const fieldById = new Map(fields.map((field) => [field.id, field]));
+
+  return [...answers].sort((left, right) => {
+    const leftField = fieldById.get(left.fieldId ?? "");
+    const rightField = fieldById.get(right.fieldId ?? "");
+
+    return sequentialFillRank(left, leftField) - sequentialFillRank(right, rightField);
+  });
+}
+
+function sequentialFillRank(answer: FillV2Answer, field: FillV2Field | undefined) {
+  let rank = 0;
+
+  if (!answer.required) {
+    rank += 12;
+  }
+
+  if (field) {
+    if (field.driver === "choice" || field.driver === "native_select" || field.driver === "custom_select") {
+      rank -= 18;
+    }
+
+    if (field.driver === "textarea" || field.driver === "contenteditable" || answer.intent === "prose") {
+      rank += 180;
+    }
+
+    if (isRiskySequentialTextField(field, answer)) {
+      rank += 120;
+    }
+
+    if (isHighSignalFactualIntent(answer.intent)) {
+      rank -= 14;
+    }
+  }
+
+  if (answer.source === "profile") rank -= 28;
+  if (answer.source === "prepared" || answer.source === "memory") rank -= 22;
+  if (answer.source === "llm") rank += 90;
+  if (answer.source === "fallback") rank += 70;
+
+  rank += Math.max(0, 100 - Math.round(answer.confidence * 100));
+
+  return rank;
+}
+
+function isHighSignalFactualIntent(intent: FillV2Intent) {
+  return [
+    "first_name",
+    "middle_name",
+    "last_name",
+    "full_name",
+    "email",
+    "confirm_email",
+    "phone",
+    "country",
+    "state",
+    "city",
+    "preferred_work_location",
+    "postal_code",
+    "address_1",
+    "address_2",
+    "current_ctc",
+    "expected_ctc",
+    "notice_period",
+    "total_experience",
+    "work_company",
+    "work_title",
+    "education_start",
+    "education_end"
+  ].includes(intent);
+}
+
+function isRiskySequentialTextField(field: FillV2Field, answer: FillV2Answer) {
+  if (!["text", "textarea", "number", "contenteditable", "email", "phone"].includes(field.driver)) {
+    return false;
+  }
+
+  if (isHighSignalFactualIntent(answer.intent) && answer.source !== "fallback" && field.confidence >= 0.82) {
+    return false;
+  }
+
+  return answer.intent === "unknown"
+    || answer.intent === "prose"
+    || answer.source === "fallback"
+    || answer.source === "llm"
+    || field.confidence < 0.82;
+}
+
+function shouldHaltSequentialFill(
+  field: FillV2Field,
+  answer: FillV2Answer,
+  verified: boolean,
+  blockers: { outstandingRequired: string[]; validationMessages: string[] }
+) {
+  if (verified || !isRiskySequentialTextField(field, answer)) {
+    return false;
+  }
+
+  if (blockers.outstandingRequired.some((label) => labelsMatch(label, answer.label))) {
+    return true;
+  }
+
+  return blockers.validationMessages.length > 0 || answer.source === "fallback" || answer.intent === "prose";
 }
 
 function answerKey(answer: FillV2Answer) {

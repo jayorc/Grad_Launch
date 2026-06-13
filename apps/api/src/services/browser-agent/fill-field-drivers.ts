@@ -21,6 +21,7 @@ type VerificationSnapshot = {
 
 type RuntimeWidgetFamily =
   | "native_text"
+  | "custom_textarea"
   | "aria_combobox"
   | "searchable_combobox"
   | "intl_phone"
@@ -43,7 +44,14 @@ export async function fillV2Field(page: Page, field: FillV2Field, answer: FillV2
     return false;
   }
 
+  if (field.driver === "custom_select") {
+    await closeOpenDropdowns(page);
+  }
+
   if (await verifyV2Field(page, field, answer)) {
+    if (field.driver === "custom_select") {
+      await closeOpenDropdowns(page);
+    }
     return true;
   }
 
@@ -60,6 +68,9 @@ export async function fillV2Field(page: Page, field: FillV2Field, answer: FillV2
     await page.waitForTimeout(140).catch(() => undefined);
 
     if (await verifyV2Field(page, field, answer)) {
+      if (field.driver === "custom_select") {
+        await closeOpenDropdowns(page);
+      }
       return true;
     }
   }
@@ -148,6 +159,10 @@ function buildFillStrategies(field: FillV2Field, runtimeFamily: RuntimeWidgetFam
   }
 
   if (runtimeFamily === "contenteditable") {
+    return ["reactive_text", "plain_text"];
+  }
+
+  if (runtimeFamily === "custom_textarea") {
     return ["reactive_text", "plain_text"];
   }
 
@@ -269,7 +284,7 @@ async function runFillStrategy(
 ) {
   switch (strategy) {
     case "choice":
-      return fillChoice(locator, answer);
+      return fillChoice(frame, locator, answer);
     case "native_select":
       return fillNativeSelect(locator, answer);
     case "country_code_select":
@@ -341,6 +356,7 @@ async function detectWidgetFamily(locator: Locator, field: FillV2Field): Promise
     if (control instanceof HTMLSelectElement) return "native_select";
     if (control.isContentEditable) return "contenteditable";
     if (field.driver === "choice") return "choice";
+    if (isCustomTextareaHost(control) || field.driver === "textarea" && hasDeepTypingTarget(control)) return "custom_textarea";
     if (/\biti__|intl|dial|country code|phone code\b/.test(descriptor)) return "intl_phone";
     if ((control.getAttribute("role") === "combobox" || control.getAttribute("aria-haspopup")) && control.getAttribute("aria-autocomplete")) {
       return "searchable_combobox";
@@ -357,6 +373,62 @@ async function detectWidgetFamily(locator: Locator, field: FillV2Field): Promise
 
     return "native_text";
 
+    function isCustomTextareaHost(element: HTMLElement) {
+      const tag = element.tagName.toLowerCase();
+      return tag.includes("textarea")
+        || element.getAttribute("role") === "textbox"
+        || /\b(spl textarea|oc textarea|textarea|hiring manager message)\b/.test(descriptor)
+        || Boolean(findDeepTypingTarget(element, "textarea"));
+    }
+
+    function hasDeepTypingTarget(element: HTMLElement) {
+      return Boolean(findDeepTypingTarget(element));
+    }
+
+    function findDeepTypingTarget(element: HTMLElement, preferredTag?: string) {
+      const roots: Array<Element | ShadowRoot> = element.shadowRoot ? [element, element.shadowRoot] : [element];
+      let fallback: HTMLElement | undefined;
+
+      for (let index = 0; index < roots.length; index += 1) {
+        const root = roots[index];
+        const candidates = Array.from(root.querySelectorAll("textarea, input, [contenteditable='true']")) as HTMLElement[];
+
+        for (const candidate of candidates) {
+          if (!isTypingTarget(candidate)) {
+            continue;
+          }
+
+          if (!fallback) {
+            fallback = candidate;
+          }
+
+          if (!preferredTag || candidate.tagName.toLowerCase() === preferredTag) {
+            return candidate;
+          }
+        }
+
+        for (const nested of Array.from(root.querySelectorAll("*")) as HTMLElement[]) {
+          if (nested.shadowRoot) {
+            roots.push(nested.shadowRoot);
+          }
+        }
+      }
+
+      return fallback;
+    }
+
+    function isTypingTarget(element: HTMLElement) {
+      if (element instanceof HTMLInputElement) {
+        return !["hidden", "file", "submit", "button", "checkbox", "radio", "image", "reset"].includes(element.type) && !element.disabled;
+      }
+
+      if (element instanceof HTMLTextAreaElement) {
+        return !element.disabled;
+      }
+
+      return element.isContentEditable;
+    }
+
     function normalize(value: string | null | undefined) {
       return (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
     }
@@ -372,6 +444,15 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
 
   const snapshot: VerificationSnapshot | undefined = await located.locator.evaluate((control, { answer, field }) => {
     if (!(control instanceof HTMLElement)) {
+      return {
+        matched: false,
+        invalid: false,
+        openPopup: false,
+        actualPreview: ""
+      };
+    }
+
+    if (!isVerifiableControl(control)) {
       return {
         matched: false,
         invalid: false,
@@ -476,6 +557,7 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
 
     function committedRawValue(element: HTMLElement) {
       const container = findFieldContainer(element) ?? element.parentElement ?? element;
+      const typingTarget = isTypingTarget(element) ? element : findDeepTypingTarget(element);
       const relatedText = Array.from(container.querySelectorAll([
         "input[type='hidden']",
         "[aria-selected='true']",
@@ -498,6 +580,14 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
         })
         .filter(Boolean)
         .join(" ");
+
+      if (typingTarget instanceof HTMLInputElement || typingTarget instanceof HTMLTextAreaElement) {
+        return `${typingTarget.value} ${relatedText}`.trim();
+      }
+
+      if (typingTarget?.isContentEditable) {
+        return `${typingTarget.textContent ?? ""} ${relatedText}`.trim();
+      }
 
       if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
         return `${element.value} ${relatedText}`.trim();
@@ -571,13 +661,7 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
         return "";
       }
 
-      return [
-        selected instanceof HTMLInputElement ? selected.value : "",
-        selected.getAttribute("aria-label"),
-        selected.id ? document.querySelector(`label[for="${CSS.escape(selected.id)}"]`)?.textContent : "",
-        selected.closest("label")?.textContent,
-        selected.parentElement?.textContent
-      ].filter(Boolean).join(" ");
+      return choiceReadableText(selected, group, group.indexOf(selected));
     }
 
     function findLocalChoiceGroup(element: HTMLElement) {
@@ -626,7 +710,59 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
     }
 
     function matches(actual: string, expected: string) {
-      return actual === expected || actual.includes(expected) || expected.includes(actual);
+      if (!actual || !expected) {
+        return false;
+      }
+
+      return actual === expected
+        || actual.includes(expected)
+        || actual.length >= 2 && expected.includes(actual);
+    }
+
+    function choiceReadableText(element: HTMLElement, group: HTMLElement[], index: number) {
+      const ownText = [
+        element instanceof HTMLInputElement ? element.value : "",
+        customChoiceValue(element),
+        element.getAttribute("value"),
+        element.getAttribute("data-value"),
+        element.getAttribute("aria-label"),
+        element.getAttribute("aria-valuetext"),
+        element.getAttribute("title"),
+        element.id ? document.querySelector(`label[for="${CSS.escape(element.id)}"]`)?.textContent : "",
+        element.closest("label")?.textContent,
+        shadowText(element),
+        element.innerText,
+        element.textContent
+      ].filter(Boolean).join(" ");
+
+      if (normalize(ownText) && (group.length !== 2 || hasChoiceSignal(ownText))) {
+        return ownText;
+      }
+
+      if (group.length === 2) {
+        return index === 0 ? "Yes" : "No";
+      }
+
+      return ownText;
+    }
+
+    function hasChoiceSignal(value: string) {
+      return /\b(yes|no|true|false|agree|accept|decline|none|not now)\b/i.test(value);
+    }
+
+    function customChoiceValue(element: HTMLElement) {
+      const value = (element as unknown as { value?: unknown }).value;
+      return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+        ? String(value)
+        : "";
+    }
+
+    function shadowText(element: HTMLElement) {
+      return element.shadowRoot
+        ? Array.from(element.shadowRoot.querySelectorAll("slot, label, span, div"))
+          .map((item) => item.textContent ?? "")
+          .join(" ")
+        : "";
     }
 
     function isAffirmativeExpected(value: string) {
@@ -741,14 +877,15 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
         container?.getAttribute("aria-invalid"),
         container?.getAttribute("data-invalid"),
         container?.className,
-        container?.querySelector("[aria-live], .error, [class*='error' i], [class*='invalid' i]")?.textContent ?? ""
+        container?.querySelector("[aria-live], .error, [class*='error' i], [class*='invalid' i], [class*='required' i]")?.textContent ?? "",
+        container?.textContent?.match(/\b(value is required|this field is required|required field|please select|please enter)\b/i)?.[0] ?? ""
       ].filter(Boolean).join(" "));
 
       return /\btrue|invalid|error|required\b/.test(descriptor);
     }
 
     function findFieldContainer(element: HTMLElement) {
-      return element.closest("label, fieldset, [role='group'], [role='radiogroup'], [role='combobox'], [aria-haspopup], [class*='field' i], [class*='input' i], [class*='select' i], section, article, div");
+      return element.closest("sr-question-field-radio, sr-question-field-checkbox, sr-question-field-text, sr-question-field-select, label, fieldset, [role='group'], [role='radiogroup'], [role='combobox'], [aria-haspopup], [class*='question-field' i], [class*='field' i], [class*='input' i], [class*='select' i], section, article, div");
     }
 
     function canonicalLocation(raw: string) {
@@ -830,6 +967,61 @@ export async function verifyV2Field(page: Page, field: FillV2Field, answer: Fill
       return element instanceof HTMLInputElement && ["radio", "checkbox"].includes(element.type)
         || element.getAttribute("role") === "radio"
         || element.getAttribute("role") === "checkbox";
+    }
+
+    function isVerifiableControl(element: HTMLElement) {
+      return element instanceof HTMLInputElement
+        || element instanceof HTMLTextAreaElement
+        || element instanceof HTMLSelectElement
+        || element.isContentEditable
+        || Boolean(findDeepTypingTarget(element))
+        || element.getAttribute("role") === "combobox"
+        || element.getAttribute("role") === "textbox"
+        || element.getAttribute("role") === "radio"
+        || element.getAttribute("role") === "checkbox"
+        || Boolean(element.getAttribute("aria-haspopup"));
+    }
+
+    function findDeepTypingTarget(element: HTMLElement) {
+      const roots: Array<Element | ShadowRoot> = element.shadowRoot ? [element, element.shadowRoot] : [element];
+      let fallback: HTMLElement | undefined;
+
+      for (let index = 0; index < roots.length; index += 1) {
+        const root = roots[index];
+        const candidates = Array.from(root.querySelectorAll("textarea, input, [contenteditable='true']")) as HTMLElement[];
+
+        for (const candidate of candidates) {
+          if (!isTypingTarget(candidate)) {
+            continue;
+          }
+
+          if (candidate instanceof HTMLTextAreaElement) {
+            return candidate;
+          }
+
+          fallback = fallback ?? candidate;
+        }
+
+        for (const nested of Array.from(root.querySelectorAll("*")) as HTMLElement[]) {
+          if (nested.shadowRoot) {
+            roots.push(nested.shadowRoot);
+          }
+        }
+      }
+
+      return fallback;
+    }
+
+    function isTypingTarget(element: HTMLElement) {
+      if (element instanceof HTMLInputElement) {
+        return !["hidden", "file", "submit", "button", "checkbox", "radio", "image", "reset"].includes(element.type) && !element.disabled;
+      }
+
+      if (element instanceof HTMLTextAreaElement) {
+        return !element.disabled;
+      }
+
+      return element.isContentEditable;
     }
 
     function isVisible(element: Element) {
@@ -953,14 +1145,104 @@ export async function collectFillV2FieldDebug(page: Page, field: FillV2Field) {
   };
 }
 
+export async function readV2FieldCurrentValue(page: Page, field: FillV2Field) {
+  const located = await findV2Locator(page, field);
+
+  if (!located) {
+    return undefined;
+  }
+
+  const value = await located.locator.evaluate((control) => {
+    if (!(control instanceof HTMLElement)) {
+      return "";
+    }
+
+    const typingTarget = isTypingTarget(control) ? control : findDeepTypingTarget(control);
+
+    if (typingTarget instanceof HTMLInputElement || typingTarget instanceof HTMLTextAreaElement) {
+      return typingTarget.value.trim();
+    }
+
+    if (typingTarget?.isContentEditable) {
+      return (typingTarget.textContent ?? "").trim();
+    }
+
+    if (control instanceof HTMLSelectElement) {
+      const selected = control.selectedOptions[0];
+      return `${selected?.textContent ?? ""} ${selected?.value ?? ""} ${control.value}`.replace(/\s+/g, " ").trim();
+    }
+
+    if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
+      return control.value.trim();
+    }
+
+    return [
+      control.getAttribute("data-value"),
+      control.getAttribute("aria-valuetext"),
+      control.getAttribute("title"),
+      control.innerText,
+      control.textContent
+    ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+
+    function findDeepTypingTarget(element: HTMLElement) {
+      const roots: Array<Element | ShadowRoot> = element.shadowRoot ? [element, element.shadowRoot] : [element];
+      let fallback: HTMLElement | undefined;
+
+      for (let index = 0; index < roots.length; index += 1) {
+        const root = roots[index];
+        const candidates = Array.from(root.querySelectorAll("textarea, input, [contenteditable='true']")) as HTMLElement[];
+
+        for (const candidate of candidates) {
+          if (!isTypingTarget(candidate)) {
+            continue;
+          }
+
+          if (candidate instanceof HTMLTextAreaElement) {
+            return candidate;
+          }
+
+          fallback = fallback ?? candidate;
+        }
+
+        for (const nested of Array.from(root.querySelectorAll("*")) as HTMLElement[]) {
+          if (nested.shadowRoot) {
+            roots.push(nested.shadowRoot);
+          }
+        }
+      }
+
+      return fallback;
+    }
+
+    function isTypingTarget(element: HTMLElement) {
+      if (element instanceof HTMLInputElement) {
+        return !["hidden", "file", "submit", "button", "checkbox", "radio", "image", "reset"].includes(element.type) && !element.disabled;
+      }
+
+      if (element instanceof HTMLTextAreaElement) {
+        return !element.disabled;
+      }
+
+      return element.isContentEditable;
+    }
+  }).catch(() => "");
+
+  return value?.trim() || undefined;
+}
+
 async function fillTextLike(locator: Locator, value: string) {
   const target = await resolveTypingLocator(locator);
 
   if (!target) {
+    return seedDeepReactiveText(locator, value);
+  }
+
+  const typed = await realType(target, value).then(() => true).catch(() => false);
+
+  if (!typed && !await seedDeepReactiveText(locator, value)) {
     return false;
   }
 
-  await realType(target, value);
   await target.press("Tab", { timeout: 350 }).catch(() => undefined);
   await target.blur().catch(() => undefined);
   await target.page().waitForTimeout(Number(process.env.BROWSER_REAL_TYPE_COMMIT_WAIT_MS ?? 120)).catch(() => undefined);
@@ -971,12 +1253,12 @@ async function fillReactiveText(locator: Locator, value: string, runtimeFamily: 
   const target = await resolveTypingLocator(locator);
 
   if (!target) {
-    return false;
+    return seedDeepReactiveText(locator, value);
   }
 
   const seeded = await seedReactiveText(target, value);
 
-  if (!seeded && runtimeFamily !== "contenteditable") {
+  if (!seeded && !await seedDeepReactiveText(locator, value) && runtimeFamily !== "contenteditable") {
     return false;
   }
 
@@ -1104,6 +1386,108 @@ async function seedReactiveText(locator: Locator, value: string) {
   }, value).catch(() => false);
 }
 
+async function seedDeepReactiveText(locator: Locator, value: string) {
+  return locator.evaluate((element, nextValue) => {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    const target = isTypingTarget(element) ? element : findDeepTypingTarget(element);
+
+    if (!target) {
+      return false;
+    }
+
+    applyTextValue(target, nextValue);
+
+    if (target !== element) {
+      dispatchCommitEvents(element, nextValue);
+      setHostValue(element, nextValue);
+    }
+
+    return true;
+
+    function applyTextValue(targetElement: HTMLElement, next: string) {
+      targetElement.focus?.();
+
+      if (targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement) {
+        const prototype = targetElement instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+
+        descriptor?.set?.call(targetElement, next);
+        targetElement.value = next;
+        dispatchCommitEvents(targetElement, next);
+        return;
+      }
+
+      if (targetElement.isContentEditable) {
+        targetElement.textContent = next;
+        dispatchCommitEvents(targetElement, next);
+      }
+    }
+
+    function dispatchCommitEvents(targetElement: HTMLElement, next: string) {
+      targetElement.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, composed: true, data: next, inputType: "insertText" }));
+      targetElement.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, data: next, inputType: "insertText" }));
+      targetElement.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      targetElement.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }));
+      targetElement.dispatchEvent(new Event("blur", { bubbles: true, composed: true }));
+    }
+
+    function setHostValue(host: HTMLElement, next: string) {
+      const writable = host as unknown as { value?: unknown };
+
+      try {
+        writable.value = next;
+      } catch {
+        // Some custom elements expose read-only value properties; DOM events above are enough.
+      }
+    }
+
+    function findDeepTypingTarget(rootElement: HTMLElement) {
+      const roots: Array<Element | ShadowRoot> = rootElement.shadowRoot ? [rootElement, rootElement.shadowRoot] : [rootElement];
+      let fallback: HTMLElement | undefined;
+
+      for (let index = 0; index < roots.length; index += 1) {
+        const root = roots[index];
+        const candidates = Array.from(root.querySelectorAll("textarea, input, [contenteditable='true']")) as HTMLElement[];
+
+        for (const candidate of candidates) {
+          if (!isTypingTarget(candidate)) {
+            continue;
+          }
+
+          if (candidate instanceof HTMLTextAreaElement) {
+            return candidate;
+          }
+
+          fallback = fallback ?? candidate;
+        }
+
+        for (const nested of Array.from(root.querySelectorAll("*")) as HTMLElement[]) {
+          if (nested.shadowRoot) {
+            roots.push(nested.shadowRoot);
+          }
+        }
+      }
+
+      return fallback;
+    }
+
+    function isTypingTarget(targetElement: HTMLElement) {
+      if (targetElement instanceof HTMLInputElement) {
+        return !["hidden", "file", "submit", "button", "checkbox", "radio", "image", "reset"].includes(targetElement.type) && !targetElement.disabled;
+      }
+
+      if (targetElement instanceof HTMLTextAreaElement) {
+        return !targetElement.disabled;
+      }
+
+      return targetElement.isContentEditable;
+    }
+  }, value).catch(() => false);
+}
+
 async function fillPhone(page: Page, frame: Frame, locator: Locator, answer: FillV2Answer) {
   const parsed = parsePhone(answer.value);
 
@@ -1215,8 +1599,9 @@ async function fillNativeSelect(locator: Locator, answer: FillV2Answer) {
   }, answer.value).catch(() => false);
 }
 
-async function fillChoice(locator: Locator, answer: FillV2Answer) {
-  return locator.evaluate((control, answer) => {
+async function fillChoice(frame: Frame, locator: Locator, answer: FillV2Answer) {
+  const marker = `fill-v2-choice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const marked = await locator.evaluate((control, { answer, marker }) => {
     if (!(control instanceof HTMLElement)) {
       return false;
     }
@@ -1224,14 +1609,17 @@ async function fillChoice(locator: Locator, answer: FillV2Answer) {
     const expected = normalize(answer.value);
     const choices = choiceGroup(control);
     const best = choices
-      .map((choice) => ({ choice, score: scoreChoice(choice, expected) }))
+      .map((choice, index) => ({ choice, score: scoreChoice(choice, expected, choices, index) }))
       .sort((left, right) => right.score - left.score)[0];
 
     if (!best || best.score < 35) {
       return false;
     }
 
-    clickChoiceControl(best.choice, /^(yes|true|agree|accept|i agree)$/.test(expected));
+    const target = choiceClickTarget(best.choice) ?? best.choice;
+    target.setAttribute("data-gradlaunch-v2-choice-target", marker);
+    best.choice.setAttribute("data-gradlaunch-v2-choice-control", marker);
+    best.choice.scrollIntoView?.({ block: "center", inline: "center" });
     return true;
 
     function choiceGroup(element: HTMLElement) {
@@ -1286,33 +1674,64 @@ async function fillChoice(locator: Locator, answer: FillV2Answer) {
       return best;
     }
 
-    function clickChoiceControl(choice: HTMLElement, forceChecked: boolean) {
-      const target = choiceClickTarget(choice) ?? choice;
+    function scoreChoice(element: HTMLElement, expected: string, group: HTMLElement[], index: number) {
+      const text = normalize(choiceReadableText(element, group, index));
+      let score = 0;
 
-      target.scrollIntoView?.({ block: "center", inline: "center" });
-      choice.focus?.();
+      if (text === expected) score += 100;
+      if (text.includes(expected) || expected.includes(text)) score += 70;
+      if (/^(yes|true|agree|accept|i agree)$/.test(expected) && /\b(yes|agree|accept|consent|confirm|privacy|terms|notice|acknowledge|read|understand)\b/.test(text)) score += 90;
+      if (/^(no|false|decline|do not|dont|not now|no thanks)$/.test(expected) && /\b(no|decline|do not|none|not now)\b/.test(text)) score += 90;
+      if (group.length === 2 && /^(yes|true|agree|accept|i agree)$/.test(expected) && index === 0) score += 55;
+      if (group.length === 2 && /^(no|false|decline|do not|dont|not now|no thanks)$/.test(expected) && index === 1) score += 55;
 
-      try {
-        target.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, view: window }));
-        target.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, view: window }));
-      } catch (_error) {
-        target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
-        target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+      return score;
+    }
+
+    function choiceReadableText(element: HTMLElement, group: HTMLElement[], index: number) {
+      const ownText = [
+        element instanceof HTMLInputElement ? element.value : "",
+        customChoiceValue(element),
+        element.getAttribute("value"),
+        element.getAttribute("data-value"),
+        element.getAttribute("aria-label"),
+        element.getAttribute("aria-valuetext"),
+        element.getAttribute("title"),
+        element.id ? document.querySelector(`label[for="${CSS.escape(element.id)}"]`)?.textContent : "",
+        element.closest("label")?.textContent,
+        shadowText(element),
+        element.innerText,
+        element.textContent
+      ].filter(Boolean).join(" ");
+
+      if (normalize(ownText) && (group.length !== 2 || hasChoiceSignal(ownText))) {
+        return ownText;
       }
 
-      target.click();
-
-      if (choice instanceof HTMLInputElement && choice.type === "radio" && !choice.checked) {
-        setNativeChecked(choice, true);
+      if (group.length === 2) {
+        return index === 0 ? "Yes" : "No";
       }
 
-      if (choice instanceof HTMLInputElement && choice.type === "checkbox" && forceChecked && !choice.checked) {
-        setNativeChecked(choice, true);
-      }
+      return ownText;
+    }
 
-      choice.dispatchEvent(new Event("input", { bubbles: true }));
-      choice.dispatchEvent(new Event("change", { bubbles: true }));
-      choice.dispatchEvent(new Event("blur", { bubbles: true }));
+    function hasChoiceSignal(value: string) {
+      return /\b(yes|no|true|false|agree|accept|decline|none|not now)\b/i.test(value);
+    }
+
+    function customChoiceValue(element: HTMLElement) {
+      const value = (element as unknown as { value?: unknown }).value;
+      return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+        ? String(value)
+        : "";
+    }
+
+    function shadowText(element: HTMLElement) {
+      return element.shadowRoot
+        ? Array.from(element.shadowRoot.querySelectorAll("slot, label, span, div"))
+          .map((item) => item.textContent ?? "")
+          .join(" ")
+        : "";
     }
 
     function choiceClickTarget(choice: HTMLElement) {
@@ -1333,34 +1752,6 @@ async function fillChoice(locator: Locator, answer: FillV2Answer) {
       const row = choice.closest("button, [role='radio'], [role='checkbox'], [role='button'], [aria-checked], [tabindex], [class*='checkbox'], [class*='radio']");
 
       return row instanceof HTMLElement && isVisible(row) ? row : undefined;
-    }
-
-    function setNativeChecked(input: HTMLInputElement, checked: boolean) {
-      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked");
-
-      if (descriptor?.set) {
-        descriptor.set.call(input, checked);
-      } else {
-        input.checked = checked;
-      }
-    }
-
-    function scoreChoice(element: HTMLElement, expected: string) {
-      const text = normalize([
-        element instanceof HTMLInputElement ? element.value : "",
-        element.getAttribute("aria-label"),
-        element.id ? document.querySelector(`label[for="${CSS.escape(element.id)}"]`)?.textContent : "",
-        element.closest("label")?.textContent,
-        element.parentElement?.textContent
-      ].filter(Boolean).join(" "));
-      let score = 0;
-
-      if (text === expected) score += 100;
-      if (text.includes(expected) || expected.includes(text)) score += 70;
-      if (/^(yes|true|agree|accept|i agree)$/.test(expected) && /\b(yes|agree|accept|consent|confirm|privacy|terms|notice|acknowledge|read|understand)\b/.test(text)) score += 90;
-      if (/^(no|false|decline|do not|dont|not now|no thanks)$/.test(expected) && /\b(no|decline|do not|none|not now)\b/.test(text)) score += 90;
-
-      return score;
     }
 
     function normalize(raw: string | null | undefined) {
@@ -1385,7 +1776,59 @@ async function fillChoice(locator: Locator, answer: FillV2Answer) {
       const style = window.getComputedStyle(element);
       return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
     }
-  }, answer).catch(() => false);
+  }, { answer, marker }).catch(() => false);
+
+  if (!marked) {
+    return false;
+  }
+
+  const target = frame.locator(`[data-gradlaunch-v2-choice-target="${cssEscape(marker)}"]`).first();
+  const clicked = await target.click({ force: true, timeout: 1200 }).then(() => true).catch(() => false);
+
+  await frame.page().waitForTimeout(80).catch(() => undefined);
+  await locator.evaluate((control, { marker, affirmative }) => {
+    const choice = document.querySelector(`[data-gradlaunch-v2-choice-control="${CSS.escape(marker)}"]`);
+    const target = document.querySelector(`[data-gradlaunch-v2-choice-target="${CSS.escape(marker)}"]`);
+
+    if (choice instanceof HTMLElement) {
+      choice.focus?.();
+
+      if (choice instanceof HTMLInputElement && choice.type === "radio" && !choice.checked) {
+        setNativeChecked(choice, true);
+      }
+
+      if (choice instanceof HTMLInputElement && choice.type === "checkbox" && affirmative && !choice.checked) {
+        setNativeChecked(choice, true);
+      }
+
+      choice.dispatchEvent(new Event("input", { bubbles: true }));
+      choice.dispatchEvent(new Event("change", { bubbles: true }));
+      choice.dispatchEvent(new Event("blur", { bubbles: true }));
+    }
+
+    if (target instanceof HTMLElement) {
+      target.dispatchEvent(new Event("change", { bubbles: true }));
+      target.removeAttribute("data-gradlaunch-v2-choice-target");
+    }
+
+    choice?.removeAttribute("data-gradlaunch-v2-choice-control");
+
+    function setNativeChecked(input: HTMLInputElement, checked: boolean) {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked");
+
+      if (descriptor?.set) {
+        descriptor.set.call(input, checked);
+      } else {
+        input.checked = checked;
+      }
+    }
+  }, { marker, affirmative: /^(yes|true|agree|accept|i agree)$/.test(normalizeForChoice(answer.value)) }).catch(() => undefined);
+
+  return clicked;
+
+  function normalizeForChoice(raw: string | null | undefined) {
+    return (raw ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
+  }
 }
 
 async function fillCustomSelect(frame: Frame, locator: Locator, field: FillV2Field, answer: FillV2Answer, adapter: FillV2Adapter) {
@@ -1396,9 +1839,10 @@ async function fillCustomSelect(frame: Frame, locator: Locator, field: FillV2Fie
   await locator.click({ force: true, timeout: 900 }).catch(() => undefined);
   await frame.page().waitForTimeout(120).catch(() => undefined);
 
+  const typingTarget = await resolveTypingLocator(locator);
   let dropdownScope = await waitForDropdownScope(frame, locator);
 
-  if (await typeOpenSelectSearch(frame.page(), query, dropdownScope)) {
+  if (await typeOpenSelectSearch(frame.page(), query, dropdownScope, typingTarget ?? locator)) {
     await frame.page().waitForTimeout(160).catch(() => undefined);
   }
 
@@ -1826,10 +2270,10 @@ async function findV2Locator(page: Page, field: FillV2Field): Promise<LocatedFie
 
   for (const frame of page.frames()) {
     for (const selector of selectors) {
-      const locator = frame.locator(selector).first();
+      const located = await findUsableInLocator(frame, frame.locator(selector), field);
 
-      if (await isUsableFieldLocator(locator, field)) {
-        return { frame, locator };
+      if (located) {
+        return located;
       }
     }
   }
@@ -1854,52 +2298,68 @@ async function findBySemanticLocator(page: Page, field: FillV2Field): Promise<Lo
 
   for (const frame of page.frames()) {
     for (const label of labelVariants) {
-      const exact = frame.getByLabel(label, { exact: true }).first();
+      const exact = await findUsableInLocator(frame, frame.getByLabel(label, { exact: true }), field);
 
-      if (await isUsableFieldLocator(exact, field)) {
-        return { frame, locator: exact };
+      if (exact) {
+        return exact;
       }
 
-      const fuzzy = frame.getByLabel(label).first();
+      const fuzzy = await findUsableInLocator(frame, frame.getByLabel(label), field);
 
-      if (await isUsableFieldLocator(fuzzy, field)) {
-        return { frame, locator: fuzzy };
+      if (fuzzy) {
+        return fuzzy;
       }
     }
 
     for (const role of roleCandidates) {
       for (const label of labelVariants) {
-        const exact = frame.getByRole(role, { name: label, exact: true }).first();
+        const exact = await findUsableInLocator(frame, frame.getByRole(role, { name: label, exact: true }), field);
 
-        if (await isUsableFieldLocator(exact, field)) {
-          return { frame, locator: exact };
+        if (exact) {
+          return exact;
         }
 
-        const fuzzy = frame.getByRole(role, { name: new RegExp(escapeFieldRegExp(label), "i") }).first();
+        const fuzzy = await findUsableInLocator(frame, frame.getByRole(role, { name: new RegExp(escapeFieldRegExp(label), "i") }), field);
 
-        if (await isUsableFieldLocator(fuzzy, field)) {
-          return { frame, locator: fuzzy };
+        if (fuzzy) {
+          return fuzzy;
         }
       }
     }
 
     for (const placeholder of placeholderVariants) {
-      const locator = frame.getByPlaceholder(placeholder, { exact: true }).first();
+      const located = await findUsableInLocator(frame, frame.getByPlaceholder(placeholder, { exact: true }), field);
 
-      if (await isUsableFieldLocator(locator, field)) {
-        return { frame, locator };
+      if (located) {
+        return located;
       }
     }
 
     const attributeLocators = [
-      field.name ? frame.locator(`[name="${cssEscape(field.name)}"]`).first() : undefined,
-      field.autocomplete ? frame.locator(`[autocomplete="${cssEscape(field.autocomplete)}"]`).first() : undefined
+      field.name ? frame.locator(`[name="${cssEscape(field.name)}"]`) : undefined,
+      field.autocomplete ? frame.locator(`[autocomplete="${cssEscape(field.autocomplete)}"]`) : undefined
     ].filter((locator): locator is Locator => Boolean(locator));
 
     for (const locator of attributeLocators) {
-      if (await isUsableFieldLocator(locator, field)) {
-        return { frame, locator };
+      const located = await findUsableInLocator(frame, locator, field);
+
+      if (located) {
+        return located;
       }
+    }
+  }
+
+  return undefined;
+}
+
+async function findUsableInLocator(frame: Frame, locator: Locator, field: FillV2Field): Promise<LocatedField | undefined> {
+  const count = Math.min(await locator.count().catch(() => 0), 8);
+
+  for (let index = 0; index < count; index += 1) {
+    const candidate = locator.nth(index);
+
+    if (await isUsableFieldLocator(candidate, field)) {
+      return { frame, locator: candidate };
     }
   }
 
@@ -1911,7 +2371,7 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
 
   for (const frame of page.frames()) {
     const found = await frame.evaluate(({ field, marker }) => {
-      const controls = Array.from(document.querySelectorAll("input, textarea, select, [contenteditable='true'], [role='combobox'], [role='radio'], [role='checkbox'], [aria-haspopup]")) as HTMLElement[];
+      const controls = Array.from(document.querySelectorAll("input, textarea, select, spl-textarea, oc-textarea, [contenteditable='true'], [role='textbox'], [role='combobox'], [role='radio'], [role='checkbox'], [aria-haspopup]")) as HTMLElement[];
       const expected = normalize(`${field.label} ${field.intent}`);
       let best: HTMLElement | undefined;
       let bestScore = 0;
@@ -1938,7 +2398,12 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
           control.closest("fieldset")?.querySelector("legend")?.textContent,
           control.parentElement?.textContent
         ].filter(Boolean).join(" "));
+        const visualOwner = findVisualOwnerLabel(control);
         const section = normalize(control.closest("fieldset, section, article, [role='group'], [class*='section' i], [class*='step' i], [class*='card' i]")?.textContent ?? "");
+
+        if (visualOwner && isOwnershipMismatch(field, visualOwner)) {
+          continue;
+        }
 
         if (isIncompatibleControl(field, control, label)) {
           continue;
@@ -1946,6 +2411,8 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
 
         let score = tokenScore(expected, label);
 
+        if (visualOwner && labelsCompatible(field.label, visualOwner)) score += 90;
+        if (field.ownerLabelText && visualOwner && labelsCompatible(field.ownerLabelText, visualOwner)) score += 70;
         if (field.label && label.includes(normalize(field.label))) score += 36;
         if (field.ariaLabel && label.includes(normalize(field.ariaLabel))) score += 24;
         if (field.placeholder && label.includes(normalize(field.placeholder))) score += 18;
@@ -1956,7 +2423,7 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
         if (field.widgetKind === "phone_input" && control instanceof HTMLInputElement && (control.type === "tel" || normalize(control.getAttribute("inputmode")) === "tel")) score += 26;
         if (field.widgetKind === "email_input" && control instanceof HTMLInputElement && control.type === "email") score += 26;
         if (field.widgetKind === "numeric_input" && control instanceof HTMLInputElement && control.type === "number") score += 22;
-        if (field.widgetKind === "textarea" && control.tagName.toLowerCase() === "textarea") score += 22;
+        if (field.widgetKind === "textarea" && (control.tagName.toLowerCase() === "textarea" || isTextareaLikeControl(control))) score += 22;
         if (field.widgetKind === "native_select" && control.tagName.toLowerCase() === "select") score += 22;
         if ((field.widgetKind === "combobox" || field.widgetKind === "autocomplete") && (control.getAttribute("role") === "combobox" || control.getAttribute("aria-haspopup"))) score += 22;
 
@@ -2038,6 +2505,275 @@ async function findByLabel(page: Page, field: FillV2Field): Promise<LocatedField
         return false;
       }
 
+      function isTextareaLikeControl(control: HTMLElement) {
+        const tag = normalize(control.tagName);
+        return tag.includes("textarea")
+          || control.getAttribute("role") === "textbox"
+          || Boolean(findDeepTypingTarget(control, "textarea"));
+      }
+
+      function findDeepTypingTarget(element: HTMLElement, preferredTag?: string) {
+        const roots: Array<Element | ShadowRoot> = element.shadowRoot ? [element, element.shadowRoot] : [element];
+        let fallback: HTMLElement | undefined;
+
+        for (let index = 0; index < roots.length; index += 1) {
+          const root = roots[index];
+          const candidates = Array.from(root.querySelectorAll("textarea, input, [contenteditable='true']")) as HTMLElement[];
+
+          for (const candidate of candidates) {
+            if (!isTypingTarget(candidate)) {
+              continue;
+            }
+
+            if (!fallback) {
+              fallback = candidate;
+            }
+
+            if (!preferredTag || candidate.tagName.toLowerCase() === preferredTag) {
+              return candidate;
+            }
+          }
+
+          for (const nested of Array.from(root.querySelectorAll("*")) as HTMLElement[]) {
+            if (nested.shadowRoot) {
+              roots.push(nested.shadowRoot);
+            }
+          }
+        }
+
+        return fallback;
+      }
+
+      function isTypingTarget(element: HTMLElement) {
+        if (element instanceof HTMLInputElement) {
+          return !["hidden", "file", "submit", "button", "checkbox", "radio", "image", "reset"].includes(element.type) && !element.disabled;
+        }
+
+        if (element instanceof HTMLTextAreaElement) {
+          return !element.disabled;
+        }
+
+        return element.isContentEditable;
+      }
+
+      function findVisualOwnerLabel(control: HTMLElement) {
+        const directOwner = directControlOwnerLabel(control);
+
+        if (directOwner) {
+          return directOwner;
+        }
+
+        const controlRect = control.getBoundingClientRect();
+        const labels = Array.from(document.querySelectorAll("label, legend, h1, h2, h3, h4, p, span, div, strong, b")) as HTMLElement[];
+        let best: { label: string; score: number } | undefined;
+
+        for (const element of labels) {
+          if (!isVisible(element) || element.contains(control) && !(element instanceof HTMLLabelElement)) {
+            continue;
+          }
+
+          const raw = element.innerText || element.textContent || "";
+          const label = cleanQuestionLabel(raw);
+
+          if (!isQuestionLabel(label, raw) || isCompositeQuestionElement(element, raw)) {
+            continue;
+          }
+
+          const rect = element.getBoundingClientRect();
+          const relation = labelControlOwnershipRelation(rect, controlRect);
+
+          if (!relation) {
+            continue;
+          }
+
+          if (hasInterveningQuestionLabel(element, control, labels)) {
+            continue;
+          }
+
+          const horizontal = rect.right < controlRect.left
+            ? controlRect.left - rect.right
+            : rect.left > controlRect.right
+              ? rect.left - controlRect.right
+              : 0;
+
+          if (horizontal > Math.max(460, controlRect.width * 3)) {
+            continue;
+          }
+
+          const score = 260
+            - relation.distance
+            - Math.abs(rect.left - controlRect.left) / 5
+            - Math.min(horizontal / 3, 90)
+            + relation.bonus * 100
+            + (element instanceof HTMLLabelElement ? 20 : 0);
+
+          if (score > 0 && (!best || score > best.score)) {
+            best = { label, score };
+          }
+        }
+
+        return best?.label;
+      }
+
+      function labelControlOwnershipRelation(labelRect: DOMRect, controlRect: DOMRect) {
+        if (labelRect.height <= 0 || labelRect.width <= 0 || controlRect.height <= 0 || controlRect.width <= 0) {
+          return undefined;
+        }
+
+        const labelCenterY = labelRect.top + labelRect.height / 2;
+        const controlCenterY = controlRect.top + controlRect.height / 2;
+        const verticalOverlap = Math.min(labelRect.bottom, controlRect.bottom) - Math.max(labelRect.top, controlRect.top);
+        const horizontalGap = labelRect.right < controlRect.left
+          ? controlRect.left - labelRect.right
+          : labelRect.left > controlRect.right
+            ? labelRect.left - controlRect.right
+            : 0;
+        const above = labelRect.bottom <= controlRect.top + 8 && labelRect.top < controlRect.top - 4;
+
+        if (above) {
+          const distance = Math.max(0, controlRect.top - labelRect.bottom);
+
+          if (distance > 420) {
+            return undefined;
+          }
+
+          return { distance, bonus: 0 };
+        }
+
+        const sameRowLeft = labelRect.left < controlRect.left - 4
+          && labelRect.right <= controlRect.left + 18
+          && Math.abs(labelCenterY - controlCenterY) <= Math.max(22, Math.min(labelRect.height, controlRect.height) * 0.9)
+          && verticalOverlap > Math.min(labelRect.height, controlRect.height) * 0.25
+          && horizontalGap <= Math.max(360, controlRect.width * 2.5);
+
+        if (sameRowLeft) {
+          return { distance: Math.abs(labelCenterY - controlCenterY), bonus: 0.08 };
+        }
+
+        return undefined;
+      }
+
+      function directControlOwnerLabel(control: HTMLElement) {
+        const wrapper = cleanQuestionLabel(control.closest("label")?.textContent ?? "");
+
+        if (wrapper && !isGenericLabel(wrapper) && !/^(yes|no|true|false|agree|accept|decline)$/i.test(wrapper)) {
+          return wrapper;
+        }
+
+        if (control.id) {
+          const label = document.querySelector(`label[for="${CSS.escape(control.id)}"]`);
+          const text = cleanQuestionLabel(label?.textContent ?? "");
+
+          if (text && !isGenericLabel(text) && !/^(yes|no|true|false|agree|accept|decline)$/i.test(text)) {
+            return text;
+          }
+        }
+
+        return "";
+      }
+
+      function hasInterveningQuestionLabel(labelElement: HTMLElement, control: HTMLElement, labels: HTMLElement[]) {
+        const labelRect = labelElement.getBoundingClientRect();
+        const controlRect = control.getBoundingClientRect();
+        const lower = Math.min(labelRect.bottom, controlRect.top);
+        const upper = Math.max(labelRect.bottom, controlRect.top);
+
+        return labels.some((candidate) => {
+          if (candidate === labelElement || candidate.contains(labelElement) || labelElement.contains(candidate) || candidate.contains(control) || !isVisible(candidate)) {
+            return false;
+          }
+
+          const raw = candidate.innerText || candidate.textContent || "";
+          const label = cleanQuestionLabel(raw);
+
+          if (!isQuestionLabel(label, raw) || isCompositeQuestionElement(candidate, raw)) {
+            return false;
+          }
+
+          const rect = candidate.getBoundingClientRect();
+          return rect.top > lower + 3 && rect.top < upper - 3;
+        });
+      }
+
+      function isOwnershipMismatch(field: { label: string; ownerLabelText?: string; intent?: string; driver?: string }, visualOwner: string) {
+        const desired = field.ownerLabelText || field.label;
+
+        if (!desired || !visualOwner || isGenericLabel(visualOwner)) {
+          return false;
+        }
+
+        return !labelsCompatible(desired, visualOwner) && !labelsCompatible(field.label, visualOwner);
+      }
+
+      function labelsCompatible(left: string | undefined, right: string | undefined) {
+        const leftKey = normalize(left);
+        const rightKey = normalize(right);
+
+        if (!leftKey || !rightKey) {
+          return false;
+        }
+
+        if (leftKey === rightKey || leftKey.includes(rightKey) || rightKey.includes(leftKey)) {
+          return true;
+        }
+
+        const leftTokens = tokens(leftKey);
+        const rightTokens = tokens(rightKey);
+        let overlap = 0;
+
+        for (const token of leftTokens) {
+          if (rightTokens.has(token)) {
+            overlap += 1;
+          }
+        }
+
+        return overlap / Math.max(1, Math.min(leftTokens.size, rightTokens.size)) >= 0.65;
+      }
+
+      function cleanQuestionLabel(raw: string) {
+        return raw
+          .replace(/\b(value is required|this field is required|required field|please select|please enter)\b/gi, " ")
+          .replace(/\b\d+\s*\/\s*\d+\b/g, " ")
+          .replace(/\*/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function isQuestionLabel(label: string, raw: string) {
+        const key = normalize(label);
+
+        if (!key || key.length < 3 || key.length > 180) {
+          return false;
+        }
+
+        if (/^(yes|no|value is required|required|select|search|close|next|back|submit)$/.test(key)) {
+          return false;
+        }
+
+        if (/\b(stage \d+|classified page|visible input fields?|filling should happen|fill engine|gradlaunch|browser agent|detected .* fillable fields?)\b/.test(key)) {
+          return false;
+        }
+
+        return /\?$/.test(raw.trim())
+          || /\*/.test(raw)
+          || /\b(name|email|phone|company|organization|expertise|reason|location|bond|obligation|notice|ctc|experience|shift|associated|aadhar|aadhaar|privacy|declare)\b/.test(key);
+      }
+
+      function isCompositeQuestionElement(element: HTMLElement, raw: string) {
+        const key = normalize(raw);
+
+        if (key.length > 220) {
+          return true;
+        }
+
+        const controls = element.querySelectorAll("input, textarea, select, [contenteditable='true'], [role='combobox'], [role='radio'], [role='checkbox']");
+        return controls.length > 1;
+      }
+
+      function isGenericLabel(value: string) {
+        return /^(yes|no|on|off|search|select|select an option|choose an option|value is required|required)$/i.test(value.trim());
+      }
+
       function isVisible(element: Element) {
         const rect = element.getBoundingClientRect();
         const style = window.getComputedStyle(element);
@@ -2076,6 +2812,10 @@ async function isUsableFieldLocator(locator: Locator, field: FillV2Field) {
       return false;
     }
 
+    if (!isFillControl(control)) {
+      return false;
+    }
+
     const inputType = control instanceof HTMLInputElement ? normalize(control.type) : "";
     const label = normalize([
       control.getAttribute("aria-label"),
@@ -2088,8 +2828,13 @@ async function isUsableFieldLocator(locator: Locator, field: FillV2Field) {
       control.closest("fieldset")?.querySelector("legend")?.textContent,
       control.parentElement?.textContent
     ].filter(Boolean).join(" "));
+    const visualOwner = findVisualOwnerLabel(control);
 
     if (["hidden", "submit", "button", "image", "reset"].includes(inputType)) {
+      return false;
+    }
+
+    if (visualOwner && isOwnershipMismatch(field, visualOwner)) {
       return false;
     }
 
@@ -2107,8 +2852,291 @@ async function isUsableFieldLocator(locator: Locator, field: FillV2Field) {
 
     return true;
 
+    function isFillControl(element: HTMLElement) {
+      return element instanceof HTMLInputElement
+        || element instanceof HTMLTextAreaElement
+        || element instanceof HTMLSelectElement
+        || element.isContentEditable
+        || Boolean(findDeepTypingTarget(element))
+        || element.getAttribute("role") === "combobox"
+        || element.getAttribute("role") === "textbox"
+        || element.getAttribute("role") === "radio"
+        || element.getAttribute("role") === "checkbox"
+        || Boolean(element.getAttribute("aria-haspopup"));
+    }
+
+    function findDeepTypingTarget(element: HTMLElement) {
+      const roots: Array<Element | ShadowRoot> = element.shadowRoot ? [element, element.shadowRoot] : [element];
+      let fallback: HTMLElement | undefined;
+
+      for (let index = 0; index < roots.length; index += 1) {
+        const root = roots[index];
+        const candidates = Array.from(root.querySelectorAll("textarea, input, [contenteditable='true']")) as HTMLElement[];
+
+        for (const candidate of candidates) {
+          if (!isTypingTarget(candidate)) {
+            continue;
+          }
+
+          if (candidate instanceof HTMLTextAreaElement) {
+            return candidate;
+          }
+
+          fallback = fallback ?? candidate;
+        }
+
+        for (const nested of Array.from(root.querySelectorAll("*")) as HTMLElement[]) {
+          if (nested.shadowRoot) {
+            roots.push(nested.shadowRoot);
+          }
+        }
+      }
+
+      return fallback;
+    }
+
+    function isTypingTarget(element: HTMLElement) {
+      if (element instanceof HTMLInputElement) {
+        return !["hidden", "file", "submit", "button", "checkbox", "radio", "image", "reset"].includes(element.type) && !element.disabled;
+      }
+
+      if (element instanceof HTMLTextAreaElement) {
+        return !element.disabled;
+      }
+
+      return element.isContentEditable;
+    }
+
+    function findVisualOwnerLabel(control: HTMLElement) {
+      const directOwner = directControlOwnerLabel(control);
+
+      if (directOwner) {
+        return directOwner;
+      }
+
+      const controlRect = control.getBoundingClientRect();
+      const labels = Array.from(document.querySelectorAll("label, legend, h1, h2, h3, h4, p, span, div, strong, b")) as HTMLElement[];
+      let best: { label: string; score: number } | undefined;
+
+      for (const element of labels) {
+        if (!isVisible(element) || element.contains(control) && !(element instanceof HTMLLabelElement)) {
+          continue;
+        }
+
+        const raw = element.innerText || element.textContent || "";
+        const label = cleanQuestionLabel(raw);
+
+        if (!isQuestionLabel(label, raw) || isCompositeQuestionElement(element, raw)) {
+          continue;
+        }
+
+        const rect = element.getBoundingClientRect();
+        const relation = labelControlOwnershipRelation(rect, controlRect);
+
+        if (!relation) {
+          continue;
+        }
+
+        if (hasInterveningQuestionLabel(element, control, labels)) {
+          continue;
+        }
+
+        const horizontal = rect.right < controlRect.left
+          ? controlRect.left - rect.right
+          : rect.left > controlRect.right
+            ? rect.left - controlRect.right
+            : 0;
+
+        if (horizontal > Math.max(460, controlRect.width * 3)) {
+          continue;
+        }
+
+        const score = 260
+          - relation.distance
+          - Math.abs(rect.left - controlRect.left) / 5
+          - Math.min(horizontal / 3, 90)
+          + relation.bonus * 100
+          + (element instanceof HTMLLabelElement ? 20 : 0);
+
+        if (score > 0 && (!best || score > best.score)) {
+          best = { label, score };
+        }
+      }
+
+      return best?.label;
+    }
+
+    function labelControlOwnershipRelation(labelRect: DOMRect, controlRect: DOMRect) {
+      if (labelRect.height <= 0 || labelRect.width <= 0 || controlRect.height <= 0 || controlRect.width <= 0) {
+        return undefined;
+      }
+
+      const labelCenterY = labelRect.top + labelRect.height / 2;
+      const controlCenterY = controlRect.top + controlRect.height / 2;
+      const verticalOverlap = Math.min(labelRect.bottom, controlRect.bottom) - Math.max(labelRect.top, controlRect.top);
+      const horizontalGap = labelRect.right < controlRect.left
+        ? controlRect.left - labelRect.right
+        : labelRect.left > controlRect.right
+          ? labelRect.left - controlRect.right
+          : 0;
+      const above = labelRect.bottom <= controlRect.top + 8 && labelRect.top < controlRect.top - 4;
+
+      if (above) {
+        const distance = Math.max(0, controlRect.top - labelRect.bottom);
+
+        if (distance > 420) {
+          return undefined;
+        }
+
+        return { distance, bonus: 0 };
+      }
+
+      const sameRowLeft = labelRect.left < controlRect.left - 4
+        && labelRect.right <= controlRect.left + 18
+        && Math.abs(labelCenterY - controlCenterY) <= Math.max(22, Math.min(labelRect.height, controlRect.height) * 0.9)
+        && verticalOverlap > Math.min(labelRect.height, controlRect.height) * 0.25
+        && horizontalGap <= Math.max(360, controlRect.width * 2.5);
+
+      if (sameRowLeft) {
+        return { distance: Math.abs(labelCenterY - controlCenterY), bonus: 0.08 };
+      }
+
+      return undefined;
+    }
+
+    function directControlOwnerLabel(control: HTMLElement) {
+      const wrapper = cleanQuestionLabel(control.closest("label")?.textContent ?? "");
+
+      if (wrapper && !isGenericLabel(wrapper) && !/^(yes|no|true|false|agree|accept|decline)$/i.test(wrapper)) {
+        return wrapper;
+      }
+
+      if (control.id) {
+        const label = document.querySelector(`label[for="${CSS.escape(control.id)}"]`);
+        const text = cleanQuestionLabel(label?.textContent ?? "");
+
+        if (text && !isGenericLabel(text) && !/^(yes|no|true|false|agree|accept|decline)$/i.test(text)) {
+          return text;
+        }
+      }
+
+      return "";
+    }
+
+    function hasInterveningQuestionLabel(labelElement: HTMLElement, control: HTMLElement, labels: HTMLElement[]) {
+      const labelRect = labelElement.getBoundingClientRect();
+      const controlRect = control.getBoundingClientRect();
+      const lower = Math.min(labelRect.bottom, controlRect.top);
+      const upper = Math.max(labelRect.bottom, controlRect.top);
+
+      return labels.some((candidate) => {
+        if (candidate === labelElement || candidate.contains(labelElement) || labelElement.contains(candidate) || candidate.contains(control) || !isVisible(candidate)) {
+          return false;
+        }
+
+        const raw = candidate.innerText || candidate.textContent || "";
+        const label = cleanQuestionLabel(raw);
+
+        if (!isQuestionLabel(label, raw) || isCompositeQuestionElement(candidate, raw)) {
+          return false;
+        }
+
+        const rect = candidate.getBoundingClientRect();
+        return rect.top > lower + 3 && rect.top < upper - 3;
+      });
+    }
+
+    function isOwnershipMismatch(field: { label: string; ownerLabelText?: string }, visualOwner: string) {
+      const desired = field.ownerLabelText || field.label;
+
+      if (!desired || !visualOwner || isGenericLabel(visualOwner)) {
+        return false;
+      }
+
+      return !labelsCompatible(desired, visualOwner) && !labelsCompatible(field.label, visualOwner);
+    }
+
+    function labelsCompatible(left: string | undefined, right: string | undefined) {
+      const leftKey = normalize(left);
+      const rightKey = normalize(right);
+
+      if (!leftKey || !rightKey) {
+        return false;
+      }
+
+      if (leftKey === rightKey || leftKey.includes(rightKey) || rightKey.includes(leftKey)) {
+        return true;
+      }
+
+      const leftTokens = tokens(leftKey);
+      const rightTokens = tokens(rightKey);
+      let overlap = 0;
+
+      for (const token of leftTokens) {
+        if (rightTokens.has(token)) {
+          overlap += 1;
+        }
+      }
+
+      return overlap / Math.max(1, Math.min(leftTokens.size, rightTokens.size)) >= 0.65;
+    }
+
+    function tokens(value: string) {
+      return new Set(value.split(" ").filter((token) => token.length > 1 && !/^(field|required|select|option|please|enter|choose|the|your)$/.test(token)));
+    }
+
+    function cleanQuestionLabel(raw: string) {
+      return raw
+        .replace(/\b(value is required|this field is required|required field|please select|please enter)\b/gi, " ")
+        .replace(/\b\d+\s*\/\s*\d+\b/g, " ")
+        .replace(/\*/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function isQuestionLabel(label: string, raw: string) {
+      const key = normalize(label);
+
+      if (!key || key.length < 3 || key.length > 180) {
+        return false;
+      }
+
+      if (/^(yes|no|value is required|required|select|search|close|next|back|submit)$/.test(key)) {
+        return false;
+      }
+
+      if (/\b(stage \d+|classified page|visible input fields?|filling should happen|fill engine|gradlaunch|browser agent|detected .* fillable fields?)\b/.test(key)) {
+        return false;
+      }
+
+      return /\?$/.test(raw.trim())
+        || /\*/.test(raw)
+        || /\b(name|email|phone|company|organization|expertise|reason|location|bond|obligation|notice|ctc|experience|shift|associated|aadhar|aadhaar|privacy|declare)\b/.test(key);
+    }
+
+    function isCompositeQuestionElement(element: HTMLElement, raw: string) {
+      const key = normalize(raw);
+
+      if (key.length > 220) {
+        return true;
+      }
+
+      const controls = element.querySelectorAll("input, textarea, select, [contenteditable='true'], [role='combobox'], [role='radio'], [role='checkbox']");
+      return controls.length > 1;
+    }
+
+    function isGenericLabel(value: string) {
+      return /^(yes|no|on|off|search|select|select an option|choose an option|value is required|required)$/i.test(value.trim());
+    }
+
     function normalize(raw: string | null | undefined) {
       return (raw ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
+    }
+
+    function isVisible(element: Element) {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity || "1") > 0;
     }
   }, field).catch(() => false);
 }
@@ -2146,8 +3174,7 @@ async function resolveTypingLocator(locator: Locator) {
 
     const target = isTypingTarget(control)
       ? control
-      : Array.from(control.querySelectorAll("input, textarea, [contenteditable='true']"))
-        .find((item): item is HTMLElement => item instanceof HTMLElement && isTypingTarget(item));
+      : findDeepTypingTarget(control);
 
     if (!target) {
       return false;
@@ -2155,6 +3182,36 @@ async function resolveTypingLocator(locator: Locator) {
 
     target.setAttribute("data-gradlaunch-v2-typing-target", marker);
     return true;
+
+    function findDeepTypingTarget(rootElement: HTMLElement) {
+      const roots: Array<Element | ShadowRoot> = rootElement.shadowRoot ? [rootElement, rootElement.shadowRoot] : [rootElement];
+      let fallback: HTMLElement | undefined;
+
+      for (let index = 0; index < roots.length; index += 1) {
+        const root = roots[index];
+        const candidates = Array.from(root.querySelectorAll("textarea, input, [contenteditable='true']")) as HTMLElement[];
+
+        for (const candidate of candidates) {
+          if (!isTypingTarget(candidate)) {
+            continue;
+          }
+
+          if (candidate instanceof HTMLTextAreaElement) {
+            return candidate;
+          }
+
+          fallback = fallback ?? candidate;
+        }
+
+        for (const nested of Array.from(root.querySelectorAll("*")) as HTMLElement[]) {
+          if (nested.shadowRoot) {
+            roots.push(nested.shadowRoot);
+          }
+        }
+      }
+
+      return fallback;
+    }
 
     function isTypingTarget(element: HTMLElement) {
       if (element instanceof HTMLInputElement) {
@@ -2184,7 +3241,12 @@ async function realType(locator: Locator, value: string) {
   });
 }
 
-async function typeOpenSelectSearch(page: Page, query: string, scope?: DropdownScope) {
+async function closeOpenDropdowns(page: Page) {
+  await page.keyboard.press("Escape").catch(() => undefined);
+  await page.waitForTimeout(80).catch(() => undefined);
+}
+
+async function typeOpenSelectSearch(page: Page, query: string, scope?: DropdownScope, fallbackTarget?: Locator) {
   if (scope && await typeScopedOpenSelectSearch(scope, query)) {
     return true;
   }
@@ -2204,6 +3266,16 @@ async function typeOpenSelectSearch(page: Page, query: string, scope?: DropdownS
 
     if (await input.isVisible({ timeout: 180 }).catch(() => false)) {
       await realType(input, query).catch(() => undefined);
+      return true;
+    }
+  }
+
+  if (fallbackTarget) {
+    const typedIntoTarget = await realType(fallbackTarget, query)
+      .then(() => true)
+      .catch(() => false);
+
+    if (typedIntoTarget) {
       return true;
     }
   }
@@ -2459,14 +3531,13 @@ async function markDropdownPopup(frame: Frame, locator: Locator): Promise<Dropdo
         ".select2-results"
       ].join(",");
       const active = deepActiveElement(document);
-      const refs = [
-        active,
+      const controlRefs = [
         control,
         control.closest("[role='combobox'], [aria-haspopup], [aria-controls], [aria-owns]"),
         control.querySelector("[role='combobox'], [aria-haspopup], [aria-controls], [aria-owns]")
       ].filter((element): element is HTMLElement => element instanceof HTMLElement);
 
-      for (const ref of refs) {
+      for (const ref of controlRefs) {
         const linked = popupFromReference(ref, popupSelectors);
 
         if (linked) {
@@ -2474,13 +3545,21 @@ async function markDropdownPopup(frame: Frame, locator: Locator): Promise<Dropdo
         }
       }
 
-      const activePopup = active?.closest(popupSelectors);
+      if (active && isActiveRelatedToControl(control, active)) {
+        const linked = popupFromReference(active, popupSelectors);
 
-      if (activePopup instanceof HTMLElement) {
-        return activePopup;
+        if (linked) {
+          return linked;
+        }
+
+        const activePopup = active.closest(popupSelectors);
+
+        if (activePopup instanceof HTMLElement) {
+          return activePopup;
+        }
       }
 
-      return undefined;
+      return nearestPopupToControl(control, popupSelectors);
     }
 
     function popupFromReference(ref: HTMLElement, popupSelectors: string) {
@@ -2531,6 +3610,66 @@ async function markDropdownPopup(frame: Frame, locator: Locator): Promise<Dropdo
       }
 
       return undefined;
+    }
+
+    function isActiveRelatedToControl(control: HTMLElement, active: HTMLElement) {
+      if (control === active || control.contains(active) || Boolean(control.shadowRoot?.contains(active))) {
+        return true;
+      }
+
+      const controlPopupIds = popupIds(control);
+      const activePopupIds = popupIds(active);
+
+      return controlPopupIds.some((id) => activePopupIds.includes(id));
+    }
+
+    function popupIds(element: HTMLElement) {
+      return [element.getAttribute("aria-controls"), element.getAttribute("aria-owns")]
+        .flatMap((value) => (value ?? "").split(/\s+/).filter(Boolean));
+    }
+
+    function nearestPopupToControl(control: HTMLElement, popupSelectors: string) {
+      const controlRect = control.getBoundingClientRect();
+      let best: HTMLElement | undefined;
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      for (const root of getSearchRoots()) {
+        const popups = Array.from(root.querySelectorAll(popupSelectors)) as HTMLElement[];
+
+        for (const popup of popups) {
+          if (!isVisible(popup)) {
+            continue;
+          }
+
+          const popupRect = popup.getBoundingClientRect();
+          const horizontalOverlap = Math.max(0, Math.min(controlRect.right, popupRect.right) - Math.max(controlRect.left, popupRect.left));
+          const verticalDistance = Math.min(
+            Math.abs(popupRect.top - controlRect.bottom),
+            Math.abs(controlRect.top - popupRect.bottom)
+          );
+
+          if (verticalDistance > 180 || horizontalOverlap < Math.min(controlRect.width, popupRect.width) * 0.25) {
+            continue;
+          }
+
+          let score = 300 - verticalDistance + horizontalOverlap / 8;
+
+          if (popupRect.top >= controlRect.top - 20) {
+            score += 80;
+          }
+
+          if (popup.id && popupIds(control).includes(popup.id)) {
+            score += 220;
+          }
+
+          if (score > bestScore) {
+            best = popup;
+            bestScore = score;
+          }
+        }
+      }
+
+      return best;
     }
 
     function getElementByIdDeep(id: string) {

@@ -53,6 +53,30 @@ export type VisibleField = {
   helpText?: string;
   labelSource?: string;
   domPathSignature?: string;
+  controlId?: string;
+  ownerLabelText?: string;
+  ownerLabelSource?: string;
+  accessibleName?: string;
+  accessibleDescription?: string;
+  ownershipConfidence?: number;
+  ownershipCandidates?: Array<{
+    label: string;
+    source: string;
+    confidence: number;
+  }>;
+  labelRect?: BrowserDomRect;
+  controlRect?: BrowserDomRect;
+  questionBoundaryRect?: BrowserDomRect;
+  siblingControlIds?: string[];
+};
+
+export type BrowserDomRect = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  width: number;
+  height: number;
 };
 
 export type ObservedControl = {

@@ -1145,16 +1145,9 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
             }
 
             const rect = candidate.getBoundingClientRect();
+            const relation = labelControlOwnershipRelation(rect, controlRect);
 
-            if (rect.top > controlRect.bottom + 20) {
-              continue;
-            }
-
-            const verticalDistance = rect.bottom <= controlRect.top
-              ? controlRect.top - rect.bottom
-              : Math.max(0, rect.top - controlRect.bottom);
-
-            if (verticalDistance > 260) {
+            if (!relation || relation.distance > 260) {
               continue;
             }
 
@@ -1168,7 +1161,7 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
               continue;
             }
 
-            let score = 260 - verticalDistance - Math.min(horizontalDistance / 3, 90);
+            let score = 260 - relation.distance - Math.min(horizontalDistance / 3, 90) + relation.bonus * 100;
 
             if (/\*/.test(raw)) score += 45;
             if (/\?/.test(text)) score += 25;
@@ -1183,6 +1176,44 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
         }
 
         return best?.text ?? "";
+      }
+
+      function labelControlOwnershipRelation(labelRect: DOMRect, controlRect: DOMRect) {
+        if (labelRect.height <= 0 || labelRect.width <= 0 || controlRect.height <= 0 || controlRect.width <= 0) {
+          return undefined;
+        }
+
+        const labelCenterY = labelRect.top + labelRect.height / 2;
+        const controlCenterY = controlRect.top + controlRect.height / 2;
+        const verticalOverlap = Math.min(labelRect.bottom, controlRect.bottom) - Math.max(labelRect.top, controlRect.top);
+        const horizontalGap = labelRect.right < controlRect.left
+          ? controlRect.left - labelRect.right
+          : labelRect.left > controlRect.right
+            ? labelRect.left - controlRect.right
+            : 0;
+        const above = labelRect.bottom <= controlRect.top + 8 && labelRect.top < controlRect.top - 4;
+
+        if (above) {
+          const distance = Math.max(0, controlRect.top - labelRect.bottom);
+
+          if (distance > 420) {
+            return undefined;
+          }
+
+          return { distance, bonus: 0 };
+        }
+
+        const sameRowLeft = labelRect.left < controlRect.left - 4
+          && labelRect.right <= controlRect.left + 18
+          && Math.abs(labelCenterY - controlCenterY) <= Math.max(22, Math.min(labelRect.height, controlRect.height) * 0.9)
+          && verticalOverlap > Math.min(labelRect.height, controlRect.height) * 0.25
+          && horizontalGap <= Math.max(360, controlRect.width * 2.5);
+
+        if (sameRowLeft) {
+          return { distance: Math.abs(labelCenterY - controlCenterY), bonus: 0.08 };
+        }
+
+        return undefined;
       }
 
       function cleanQuestionLabel(value: string | null | undefined) {
@@ -1200,13 +1231,13 @@ export async function getVisibleRequiredEmptyLabels(page: Page) {
           return false;
         }
 
-        if (/\b(fields? marked|marked with|required fields?|all fields|this field is required|there are some errors|please correct|show details|select an option|required field|cannot find your city|click here|upload|drag and drop)\b/.test(normalized)) {
+        if (/\b(fields? marked|marked with|required fields?|all fields|this field is required|there are some errors|please correct|show details|select an option|required field|cannot find your city|click here|upload|drag and drop|stage \d+|classified page|visible input fields?|filling should happen|fill engine|gradlaunch|browser agent|detected .* fillable fields?)\b/.test(normalized)) {
           return false;
         }
 
         return /\*/.test(raw)
           || /\?/.test(text)
-          || /\b(experience|company|expertise|reason|location|office|hybrid|bond|obligation|associated|shift|night|notice period|ctc|salary|privacy|consent|authorization|sponsorship)\b/.test(normalized);
+          || /\b(experience|company|expertise|reason|location|office|hybrid|bond|obligation|associated|shift|night|notice period|ctc|salary|privacy|consent|declare|declaration|authorization|sponsorship)\b/.test(normalized);
       }
 
       function isGenericLabel(value: string | null | undefined) {
